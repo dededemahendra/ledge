@@ -397,8 +397,21 @@ bundle id `com.apple.perl` and is therefore entitled. Its README lists macOS
 
 - **Transport:** supervised `Process` reading newline-delimited JSON from stdout
   via `AsyncLineSequence`.
-- **Supervision:** exponential restart backoff 0.5 → 1 → 2 → 4 → … capped at
-  30 s; five rapid failures marks the service `unavailable`.
+- **Supervision:** the upstream README states plainly *"You should not reinvoke
+  the script when a fatal error occurs (non-zero exit code)"*, so the policy is
+  split by exit reason. A **clean exit or signal termination** is transient:
+  restart with exponential backoff 0.5 → 1 → 2 → 4 → … capped at 30 s, five
+  rapid failures then `unavailable`. A **non-zero exit is fatal**: do not
+  reinvoke, mark `unavailable`, switch to the fallback source.
+- **Capability probe:** the adapter ships a `test` command whose exit code 0
+  means MediaRemote access still works. Run it once at startup to choose between
+  the adapter and the ScriptingBridge fallback, rather than discovering the
+  failure through a dead stream.
+- **Diffing:** `stream` emits diffs **by default**. Each line is
+  `{"type":"data","diff":Bool,"payload":{…}}`; when `diff` is true the payload
+  carries only changed keys and a `null` means *that key vanished*. The client
+  must merge diffs onto the last non-diff payload. Getting this wrong shows up
+  as stale titles that never clear.
 - **Position:** extrapolated locally at 1 Hz from `elapsed + rate + timestamp`.
   The adapter is never polled. The tick runs only while playing.
 - **Artwork:** cached by `(title, album)`, because the adapter's README admits
@@ -483,7 +496,8 @@ No telemetry, no network access of any kind.
 | Service throws at startup | `unavailable(reason)`; red row in Settings; app launches normally |
 | Service dies at runtime | its activities evicted from the queue; state flips; no crash |
 | Any failure | **no modal alerts, ever** — nothing is worse than a notch app throwing dialogs |
-| Media subprocess exits | restart with backoff; five strikes then `unavailable` |
+| Media subprocess exits cleanly or is signalled | restart with backoff; five strikes then `unavailable` |
+| Media subprocess exits **non-zero** | fatal per upstream guidance: no reinvoke, `unavailable`, fall back |
 | App crashes | no persistent system state left broken; `OSDUIHelper` recovery per §7 |
 | Screen params change | geometry recomputed; island repositioned |
 | Lid closed / clamshell | island hidden entirely |
