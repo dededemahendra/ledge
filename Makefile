@@ -29,7 +29,7 @@ bundle: build
 
 sign: bundle
 	codesign --force --sign "$(IDENTITY)" "$(APPDIR)"
-	@codesign -dv "$(APPDIR)" 2>&1 | grep -E 'Identifier|Authority' || true
+	@codesign -dv --verbose=2 "$(APPDIR)" 2>&1 | grep -E 'Identifier|Authority' || true
 
 stop:
 	-@pkill -x $(APP) 2>/dev/null || true
