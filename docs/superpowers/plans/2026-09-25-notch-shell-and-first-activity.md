@@ -145,11 +145,26 @@ IDENTITY="${1:-Ledge Dev}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-# A throwaway transport password for the PKCS#12 bundle. It MUST be non-empty:
-# `security import` fails an empty-password p12 with "MAC verification failed"
-# regardless of which openssl produced it (verified against LibreSSL 3.3.6 and
-# OpenSSL 3.6.4, with and without -legacy). The password protects nothing here —
-# the file lives in a temp dir for one command — it only has to be non-empty.
+# `security import` needs BOTH of these to be true, independently — verified
+# matrix, 2026-09-25:
+#
+#   openssl                    password    security import
+#   -------------------------  ----------  -----------------------------
+#   Homebrew 3.6.4 default     empty       FAIL (MAC verification failed)
+#   Homebrew 3.6.4 default     non-empty   FAIL (MAC verification failed)
+#   Homebrew 3.6.4 -legacy     empty       FAIL (MAC verification failed)
+#   Homebrew 3.6.4 -legacy     non-empty   OK
+#   LibreSSL 3.3.6 default     empty       FAIL (MAC verification failed)
+#   LibreSSL 3.3.6 default     non-empty   OK
+#
+# 1. A non-empty PKCS#12 transport password. It protects nothing — the file
+#    lives in a temp dir for one command — it only has to be non-empty.
+# 2. A legacy-format p12. OpenSSL 3.x defaults to AES/SHA-256 which
+#    `security import` cannot read; LibreSSL's default is already compatible.
+#
+# Hence /usr/bin/openssl is pinned below rather than passing `-legacy`:
+# LibreSSL rejects `-legacy` outright ("unknown option"), so a single code path
+# is only possible by pinning the system binary, which macOS always ships.
 P12PASS="ledge-transport"
 
 # NOT `-v`: a self-signed certificate is legitimately untrusted, and
@@ -161,14 +176,16 @@ if security find-identity -p codesigning | grep -q "$IDENTITY"; then
 fi
 
 echo "Minting self-signed code-signing certificate '$IDENTITY'..."
-openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
+/usr/bin/openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
     -keyout "$WORK/key.pem" -out "$WORK/cert.pem" \
     -subj "/CN=$IDENTITY" \
     -addext "basicConstraints=critical,CA:false" \
     -addext "keyUsage=critical,digitalSignature" \
     -addext "extendedKeyUsage=critical,codeSigning" 2>/dev/null
 
-openssl pkcs12 -export -out "$WORK/identity.p12" \
+# Pinned: see the matrix above. A Homebrew openssl earlier in PATH produces a
+# p12 that `security import` cannot read.
+/usr/bin/openssl pkcs12 -export -out "$WORK/identity.p12" \
     -inkey "$WORK/key.pem" -in "$WORK/cert.pem" \
     -passout "pass:$P12PASS" -name "$IDENTITY"
 
