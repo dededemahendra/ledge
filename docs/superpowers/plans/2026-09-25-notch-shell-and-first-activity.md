@@ -145,7 +145,17 @@ IDENTITY="${1:-Ledge Dev}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
+# A throwaway transport password for the PKCS#12 bundle. It MUST be non-empty:
+# `security import` fails an empty-password p12 with "MAC verification failed"
+# regardless of which openssl produced it (verified against LibreSSL 3.3.6 and
+# OpenSSL 3.6.4, with and without -legacy). The password protects nothing here —
+# the file lives in a temp dir for one command — it only has to be non-empty.
+P12PASS="ledge-transport"
+
+# NOT `-v`: a self-signed certificate is legitimately untrusted, and
+# `find-identity -v` lists only trusted identities, so it reports 0 even after a
+# successful import. `codesign` signs happily with an untrusted identity.
+if security find-identity -p codesigning | grep -q "$IDENTITY"; then
     echo "Identity '$IDENTITY' already exists — nothing to do."
     exit 0
 fi
@@ -160,17 +170,17 @@ openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
 
 openssl pkcs12 -export -out "$WORK/identity.p12" \
     -inkey "$WORK/key.pem" -in "$WORK/cert.pem" \
-    -passout pass: -name "$IDENTITY"
+    -passout "pass:$P12PASS" -name "$IDENTITY"
 
 echo "Importing into the login keychain."
 echo "macOS may ask you to allow keychain access — click Allow."
 security import "$WORK/identity.p12" \
     -k "$HOME/Library/Keychains/login.keychain-db" \
-    -P "" -T /usr/bin/codesign -A
+    -P "$P12PASS" -T /usr/bin/codesign -A
 
 echo
 echo "Result:"
-security find-identity -v -p codesigning | grep "$IDENTITY" \
+security find-identity -p codesigning | grep "$IDENTITY" \
     || { echo "FAILED: identity not found after import." >&2
          echo "Fallback: Keychain Access → Certificate Assistant →" >&2
          echo "  Create a Certificate: name '$IDENTITY', type 'Code Signing', self-signed." >&2
@@ -214,7 +224,7 @@ bundle: build
 
 sign: bundle
 	codesign --force --sign "$(IDENTITY)" "$(APPDIR)"
-	@codesign -dv "$(APPDIR)" 2>&1 | grep -E 'Identifier|Authority' || true
+	@codesign -dv --verbose=2 "$(APPDIR)" 2>&1 | grep -E 'Identifier|Authority' || true
 
 stop:
 	-@pkill -x $(APP) 2>/dev/null || true
@@ -335,7 +345,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 - [ ] **Step 8: Create the signing identity (once)**
 
 Run: `make cert`
-Expected: prints `Ledge Dev` in the resulting identity list. A keychain access prompt is normal — allow it. If import fails, the script prints the Keychain Access fallback; follow it, then re-run `make cert` to confirm.
+Expected: `1 identity imported.` followed by a line containing `Ledge Dev`. A keychain access prompt is normal — allow it. If import fails, the script prints the Keychain Access fallback; follow it, then re-run `make cert` to confirm.
+
+Note: `security find-identity -v -p codesigning` will still report **0 valid identities** afterwards, and that is correct — `-v` counts only *trusted* identities, and a self-signed certificate is untrusted by design. Use `security find-identity -p codesigning` (no `-v`) to see it. Trust is deliberately not configured: `codesign` signs fine without it, and adding trust would need `sudo` for no benefit.
 
 - [ ] **Step 9: Build, sign and launch**
 
