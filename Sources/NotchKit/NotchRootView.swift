@@ -264,6 +264,14 @@ public struct NotchRootView: View {
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
                 .lineLimit(1)
+                // `AppModel` gives every power record the same `id`
+                // ("power"), so `compact` changing (e.g. 87% -> 86%) is an
+                // in-place update to the SAME `Text`, not an insertion —
+                // `.transition` only ever plays on insertion/removal, so
+                // without a value-keyed `.id` here it never ran. Re-keying
+                // on the value itself is what makes each change register as
+                // a fresh view for `.blurReplace` to animate.
+                .id(compact)
                 .transition(.blurReplace)
         }
     }
@@ -274,6 +282,7 @@ public struct NotchRootView: View {
                 Text(activity.title)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
+                    .id(activity.title)   // see trailingEar's `.id(compact)` above
                     .transition(.blurReplace)
                 if let detail = activity.detail {
                     Text(detail)
