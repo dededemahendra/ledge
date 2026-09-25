@@ -540,3 +540,145 @@ Everything that requires either (a) a real hardware media-key event, or
 Step 5 procedure verbatim once composition exists, paying specific
 attention to the crash-recovery half — that is the one path where a bug
 degrades the user's system rather than just this app.
+
+# Task 5 manual checks — `HUDService` and the HUD island view
+
+Unlike Task 4, this session found a working, signed, running `Ledge.app`
+already on the machine (`/Applications/Ledge.app`, self-signed with the
+"Ledge Dev" identity). That let far more of this task's Step 9 be checked
+directly than Task 4's note anticipated — including two corrections to
+that note itself, below.
+
+## Correction to the Task 4 entry above
+
+Task 4's entry says `security find-identity -v -p codesigning` → "0 valid
+identities found" means `make dev`/`make sign` "cannot run here at all."
+That conclusion does not follow, and this session confirmed it: `-v` lists
+only *trusted* identities, and `scripts/make-cert.sh`'s own comment says so
+("a self-signed certificate is legitimately untrusted... `codesign` signs
+happily with an untrusted identity"). The "Ledge Dev" identity is present
+(`security find-certificate -a -c "Ledge Dev"` finds it) and both
+`make dev` and `make install` ran successfully in this session, building,
+signing, and launching the app with no prompts or errors. Recorded here so
+the `-v` result isn't mistaken for a hard blocker again.
+
+## What was checked
+
+1. **Full package build, debug and release** (`swift build`, `swift build
+   -c release`) — both clean, no warnings besides the known CLT linker
+   search-path noise.
+
+2. **Full suite passes: 126/126** (`make test`), up from the 122 this task
+   started with — `NotchRenderTests` grew from 5 to 8 (three new tests
+   pinning `symbolName`/`barFill` rendering, described in the task report),
+   `HUDServiceTests` grew from 32 to 33 (net: -1 from consolidating the two
+   `launchRecoveryActions` cases into
+   `launchRecoveryAlwaysResumesUnconditionally` per a mid-task correction —
+   see the task report — +2 for `composedAvailability`). Every other
+   target's count is unchanged.
+
+3. **`make dev` and `make install` both actually run here** (see the
+   correction above) — built, signed, launched `/Applications/Ledge.app`
+   for real, not simulated.
+
+4. **Menu bar content verified live**, via `System Events` /
+   Accessibility (`osascript` querying `menu bar items of menu bar 1` of
+   the running `Ledge` process — no synthetic input, just reading what is
+   actually on screen): the running app's status menu read exactly
+   `HUD — ready, Power — ready, Ledge — running, Toggle Panel, Toggle
+   Stock OSD Suppression, missing value, Quit Ledge` — the exact order
+   `StatusItemController`'s insert-at-0 / insert-above-Quit rules predict
+   for the order `AppDelegate.applicationDidFinishLaunching` calls
+   `setStatus`/`addItem` in. Confirms Step 6/7's wiring end to end, not
+   just in `NotchKitTests`.
+
+5. **Startup log confirms `composedAvailability` for real**: `log show`
+   against the running process shows `hud ready, brightness backend
+   polling` — i.e. on this machine, at least one channel (here, brightness
+   via the polling fallback) came back available, `composedAvailability`
+   correctly folded that into `.available`, and the menu bar's "HUD —
+   ready" (#4) matches.
+
+6. **The full volume pipeline fires end to end against real CoreAudio**,
+   not just in `HUDEventDeriverTests`. A temporary log line was added to
+   `AppModel.handle(_ event: HUDEvent)` for this check only, exercised via
+   `osascript -e "set volume output volume N"` (confirmed by Task 4's own
+   finding to go through real CoreAudio, just not through the hardware
+   media-key path `OSDUIHelper` watches), then reverted before committing
+   (`git diff` confirmed clean). Observed in the log, in order, for a
+   40 → 60 → 45 → 30 (+ mute) → unmute sequence:
+   ```
+   volume(level: 0.400..., muted: false)
+   volume(level: 0.600..., muted: false)
+   volume(level: 0.450..., muted: false)
+   volume(level: 0.300..., muted: false)
+   volume(level: 0.300..., muted: true)
+   volume(level: 0.300..., muted: false)
+   ```
+   Every level change fired, the mute toggle fired separately at an
+   unchanged level (proving mute is tracked independently of level, per
+   `muteTogglingFiresEvenAtTheSameLevel`), and the values match what was
+   actually set. This is real `VolumeObserver` → `HUDEventDeriver` →
+   `HUDService`'s `AsyncStream` → `AppModel.handle` → queue, observed live.
+
+7. **The brightness pipeline fired end to end too, unprompted** — while
+   the same temporary logging was in place, something on the machine
+   dimmed the display for real (not scripted; no headless brightness
+   setter was found — `which brightness` came back empty), and the log
+   shows eight `brightness(level: ...)` events tracking it smoothly down
+   from 0.75 to 0.3125. Confirms the polling backend (`BrightnessObserver`
+   backend reported "polling" in #5 above) is not just reading a value
+   once at launch but genuinely observing change over time.
+
+8. **`Toggle Stock OSD Suppression` clicked twice via Accessibility**
+   (on, then off again, restoring the default) — the app stayed at the
+   same PID throughout, i.e. did not crash either transition. With
+   `OSDUIHelper` not resident (#9), there was nothing for
+   `OSDSuppressionPolicy.actions` to actually signal, so this confirms the
+   toggle is wired and safe, not that suppression itself does anything
+   observable here.
+
+9. **`OSDUIHelper` confirmed not resident throughout** every check above
+   (`pgrep -xl OSDUIHelper` → exit 1 before, during, and after) — consistent
+   with Task 4's finding that nothing short of a real hardware media-key
+   event launches it.
+
+## What remains genuinely unverified
+
+Same fundamental limit as Task 4, now with composition in place to remove
+the second reason: no hardware media-key event, no screenshot, no
+Accessibility/Input Monitoring grant to synthesize one.
+
+- That the running island actually shows the `symbolName` glyph and the
+  filling `barFill` bar on screen, styled and positioned as intended.
+  `NotchRenderTests` proves this at the pixel level (headless
+  `ImageRenderer`, colour-tagged content, exact bounds/budget checks) for
+  every state this task added coverage for, which is strong evidence — but
+  it is not the same as a human (or a screenshot-capable agent) actually
+  looking at the notch.
+- Apple's stock overlay actually being suppressed/restored by
+  `setSuppressing`/the toggle, against a *real* `OSDUIHelper` triggered by
+  a real key press — `OSDUIHelper` still cannot be launched headlessly
+  here (#9), so this is exactly the gap Task 4's entry already flagged,
+  now with the wiring in place to actually test it.
+- Connecting a real Bluetooth audio device mid-session (spec's "Review
+  Focus 1", AirPods scenario) — no such device is available to this
+  session. See the task report's concerns section for a related design
+  gap this surfaced: `HUDEventDeriver.reset()` exists and is unit-tested
+  (`resetForcesTheNextReadingToBeTreatedAsFresh`) for exactly this
+  scenario, but nothing in `VolumeObserver`'s current public surface gives
+  `HUDService` a signal to call it from, so a device rebind's first
+  reading is not distinguished from a real user change.
+- The `atexit` restoration path on a real signal-kill (same gap Task 4
+  noted; still untestable without actually killing a running signed app
+  with `OSDUIHelper` resident under it).
+
+## Bottom line
+
+Everything checkable without hardware key-press/screenshot access was
+checked, including two things Task 4 assumed were unreachable here
+(codesigning, and therefore `make dev`/`make install`) and two full,
+real, end-to-end pipeline firings (volume via `osascript`, brightness
+unprompted). What remains is exactly the on-screen/real-overlay
+confirmation every prior task in this file has also deferred to a human
+or a screenshot-capable agent.

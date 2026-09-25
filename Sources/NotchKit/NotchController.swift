@@ -29,11 +29,27 @@ public final class NotchController {
         /// no words at all. The ear is only ~38pt wide, so this must stay to a
         /// few characters — the full `title` will not fit.
         public let compactText: String?
-        public init(id: String, title: String, detail: String? = nil, compactText: String? = nil) {
+        /// SF Symbol shown in the leading ear, e.g. "speaker.wave.2.fill".
+        /// `nil` falls back to the plain activity dot.
+        public let symbolName: String?
+        /// `0...1` progress bar shown in the detail row, or `nil` for
+        /// activities without one (e.g. a plain status line).
+        public let barFill: Double?
+
+        public init(
+            id: String,
+            title: String,
+            detail: String? = nil,
+            compactText: String? = nil,
+            symbolName: String? = nil,
+            barFill: Double? = nil
+        ) {
             self.id = id
             self.title = title
             self.detail = detail
             self.compactText = compactText
+            self.symbolName = symbolName
+            self.barFill = barFill.map { min(1, max(0, $0)) }
         }
     }
 

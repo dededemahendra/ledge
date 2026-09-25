@@ -3,6 +3,7 @@ import Foundation
 import ActivityKit
 import NotchKit
 import PowerService
+import HUDService
 import OSLog
 
 /// Consumes service streams, maintains the queue, drives the controller.
@@ -13,6 +14,7 @@ final class AppModel {
 
     private let presenter: NotchPresenter
     private let power = PowerService()
+    private let hud = HUDService()
 
     private var queue = ActivityQueue()
     private var tasks: [Task<Void, Never>] = []
@@ -23,11 +25,24 @@ final class AppModel {
     }
 
     var powerStatus: String { power.availability.statusText }
+    var hudStatus: String { hud.availability.statusText }
+    var isSuppressingStockOSD: Bool { hud.isSuppressingStockOSD }
+
+    func toggleStockOSDSuppression() {
+        hud.setSuppressStockOSD(!hud.isSuppressingStockOSD)
+    }
 
     func start() {
         let stream = power.start()
         tasks.append(Task { [weak self] in
             for await event in stream {
+                self?.handle(event)
+            }
+        })
+
+        let hudStream = hud.start()
+        tasks.append(Task { [weak self] in
+            for await event in hudStream {
                 self?.handle(event)
             }
         })
@@ -49,6 +64,7 @@ final class AppModel {
         tasks.removeAll()
         pruneTimer?.invalidate()
         pruneTimer = nil
+        hud.stop()
         power.stop()
     }
 
@@ -66,6 +82,27 @@ final class AppModel {
         publish()
     }
 
+    /// Presentation fields (`symbolName`/`barFill`) ride on `ActivityRecord`
+    /// itself, same as `compactText` — not a side-table keyed by activity id.
+    /// `ActivityRecord` already carries `title`/`detail`, which are equally
+    /// presentational, and a side-table would need hand-maintained
+    /// synchronisation with `insert`/coalesce/`prune` that no test covers.
+    private func handle(_ event: HUDEvent) {
+        queue.insert(
+            ActivityRecord(
+                id: ActivityKind.hud.rawValue,
+                kind: .hud,
+                insertedAt: Date(),
+                ttl: ActivityKind.hud.defaultTTL,
+                title: event.activityTitle,
+                compactText: event.compactText,
+                symbolName: event.symbolName,
+                barFill: event.barFill
+            )
+        )
+        publish()
+    }
+
     private func prune() {
         let before = queue.count
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
@@ -73,9 +110,14 @@ final class AppModel {
     }
 
     private func publish() {
-        let display = queue.visible.map {
+        let display = queue.visible.map { record in
             NotchController.ActivityDisplay(
-                id: $0.id, title: $0.title, detail: $0.detail, compactText: $0.compactText
+                id: record.id,
+                title: record.title,
+                detail: record.detail,
+                compactText: record.compactText,
+                symbolName: record.symbolName,
+                barFill: record.barFill
             )
         }
         // `setActivities` sets the count itself — do not also call

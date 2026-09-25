@@ -22,8 +22,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = StatusItemController()
         item.setStatus(key: "app", text: "Ledge — running")
         item.setStatus(key: "power", text: "Power — \(model.powerStatus)")
+        item.setStatus(key: "hud", text: "HUD — \(model.hudStatus)")
         item.addItem(title: "Toggle Panel") { [weak presenter] in
             presenter?.toggle()
+        }
+        item.addItem(title: "Toggle Stock OSD Suppression") { [weak model] in
+            model?.toggleStockOSDSuppression()
         }
         statusItem = item
 

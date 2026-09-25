@@ -314,6 +314,129 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     )
 }
 
+// MARK: - HUD symbol and bar (Task 5)
+
+/// A lone HUD activity: `detailRow` is gated off at one-activity size (it
+/// stays exactly notch-height), so the leading ear's `symbolName` glyph is
+/// the ONLY new Task 5 surface reachable here — same reasoning that already
+/// makes `compactText` load-bearing in the trailing ear at this size.
+@MainActor
+@Test func hudSymbolInLeadingEarRendersInsideTheIslandAndClearOfTheNotch() {
+    let controller = makeController()
+    controller.setActivities(
+        [.init(id: "hud", title: "Volume 62%", compactText: "62%", symbolName: "speaker.wave.2.fill")],
+        overflow: 0
+    )
+    #expect(controller.state == .activity)
+    #expect(controller.parameters == controller.metrics.oneActivity)
+
+    let result = renderAndClassify(controller)
+    #expect(
+        result.hasContentInsideIsland,
+        """
+        no content pixel found inside the island bounds \(result.islandBounds) \
+        — the symbolName glyph did not render
+        """
+    )
+    #expect(
+        result.contentInsideNotchCount == 0,
+        "\(result.contentInsideNotchCount) content pixel(s) drawn inside the notch rect \(result.holeRect)"
+    )
+    #expect(
+        result.contentOutsideIslandCount == 0,
+        """
+        \(result.contentOutsideIslandCount) content pixel(s) drawn outside the island bounds \
+        \(result.islandBounds)
+        """
+    )
+}
+
+/// The realistic concurrent case (spec's HUD priority 100 outranks
+/// power's 60): a HUD activity with both `symbolName` and `barFill` shares
+/// the two-activity size with another activity. Proves the full Task 5
+/// surface — leading-ear glyph AND detail-row bar — renders without
+/// leaking outside the island or into the notch, same shape as
+/// `twoActivitiesContentRendersInsideTheIslandAndClearOfTheNotch` above.
+@MainActor
+@Test func hudSymbolAndBarAlongsideAnotherActivityRenderInsideTheIslandAndClearOfTheNotch() {
+    let controller = makeController()
+    controller.setActivities(
+        [
+            .init(id: "hud", title: "Volume 62%", compactText: "62%",
+                  symbolName: "speaker.wave.2.fill", barFill: 0.62),
+            .init(id: "power", title: "Charging · 42%", compactText: "42%"),
+        ],
+        overflow: 0
+    )
+    #expect(controller.state == .activity)
+    #expect(controller.parameters == controller.metrics.twoActivities)
+
+    let result = renderAndClassify(controller)
+    #expect(
+        result.hasContentInsideIsland,
+        "no content pixel found inside the island bounds \(result.islandBounds)"
+    )
+    #expect(
+        result.contentInsideNotchCount == 0,
+        "\(result.contentInsideNotchCount) content pixel(s) drawn inside the notch rect \(result.holeRect)"
+    )
+    #expect(
+        result.contentOutsideIslandCount == 0,
+        """
+        \(result.contentOutsideIslandCount) content pixel(s) drawn outside the island bounds \
+        \(result.islandBounds)
+        """
+    )
+}
+
+/// `twoActivityDetailRowIdealHeightFitsItsBudget` above pins the budget with
+/// fixtures that carry no `barFill`, so it cannot tell a rendered bar from a
+/// silently-missing one — both measure the same. This pins the bar
+/// POSITIVELY, by comparing the same detail row with and without `barFill`:
+/// the version with a bar must measure measurably taller (proving the bar
+/// actually drew something), while both must still fit the budget.
+@MainActor
+@Test func detailBarAddsMeasurableHeightAndStillFitsTheTwoActivityBudget() {
+    func idealHeight(barFill: Double?) -> CGFloat {
+        let controller = makeController()
+        controller.setActivities(
+            [
+                .init(id: "hud", title: "Volume 62%", compactText: "62%", barFill: barFill),
+                .init(id: "power", title: "Charging · 42%", compactText: "42%"),
+            ],
+            overflow: 0
+        )
+        let renderer = ImageRenderer(content: NotchRootView(controller: controller).detailRowForTesting)
+        renderer.scale = 2
+        renderer.proposedSize = ProposedViewSize(width: controller.parameters.width, height: nil)
+        guard let cgImage = renderer.cgImage else {
+            fatalError("ImageRenderer produced no image for detailRowForTesting")
+        }
+        return CGFloat(cgImage.height) / renderer.scale
+    }
+
+    let withoutBar = idealHeight(barFill: nil)
+    let withBar = idealHeight(barFill: 0.62)
+
+    #expect(
+        withBar > withoutBar,
+        """
+        a barFill activity's detail row (\(withBar)pt) should measurably exceed the same row \
+        with no bar (\(withoutBar)pt) — otherwise the bar silently isn't rendering
+        """
+    )
+
+    let controller = makeController()
+    let budget = controller.metrics.twoActivities.height - controller.metrics.notchRect.height
+    #expect(
+        withBar <= budget,
+        """
+        detailRow's ideal height \(withBar)pt with a barFill activity exceeds its \(budget)pt \
+        budget at two-activity size
+        """
+    )
+}
+
 // MARK: - Harness self-check
 
 /// Validates the rendering + coordinate-flip pipeline above independently of

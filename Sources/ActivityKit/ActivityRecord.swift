@@ -12,6 +12,11 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// Very short glanceable form (e.g. "87%") for layouts with no room for
     /// `title` — see `NotchController.ActivityDisplay.compactText`.
     public let compactText: String?
+    /// SF Symbol shown in the leading ear — see `NotchController.ActivityDisplay.symbolName`.
+    public let symbolName: String?
+    /// `0...1` progress bar, or `nil` for activities without one — see
+    /// `NotchController.ActivityDisplay.barFill`.
+    public let barFill: Double?
 
     public init(
         id: String,
@@ -20,7 +25,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         ttl: TimeInterval?,
         title: String,
         detail: String? = nil,
-        compactText: String? = nil
+        compactText: String? = nil,
+        symbolName: String? = nil,
+        barFill: Double? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -29,6 +36,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.title = title
         self.detail = detail
         self.compactText = compactText
+        self.symbolName = symbolName
+        self.barFill = barFill.map { min(1, max(0, $0)) }
     }
 
     public var isSticky: Bool { ttl == nil }

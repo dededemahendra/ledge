@@ -277,7 +277,26 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if controller.activityCount > 0 {
+        if let symbol = controller.activities.first?.symbolName {
+            // Keyed and animated exactly like `trailingEar`'s `compact` text and
+            // `detailTitle`'s title below: `AppModel` gives every HUD record the
+            // same id ("hud"), so a symbol changing (e.g. wave.1 -> wave.2 as
+            // volume rises, or the mute slash toggling) is an in-place update to
+            // the SAME view, not an insertion — `.transition` only plays on
+            // insertion/removal, so it needs this value-keyed `.id` to register
+            // as one, and a local `.animation(value:)` to get an actually-
+            // animated transaction (the root view's `.animation(value:
+            // parameters)` does not attach for a symbol change alone, since
+            // `parameters` — state/activityCount/metrics — stays equal).
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .medium))
+                .id(symbol)
+                .transition(.blurReplace)
+                .animation(
+                    NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                    value: symbol
+                )
+        } else if controller.activityCount > 0 {
             Circle().fill(contentColor.opacity(0.28)).padding(6)
         }
     }
@@ -340,6 +359,9 @@ public struct NotchRootView: View {
             if controller.state == .expanded {
                 ForEach(controller.activities) { activity in
                     detailTitle(activity.title)
+                    if let fill = activity.barFill {
+                        detailBar(fill)
+                    }
                     if let detail = activity.detail {
                         Text(detail)
                             .font(.system(size: 9))
@@ -349,6 +371,9 @@ public struct NotchRootView: View {
                 }
             } else if let activity = controller.activities.first {
                 detailTitle(activity.title)
+                if let fill = activity.barFill {
+                    detailBar(fill)
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -375,6 +400,27 @@ public struct NotchRootView: View {
                 NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                 value: title
             )
+    }
+
+    /// `barFill`'s progress bar, shown directly below its activity's title —
+    /// the same slot `detail` occupies when present, each gated by its own
+    /// `if let` so an activity with neither contributes no extra height.
+    /// Fixed at 4pt tall via the outer `.frame(height:)` regardless of what
+    /// `GeometryReader` itself would report as an ideal size — that is what
+    /// makes this a small, KNOWN addition to `detailRow`'s ideal-height
+    /// measurement in `NotchRenderTests`
+    /// (`twoActivityDetailRowIdealHeightFitsItsBudget`), rather than an
+    /// unbounded one.
+    private func detailBar(_ fill: Double) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(contentColor.opacity(0.22))
+                Capsule()
+                    .fill(contentColor)
+                    .frame(width: geometry.size.width * fill)
+            }
+        }
+        .frame(height: 4)
     }
 
     #if DEBUG
