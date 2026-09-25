@@ -86,7 +86,30 @@ Tests/
 **Interfaces:**
 - Consumes: `ActivityKit` (`ServiceAvailability`).
 - Produces:
-  - `enum HUDEvent: Sendable, Equatable` — `volume(level: Double, muted: Bool)`, `brightness(level: Double)`; `var activityTitle: String`; `var barFill: Double`; `var symbolName: String`
+  - `enum HUDEvent: Sendable, Equatable` — `volume(level: Double, muted: Bool)`, `brightness(level: Double)`; `var activityTitle: String`; `var barFill: Double`; `var symbolName: String`; `var compactText: String`
+
+`compactText` is **required, not decorative.** At one activity the island stays exactly
+notch-height, so `detailRow` is gated off and `activityTitle` has nowhere to render —
+the trailing ear is the only place a value can appear. A volume HUD that shows a
+speaker glyph and no number fails at the one thing a volume HUD exists for. Plan A hit
+this exact defect with power activities and it was invisible to all 81 tests, because
+no test renders a view. Add to `HUDEvent`:
+
+```swift
+    /// Glanceable form for the trailing ear, which is the only place text can appear
+    /// while a single activity holds the island at notch height. The ear is ~38pt
+    /// wide, so this stays to a few characters.
+    public var compactText: String {
+        switch self {
+        case .volume(_, true):            return "Muted"
+        case .volume(let level, false):   return "\(Int((level * 100).rounded()))%"
+        case .brightness(let level):      return "\(Int((level * 100).rounded()))%"
+        }
+    }
+```
+
+and pin all three cases in `HUDEventDeriverTests`, including that muted yields `"Muted"`
+rather than a percentage.
   - `struct HUDEventDeriver: Sendable` — `static let minimumDelta: Double`; `mutating func volumeChanged(level: Double, muted: Bool) -> HUDEvent?`; `mutating func brightnessChanged(level: Double) -> HUDEvent?`; `mutating func reset()`
 
 - [ ] **Step 1: Add the `HUDService` targets to `Package.swift`**
@@ -1285,13 +1308,15 @@ In `Sources/NotchKit/NotchController.swift`, replace the `ActivityDisplay` struc
             title: String,
             detail: String? = nil,
             symbolName: String? = nil,
-            barFill: Double? = nil
+            barFill: Double? = nil,
+            compactText: String? = nil
         ) {
             self.id = id
             self.title = title
             self.detail = detail
             self.symbolName = symbolName
             self.barFill = barFill.map { min(1, max(0, $0)) }
+            self.compactText = compactText
         }
     }
 ```
@@ -1369,7 +1394,21 @@ In `start()`, alongside the power stream:
         })
 ```
 
-Add the handler:
+**First extend `ActivityRecord`, rather than keeping a side-table in `AppModel`.**
+Plan A settled this: `compactText` already lives on `ActivityRecord`, because the
+value has to survive the queue between `handle()` and `publish()`. Add
+`symbolName: String?` and `barFill: Double?` alongside it, defaulted to `nil` in the
+memberwise init, and clamp `barFill` to `0...1` there.
+
+There is a real objection — these are presentation concerns on a domain type — but
+`ActivityRecord` already carries `title` and `detail`, which are equally presentation
+strings ("Charging · 87% · 24 min to full"). A side-table keyed by activity id would
+be the inconsistent choice, and it would need hand-maintained synchronisation with
+`insert` and `prune` that no test covers. One object riding the one tested lifecycle
+is simpler and has fewer failure modes. `ActivityKit` still declares no dependency on
+`NotchKit`, so the module boundary the spec cares about is untouched.
+
+Then the handler carries everything in the record:
 
 ```swift
     private func handle(_ event: HUDEvent) {
@@ -1379,33 +1418,37 @@ Add the handler:
                 kind: .hud,
                 insertedAt: Date(),
                 ttl: ActivityKind.hud.defaultTTL,
-                title: event.activityTitle
+                title: event.activityTitle,
+                compactText: event.compactText,
+                symbolName: event.symbolName,
+                barFill: event.barFill
             )
         )
-        hudPresentation[ActivityKind.hud.rawValue] = (event.symbolName, event.barFill)
         publish()
     }
 ```
 
-Add the store and use it in `publish()`:
+and `publish()` is a straight projection with no side-table and no lookup that can
+miss:
 
 ```swift
-    private var hudPresentation: [String: (symbol: String, fill: Double)] = [:]
-
     private func publish() {
         let display = queue.visible.map { record in
-            let extra = hudPresentation[record.id]
-            return NotchController.ActivityDisplay(
+            NotchController.ActivityDisplay(
                 id: record.id,
                 title: record.title,
                 detail: record.detail,
-                symbolName: extra?.symbol,
-                barFill: extra?.fill
+                symbolName: record.symbolName,
+                barFill: record.barFill,
+                compactText: record.compactText
             )
         }
         presenter.setActivities(display, overflow: queue.overflowCount)
     }
 ```
+
+This also replaces Plan A's `publish()`, which had the same shape without the three
+new fields — update it in place rather than adding a second projection.
 
 In `stop()`, add `hud.stop()` before `power.stop()`.
 
