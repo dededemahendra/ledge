@@ -1928,8 +1928,39 @@ public final class NotchPresenter {
             )
             window = created
         }
+        syncWindowToVisibility()
+    }
+
+    /// Opens or collapses the panel on demand (e.g. the menu bar's "Toggle
+    /// Panel" item), independent of hover.
+    ///
+    /// `NotchController.click()`/`dismiss()` only ever touch the model. Without
+    /// a resync here, a toggle fired with the cursor away from the notch — the
+    /// realistic case, since the status item sits at the other end of the menu
+    /// bar — would flip `state` to `.expanded` while the window stayed ordered
+    /// out, so nothing would appear on screen.
+    public func toggle() {
+        if controller.state == .expanded {
+            controller.dismiss()
+        } else {
+            controller.click()
+        }
+        syncWindowToVisibility()
+    }
+
+    /// Keeps the claimed region in step with what is drawn, and keeps the window
+    /// ordered in only while the island has something to show. Spec §5 requires
+    /// the window be ordered out when hidden so idle compositing cost is zero;
+    /// this is the single choke point, so every caller — rebuild, hover,
+    /// `toggle()` — gets that for free.
+    private func syncWindowToVisibility() {
         refreshInteractiveRegion()
-        window?.orderFrontRegardless()
+        guard let window else { return }
+        if controller.isVisible {
+            window.orderFrontRegardless()
+        } else {
+            window.orderOut(nil)
+        }
     }
 
     /// Keeps the claimed region in step with what is actually drawn.
@@ -1949,31 +1980,31 @@ public final class NotchPresenter {
         window.setInteractiveShape(NotchShape(parameters), in: canvas)
     }
 
+    /// Only acts when hover actually crosses the island's boundary.
+    ///
+    /// Global `.mouseMoved` monitors fire at high frequency for the whole
+    /// screen. Recomputing the interactive path and reordering the window on
+    /// *every* such event — as a naive version does — wastes CPU on every pixel
+    /// of cursor travel and risks visible flicker from reordering that often.
+    /// Gating on the hover boolean actually changing makes the common case a
+    /// single `CGRect.contains` check and nothing else.
     private func updateHover() {
-        guard let window, let screen = NSScreen.builtIn else { return }
+        guard let screen = NSScreen.builtIn else { return }
         let mouse = NSEvent.mouseLocation
-        let notch = controller.metrics.notchRect
+        let parameters = controller.parameters
 
         // Island hit region in global screen coordinates.
-        let parameters = controller.parameters
-        let islandTop = screen.frame.maxY
         let region = CGRect(
             x: screen.frame.midX - parameters.width / 2 - 4,
-            y: islandTop - parameters.height - 4,
+            y: screen.frame.maxY - parameters.height - 4,
             width: parameters.width + 8,
             height: parameters.height + 4
         )
-        _ = notch
-        let wasVisible = controller.isVisible
-        controller.setHovered(region.contains(mouse))
-        if wasVisible != controller.isVisible || controller.isVisible {
-            refreshInteractiveRegion()
-            if controller.isVisible {
-                window.orderFrontRegardless()
-            } else {
-                window.orderOut(nil)
-            }
-        }
+
+        let hovered = region.contains(mouse)
+        guard hovered != controller.isHovered else { return }
+        controller.setHovered(hovered)
+        syncWindowToVisibility()
     }
 }
 ```
@@ -2001,13 +2032,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let item = StatusItemController()
         item.setStatus(key: "app", text: "Ledge — running")
+        // Goes through the presenter, not the controller: mutating the model
+        // alone would leave the window ordered out and nothing would appear.
         item.addItem(title: "Toggle Panel") { [weak presenter] in
-            guard let presenter else { return }
-            if presenter.controller.state == .expanded {
-                presenter.controller.dismiss()
-            } else {
-                presenter.controller.click()
-            }
+            presenter?.toggle()
         }
         statusItem = item
 
