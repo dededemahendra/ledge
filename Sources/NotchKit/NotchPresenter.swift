@@ -11,6 +11,8 @@ public final class NotchPresenter {
     private var window: NotchWindow?
     private var observers: [NSObjectProtocol] = []
     private var trackingMonitor: Any?
+    private var clickOutsideMonitor: Any?
+    private var escapeMonitor: Any?
 
     public init() {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -38,6 +40,51 @@ public final class NotchPresenter {
         trackingMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateHover() }
         }
+
+        // Click-outside dismissal, spec §5. Global monitors only see events
+        // NOT delivered to one of this app's own windows (Apple's own
+        // documentation: "your handler will not be called for events that
+        // are sent to your own application's windows") — a tap ON the
+        // island is instead consumed by `NotchRootView`'s `.onTapGesture`
+        // via the normal responder chain, and a click inside our 640x320
+        // canvas but outside the island's claimed `interactivePath` falls
+        // through to whatever is beneath us, which IS "another
+        // application" from the system's perspective. So "global monitor
+        // fired" and "click landed outside the island" are the same
+        // condition here; no extra geometry check is needed. Mouse
+        // monitors need no permission, same as the one above.
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated { self?.dismissIfExpanded() }
+        }
+
+        // Escape dismissal, spec §5, as a LOCAL monitor per the fix-wave
+        // review. NOTE (flagged, not silently worked around): `NotchWindow`
+        // hardwires `canBecomeKey` to false, so this window can never
+        // become key. A local monitor observes events already routed into
+        // THIS app's dispatch, which for keyDown structurally requires a
+        // key window — so this is unlikely to fire while some other app
+        // has focus, the realistic case for a background accessory app. A
+        // GLOBAL keyDown monitor would fire reliably instead, but per
+        // Apple's documentation key-event global monitoring additionally
+        // requires Accessibility/Input Monitoring trust, a permission
+        // nothing else in this app needs — a real product tradeoff, not
+        // an implementation detail, so it is left for a human to decide
+        // rather than granted unasked. Implemented as specified; see the
+        // fix-wave report.
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return event }   // Escape
+            // `NSEvent` is not `Sendable` in this SDK, so it must not cross
+            // back out of `assumeIsolated`'s return — only the `Bool`
+            // verdict does, and `event` itself (already a plain parameter
+            // of this closure, never having crossed an isolation boundary)
+            // is handled below instead.
+            let consumed: Bool = MainActor.assumeIsolated {
+                guard let self, self.controller.state == .expanded else { return false }
+                self.dismissIfExpanded()
+                return true
+            }
+            return consumed ? nil : event   // nil consumes the keypress
+        }
     }
 
     public func stop() {
@@ -45,6 +92,10 @@ public final class NotchPresenter {
         observers.removeAll()
         if let trackingMonitor { NSEvent.removeMonitor(trackingMonitor) }
         trackingMonitor = nil
+        if let clickOutsideMonitor { NSEvent.removeMonitor(clickOutsideMonitor) }
+        clickOutsideMonitor = nil
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        escapeMonitor = nil
         window?.orderOut(nil)
         window = nil
     }
@@ -64,6 +115,15 @@ public final class NotchPresenter {
         } else {
             controller.click()
         }
+        syncWindowToVisibility()
+    }
+
+    /// The shared action behind click-outside and Escape dismissal. Routes
+    /// through the presenter rather than `controller.dismiss()` alone, so
+    /// the window resyncs — see `toggle()`.
+    private func dismissIfExpanded() {
+        guard controller.state == .expanded else { return }
+        controller.dismiss()
         syncWindowToVisibility()
     }
 
@@ -97,7 +157,9 @@ public final class NotchPresenter {
         } else {
             let created = NotchWindow(
                 screen: screen,
-                content: AnyView(NotchRootView(controller: controller))
+                content: AnyView(NotchRootView(controller: controller, onTap: { [weak self] in
+                    self?.toggle()
+                }))
             )
             window = created
         }

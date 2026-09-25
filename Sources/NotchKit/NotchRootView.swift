@@ -66,6 +66,15 @@ enum NotchRenderTestHook {
 public struct NotchRootView: View {
     private let controller: NotchController
 
+    /// Spec §5/§14: click-to-expand is the interaction model. Defaults to a
+    /// no-op so every existing call site (including `NotchRenderTests`, which
+    /// constructs this view directly with no presenter around) keeps
+    /// compiling unchanged; `NotchPresenter` supplies its own `toggle()` so
+    /// the window resyncs — mutating the controller alone would leave the
+    /// window ordered out, the same bug `toggle()` was written to fix for
+    /// the menu bar's "Toggle Panel".
+    private let onTap: () -> Void
+
     /// The target height from before whichever transition is currently
     /// running, so `expanding` below reflects whether the island is
     /// actually growing or shrinking — not which named state it happens to
@@ -93,8 +102,9 @@ public struct NotchRootView: View {
         nonmutating set { _previousHeight.wrappedValue = newValue }
     }
 
-    public init(controller: NotchController) {
+    public init(controller: NotchController, onTap: @escaping () -> Void = {}) {
         self.controller = controller
+        self.onTap = onTap
         _previousHeight = State(initialValue: controller.parameters.height)
     }
 
@@ -138,6 +148,12 @@ public struct NotchRootView: View {
             height: NotchMetrics.canvasSize.height,
             alignment: .top
         )
+        // Spec §5: `peek ──click──▶ expanded`, and `.leftMouseDown`/Escape
+        // dismissal (both in `NotchPresenter`) close it again. AppKit's own
+        // hit-testing (`NotchHostingView.hitTest`, driven by
+        // `interactivePath`) already restricts which points ever reach this
+        // view, so no extra region check is needed here.
+        .onTapGesture { onTap() }
         .animation(
             NotchAnimation.animation(expanding: expanding, reduceMotion: controller.reduceMotion),
             value: parameters
