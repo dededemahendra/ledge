@@ -439,3 +439,104 @@ yet and did not exist before this pass. Before shipping, a human needs to:
 run `make cert` once (interactive), `make dev`, and go through Task 6's
 six checks, Task 8's six checks (with the corrected expectation above),
 and the seven new checks in this section.
+
+# Task 4 manual checks — `OSDSuppressor`
+
+Performed from the same unattended CLI agent session described throughout
+this file: no interactive mouse/keyboard input, no screenshot capability,
+and no Accessibility/Input Monitoring grant available to this process. That
+matters more than usual for this specific task, because the thing being
+checked — Apple's stock volume/brightness overlay — is driven by real
+hardware media-key HID events, not by a value change, and Task 4's own
+constraints forbid requesting Accessibility/Input Monitoring to synthesize
+one. So the brief's literal Step 5 procedure (`make dev`, press volume
+keys, watch for the overlay) could not be carried out here. Recorded
+honestly below rather than claimed.
+
+**Also relevant: `OSDSuppressor` is not wired into the running app yet.**
+Tasks 2–4 build the three services; composing them into `Ledge`'s
+`AppDelegate` (calling `recoverAtLaunch()`, `setSuppressing(true)`,
+`shutdown()`) is Task 5's job. So even with key-press access, `make dev`
+would not exercise suppression at all right now — there is nothing in the
+running app yet that calls into `OSDSuppressor`. The checks below verify
+what is checkable before that wiring exists; the brief's actual Step 5
+procedure needs to be re-run by a human (or an agent with input/screenshot
+access) after Task 5 lands.
+
+## What was checked
+
+1. **No codesigning identity exists in this environment**
+   (`security find-identity -v -p codesigning` → "0 valid identities
+   found"), matching the precedent already recorded elsewhere in this file.
+   `make dev`/`make sign` cannot run here at all, independent of the
+   composition-ordering point above.
+
+2. **`OSDUIHelper` is confirmed not resident**, matching the task's
+   verified environment facts: `pgrep -xl OSDUIHelper` found nothing at
+   baseline.
+
+3. **Tried a headless way to trigger it anyway, and confirmed it does not
+   work**: changing system volume via `osascript -e "set volume output
+   volume N"` several times in a row did not launch `OSDUIHelper`
+   (`pgrep` still found nothing afterward). This confirms the overlay is
+   tied specifically to the hardware media-key event path, not to CoreAudio
+   volume changes — consistent with `VolumeObserver` (Task 2) and
+   `OSDSuppressor` needing to be independent mechanisms, and confirms there
+   is no scriptable, permission-free way to trigger the real overlay from
+   this environment.
+
+4. **Validated the actual `kill()`-based signal mechanics against a real
+   process** (a spawned `sleep 300`, standing in for the helper, since the
+   real one cannot be launched here): `kill -STOP` brought it to `ps`'s `T`
+   state, `kill -CONT` brought it back out of `T`, and sending `SIGSTOP`
+   twice in a row was confirmed idempotent (state stays `T`, no error) —
+   this is exactly what `OSDSuppressionPolicy`'s sweep relies on needing no
+   process-state inspection. This exercises the identical `kill(pid,
+   SIGSTOP)` / `kill(pid, SIGCONT)` calls `OSDSuppressor.apply(_:)` makes,
+   just against a stand-in pid rather than a real `OSDUIHelper` one.
+
+5. **Validated `NSRunningApplication.runningApplications(withBundleIdentifier:)`**
+   — the real API `helperPIDs()` wraps — actually runs cleanly from a plain
+   command-line process (no crash, no hang), the same execution context
+   `swift test` uses (not a signed `.app` bundle): returned an empty array
+   both for `com.apple.OSDUIHelper` (not running) and for a bundle id that
+   can never exist. This is the exact call `OSDSuppressor` makes on every
+   sweep tick and at launch recovery; confirming it behaves under `swift
+   test`'s process context (rather than only inside a full signed app)
+   closes a gap the automated suite itself doesn't cover, since none of
+   `OSDSuppressorTests.swift`'s 7 tests instantiate `OSDSuppressor` itself
+   (by design — they test the pure `OSDSuppressionPolicy` decisions; the
+   brief's own Step 1 tests don't exercise the shell either).
+
+6. **Full package build succeeds** (`swift build`) and the full suite
+   passes (122/122 at the time of this task) with `OSDSuppressor` compiled
+   in as part of `HUDService`.
+
+## What remains genuinely unverified
+
+Everything that requires either (a) a real hardware media-key event, or
+(b) `OSDSuppressor` actually wired into the running app (Task 5):
+
+- That `setSuppressing(true)` actually keeps Apple's overlay from
+  appearing when volume/brightness keys are pressed for real.
+- That the repeating sweep (`sweepInterval` = 0.75s) actually catches a
+  real on-demand `OSDUIHelper` launch before it draws, rather than after —
+  timing against a real process launch was not observable here.
+- The crash-recovery scenario exactly as the brief describes it end to end
+  (`pkill -9 -x Ledge`, confirm a real `OSDUIHelper` is left in `T` state,
+  relaunch, confirm `recoverAtLaunch()` resumes it, quit cleanly, confirm
+  the stock overlay returns). The `SIGSTOP`/`SIGCONT` mechanics underneath
+  this are verified (#4 above) and the unconditional-resume *decision* is
+  proven by `launchRecoveryResumesUnconditionallyWhenNotSuppressing` and
+  `launchRecoveryStillResumesFirstEvenWhenAboutToSuppress`, but the
+  end-to-end real-process version of this — the one the brief calls "the
+  one failure that damages the user's system rather than the app" — needs
+  a human, or an agent with input and screenshot access, after Task 5.
+- The `atexit` handler firing on real process termination paths (it cannot
+  be triggered by a unit test, and this session never ran `Ledge` as a
+  signed app to terminate).
+
+**Recommendation for whoever picks this up after Task 5:** run the brief's
+Step 5 procedure verbatim once composition exists, paying specific
+attention to the crash-recovery half — that is the one path where a bug
+degrades the user's system rather than just this app.
