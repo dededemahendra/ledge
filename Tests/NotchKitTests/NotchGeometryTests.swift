@@ -7,7 +7,7 @@ struct FakeScreen: ScreenDescribing {
     var safeAreaTopInset: CGFloat
     var auxiliaryTopLeftMaxX: CGFloat?
     var auxiliaryTopRightMinX: CGFloat?
-    var isBuiltIn: Bool = true
+    var hasNotch: Bool = true
 
     /// The measured built-in display of the target machine.
     static let measured = FakeScreen(
@@ -72,7 +72,7 @@ struct FakeScreen: ScreenDescribing {
 // Review Focus 3: an external display is not a host, even if it reports oddities.
 @Test func externalScreenHasNoNotch() {
     var screen = FakeScreen.measured
-    screen.isBuiltIn = false
+    screen.hasNotch = false
     #expect(NotchGeometry.notchRect(for: screen) == nil)
 }
 

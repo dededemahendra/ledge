@@ -9,7 +9,7 @@ import CoreGraphics
 /// a wrong rect would put the island over live pixels or over the camera.
 public enum NotchGeometry {
     public static func notchRect(for screen: some ScreenDescribing) -> CGRect? {
-        guard screen.isBuiltIn else { return nil }
+        guard screen.hasNotch else { return nil }
 
         let height = screen.safeAreaTopInset
         guard height > 0 else { return nil }
