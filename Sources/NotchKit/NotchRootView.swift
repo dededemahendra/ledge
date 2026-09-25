@@ -296,46 +296,134 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: symbol
                 )
+        } else if controller.activities.first?.id == Self.mediaActivityID, let media = controller.media {
+            // Task 8: media's artwork takes the leading ear once it is the
+            // TOPMOST activity — guarded on `.first?.id`, not just
+            // `controller.media != nil`, because `controller.media` stays
+            // set (sticky) even while something higher-priority (e.g. power,
+            // which — like media — has no `symbolName` of its own) currently
+            // occupies the ear. Without that guard this branch would show
+            // media's artwork here while `trailingEar` below (which also
+            // only ever reads `.first`) showed the OTHER activity's value —
+            // two ears telling two different stories.
+            mediaArtwork(media)
+                .id(media.title)
+                .transition(.blurReplace)
+                .animation(
+                    NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                    value: media.title
+                )
         } else if controller.activityCount > 0 {
             Circle().fill(contentColor.opacity(0.28)).padding(6)
         }
     }
 
+    /// `AppModel` inserts the sticky media activity with this id
+    /// (`ActivityKind.media.rawValue` — a string, not the enum itself, since
+    /// `NotchKit` has no dependency on `ActivityKit`; see `Package.swift`).
+    /// Same cross-module id convention already relied on above and in
+    /// `trailingEar`/`detailTitle` below (`AppModel` gives every HUD/power
+    /// record a fixed id too — "hud", "power" — so a value changing there is
+    /// an in-place update, not an insertion).
+    private static let mediaActivityID = "media"
+
+    @ViewBuilder
+    private func mediaArtwork(_ media: MediaPresentation) -> some View {
+        Group {
+            if let data = media.artwork, let image = NSImage(data: data) {
+                Image(nsImage: image).resizable().scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(contentColor.opacity(0.25))
+            }
+        }
+        .frame(width: 20, height: 20)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+
+    /// At one activity the island is notch-height and `detailRow` is gated
+    /// off, so this ear is the ONLY place a value can appear — without
+    /// something here the island widens, shows a glyph, and says nothing.
+    ///
+    /// Task 8 design change: `barFill` wins over `compactText` when both are
+    /// present (true today only for HUD's volume/brightness activities —
+    /// power/device/notification/media carry no `barFill`). Before this, a
+    /// single HUD activity computed and tested a `barFill` that never
+    /// rendered anywhere — `detailRow`'s own bar is gated off at exactly this
+    /// size, the same dead-value shape that already cost two Critical
+    /// defects in this codebase's history. A bar reads a level faster than
+    /// three digits at a glance, so volume/brightness now show glyph + bar;
+    /// battery keeps glyph + `87%`, having no `barFill` to prefer.
     @ViewBuilder private var trailingEar: some View {
         if controller.overflowCount > 0 {
             Text("+\(controller.overflowCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
-        } else if let compact = controller.activities.first?.compactText {
-            // At one activity the island is notch-height and `detailRow` is gated
-            // off, so this ear is the ONLY place a value can appear. Without it the
-            // island widens, shows a glyph, and says nothing.
-            Text(compact)
-                .font(.system(size: 11, weight: .medium))
-                .monospacedDigit()
-                .lineLimit(1)
-                // `AppModel` gives every power record the same `id`
-                // ("power"), so `compact` changing (e.g. 87% -> 86%) is an
-                // in-place update to the SAME `Text`, not an insertion —
-                // `.transition` only ever plays on insertion/removal, so
-                // without a value-keyed `.id` here it never ran. Re-keying
-                // on the value itself is what makes each change register as
-                // a fresh view for `.blurReplace` to animate.
-                .id(compact)
-                .transition(.blurReplace)
-                // `.transition` needs an ANIMATED transaction to actually
-                // play, not just the insertion/removal `.id` gives it above.
-                // The only animation in scope, `.animation(value: parameters)`
-                // on the root view, attaches only when `parameters` itself
-                // changes — a percent tick (87% -> 86%) changes `compact`
-                // but leaves `parameters` equal, so without this, nothing
-                // attaches and the swap is instantaneous. Keyed on `compact`
-                // specifically, so only an actual value change animates.
-                .animation(
-                    NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
-                    value: compact
-                )
+        } else if let activity = controller.activities.first {
+            if let fill = activity.barFill {
+                trailingBar(fill)
+            } else if let compact = activity.compactText {
+                Text(compact)
+                    .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    // `AppModel` gives every power record the same `id`
+                    // ("power"), so `compact` changing (e.g. 87% -> 86%) is an
+                    // in-place update to the SAME `Text`, not an insertion —
+                    // `.transition` only ever plays on insertion/removal, so
+                    // without a value-keyed `.id` here it never ran. Re-keying
+                    // on the value itself is what makes each change register as
+                    // a fresh view for `.blurReplace` to animate.
+                    .id(compact)
+                    .transition(.blurReplace)
+                    // `.transition` needs an ANIMATED transaction to actually
+                    // play, not just the insertion/removal `.id` gives it above.
+                    // The only animation in scope, `.animation(value: parameters)`
+                    // on the root view, attaches only when `parameters` itself
+                    // changes — a percent tick (87% -> 86%) changes `compact`
+                    // but leaves `parameters` equal, so without this, nothing
+                    // attaches and the swap is instantaneous. Keyed on `compact`
+                    // specifically, so only an actual value change animates.
+                    .animation(
+                        NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                        value: compact
+                    )
+            } else {
+                // Not decorative — load-bearing. An activity with neither
+                // `barFill` nor `compactText` (exactly media's shape: title +
+                // detail only) would otherwise make this WHOLE branch
+                // evaluate to `EmptyView`. SwiftUI's `EmptyView` collapses to
+                // zero size even under an explicit `.frame(width:)` — proven
+                // by rendering it here: with a bare `EmptyView` in this slot,
+                // the trailing ear's `.frame(width: ear, height:
+                // notch.height)` at `islandContent`'s call site stopped
+                // reserving `ear`'s width entirely, so the whole ears row
+                // measured `ear` narrower than `parameters.width` and got
+                // RE-CENTRED within it — shifting the LEADING ear's content
+                // sideways into the notch. `Color.clear` is a real view (not
+                // `EmptyView`), so it keeps claiming its `ear`-wide slot while
+                // drawing nothing.
+                Color.clear
+            }
         }
+    }
+
+    /// `barFill`'s progress bar in the trailing ear — same visual language as
+    /// `detailBar` below, just narrower (the ear is ~38pt wide at
+    /// one-activity size, versus the full island width `detailBar` gets).
+    /// Unanimated on value change, matching `detailBar`'s own precedent
+    /// exactly: neither bar explicitly animates a `barFill` change today.
+    private func trailingBar(_ fill: Double) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(contentColor.opacity(0.22))
+                Capsule()
+                    .fill(contentColor)
+                    .frame(width: geometry.size.width * fill)
+            }
+        }
+        .frame(height: 4)
+        .padding(.horizontal, 4)
     }
 
     /// Budget below the hole is tight: at two (or three+, which shares the
@@ -354,31 +442,70 @@ public struct NotchRootView: View {
     /// `twoActivityDetailRowIdealHeightFitsItsBudget`, which measures this
     /// subtree's own ideal (unclipped) height directly — a rendered/clipped
     /// pixel check can't see content silently truncated by `.clipShape`.
+    /// Task 8: `.expanded` shows the rich media panel instead of the generic
+    /// per-activity list whenever media exists — deliberately unconditional
+    /// on which activity currently leads (unlike the ears above): a click
+    /// is always a deliberate action, and the panel's buttons/scrubber are
+    /// the only way to control playback, so a transient HUD blip (1.5s TTL)
+    /// that happens to still be live must not steal a screen with no
+    /// controls on it in place of one that has them. HUD's own preemption
+    /// stays fully visible via the ears, which render regardless of state
+    /// (spec §6: "ears keep glyphs" at Expanded too).
+    ///
+    /// No `matchedGeometryEffect` between this panel's 60pt artwork and
+    /// `leadingEar`'s 20pt one, despite spec §5 naming that effect: the two
+    /// are simultaneously and PERSISTENTLY visible together whenever this
+    /// branch is showing (ears never disappear, even here), not a transient
+    /// insert/remove pair — `matchedGeometryEffect`'s hero-transition
+    /// semantics assume the latter. Forcing an `isSource` pairing between two
+    /// views that both stay on screen makes the non-source view adopt the
+    /// SOURCE's frame outright: mark the ear source and the panel's artwork
+    /// would be forced down to a 20x20pt image inside a spec-mandated 60pt
+    /// slot; mark the panel source and the ear would be forced up to 60pt,
+    /// blowing out the compact layout. Either direction is a visible
+    /// regression of exactly the shape this codebase's render tests exist to
+    /// catch, in exchange for an animation nicety. Dropped, not attempted.
     @ViewBuilder private var detailRow: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if controller.state == .expanded {
-                ForEach(controller.activities) { activity in
+        if controller.state == .expanded, let media = controller.media {
+            MediaPanelView(
+                media: media,
+                reduceMotion: controller.reduceMotion,
+                contentColor: contentColor,
+                emit: { controller.emit($0) }
+            )
+            // Matches the sibling branch's own technique below: `islandContent`'s
+            // `detailRow.frame(maxWidth: .infinity)` has no `alignment`, so
+            // without this the panel — which otherwise just hugs its own
+            // (artwork + text) content width — would be CENTRED in the
+            // island's full width instead of starting flush at the leading
+            // edge like every other piece of island content does.
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                if controller.state == .expanded {
+                    ForEach(controller.activities) { activity in
+                        detailTitle(activity.title)
+                        if let fill = activity.barFill {
+                            detailBar(fill)
+                        }
+                        if let detail = activity.detail {
+                            Text(detail)
+                                .font(.system(size: 9))
+                                .foregroundStyle(contentColor.opacity(0.6))
+                                .lineLimit(1)
+                        }
+                    }
+                } else if let activity = controller.activities.first {
                     detailTitle(activity.title)
                     if let fill = activity.barFill {
                         detailBar(fill)
                     }
-                    if let detail = activity.detail {
-                        Text(detail)
-                            .font(.system(size: 9))
-                            .foregroundStyle(contentColor.opacity(0.6))
-                            .lineLimit(1)
-                    }
-                }
-            } else if let activity = controller.activities.first {
-                detailTitle(activity.title)
-                if let fill = activity.barFill {
-                    detailBar(fill)
                 }
             }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// One activity title, keyed and transitioned exactly like `trailingEar`'s

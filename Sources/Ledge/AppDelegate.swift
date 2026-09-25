@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.setStatus(key: "app", text: "Ledge — running")
         item.setStatus(key: "power", text: "Power — \(model.powerStatus)")
         item.setStatus(key: "hud", text: "HUD — \(model.hudStatus)")
+        item.setStatus(key: "media", text: "Media — \(model.mediaStatus)")
         item.addItem(title: "Toggle Panel") { [weak presenter] in
             presenter?.toggle()
         }

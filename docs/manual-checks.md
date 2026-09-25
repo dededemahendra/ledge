@@ -682,3 +682,116 @@ real, end-to-end pipeline firings (volume via `osascript`, brightness
 unprompted). What remains is exactly the on-screen/real-overlay
 confirmation every prior task in this file has also deferred to a human
 or a screenshot-capable agent.
+
+# Task 8 manual checks — now-playing in the island
+
+Same environment constraints as every check above: unattended CLI agent, no
+synthetic mouse/keyboard input, no screenshot capability. No codesigning
+identity in the keychain this session (`security find-identity -v
+-p codesigning` → 0 identities), so `make install`/`make dev` could not be
+used as written. Substituted: `make bundle` (unsigned build) followed by
+`codesign --force --sign - --identifier com.dedemahendra.ledge dist/Ledge.app`
+(ad-hoc signing, no identity required), then `open dist/Ledge.app` — this
+produces a real, properly bundled `.app` with the vendored adapter under
+`Contents/Resources`, launched the normal way (not the raw debug binary),
+which matters here specifically because `AdapterLocator.inMainBundle()`
+resolves paths relative to `Bundle.main.resourceURL`.
+
+## What was checked
+
+1. **The app launches clean with the new media wiring in place.**
+   `/usr/bin/log show --info --debug --predicate 'subsystem ==
+   "com.dedemahendra.ledge"'` against the ad-hoc-signed bundle showed, in
+   order: `hud ready, brightness backend polling`, then `launched; notch
+   <private>` — the same final statement every prior task's smoke test
+   confirmed reaches only after `AppDelegate.applicationDidFinishLaunching`
+   runs to completion. Critically, **no `media unavailable` line appeared**
+   this time (contrast with the raw-debug-binary run below) — see #2.
+
+2. **The vendored adapter actually launches and stays up on real
+   hardware.** `ps` after launch showed a second process beside `Ledge`
+   itself: `/usr/bin/perl .../Contents/Resources/mediaremote-adapter/
+   mediaremote-adapter.pl .../MediaRemoteAdapter.framework stream` — the
+   exact command `MediaRemoteSource.run()` builds. This proves
+   `AdapterLocator.inMainBundle()` resolved real paths, `locator.validate()`
+   passed, `MediaRemoteSource.probe(locator:)` passed (a failed probe logs
+   and never calls `launch()`), and the real `stream` subprocess is running
+   under `/usr/bin/perl` (entitled, per the design doc). Both processes
+   (`Ledge`, the adapter) were still alive and not crash-looping 49s later
+   (`ps -p ... -o pid,etime,command`).
+
+3. **Graceful degradation, confirmed the OTHER way too.** Running
+   `.build/debug/Ledge` directly (bypassing `make bundle`, so
+   `Bundle.main.resourceURL` does not contain `mediaremote-adapter`)
+   logged `media unavailable: unavailable — adapter script missing from
+   bundle` and then still reached `launched; notch <private>` — i.e. the
+   app completes startup and HUD/power keep working with media entirely
+   absent, no crash, no modal alert. This is the closest this environment
+   can get to Step 9's "delete the adapter and relaunch" check without a
+   codesigned install to delete a resource from.
+
+4. **Menu bar status row — reasoned, not eye-verified, and here is
+   exactly why not.** `AppDelegate.applicationDidFinishLaunching` calls
+   `item.setStatus(key: "media", text: "Media — \(model.mediaStatus)")`
+   unconditionally, immediately before the final `Self.log.info("launched;
+   ...")` line — since #1/#2 confirm that final log line was reached, the
+   call before it structurally must have executed without throwing
+   (`StatusItemController.setStatus` has no failure path). Attempted to
+   confirm this on screen via the same Accessibility technique the Task 6
+   fix-wave check used (`osascript` querying `System Events`): it failed
+   for a different reason than "no permission was ever granted" — `every
+   process whose name is "Ledge"` only ever returned the **pre-existing,
+   already-running, separately-installed** `/Applications/Ledge.app`
+   (pid 88107, an older build with no Media row, launched before this
+   session), never the freshly ad-hoc-signed `dist/Ledge.app` instance
+   (confirmed alive and correctly PID'd via `ps`/`lsappinfo` throughout).
+   Whatever Accessibility trust exists in this environment appears scoped
+   to that specific earlier bundle/signature, not to a fresh ad-hoc
+   signature from this session, and granting new Accessibility trust is
+   the same "requires a human to click Allow" wall every check above has
+   already hit. Reasoned correct from the log evidence in #1, not observed
+   on screen.
+
+5. **Clean shutdown attempt.** Tried the same Accessibility-driven "click
+   Quit Ledge" approach used successfully in the Task 6 fix-wave check;
+   it silently targeted nothing (same root cause as #4 — the query cannot
+   see the new instance), so this did not actually exercise
+   `applicationWillTerminate` → `model.stop()` → `media.stop()`. Not
+   claimed as verified; the processes were instead cleaned up directly
+   (`kill -9`) once the checks above were complete.
+
+## What remains genuinely unverified
+
+- Artwork/title/artist/scrubber/controls actually appearing and working on
+  screen, styled as intended. `NotchRenderTests` (11 assertions across 4
+  new tests this task added, all green) proves the pixel-level geometry —
+  content inside the island, clear of the notch, the panel's ideal height
+  under its 86pt budget — for every state Task 8 touches, using the same
+  headless `ImageRenderer` technique as every prior task's coverage. That
+  is strong evidence the layout is correct; it is not the same as a human
+  looking at the notch.
+- Play/pause/next/previous and drag-to-seek against a real playing track —
+  no music was played during this session (nothing was actively playing
+  against the real adapter, so `hasMedia` stayed false throughout and no
+  activity was ever inserted) — combined with no synthetic input capability
+  to press the panel's buttons or drag its scrubber even if something were
+  playing.
+- Switching source apps (Music → Spotify → a browser tab) and the 1Hz tick
+  visibly advancing/freezing on play/pause — same root blocker (nothing was
+  playing).
+- The HUD-preempts-media-then-returns sequence (spec's priority
+  interaction) on screen — `ActivityQueue`/`NotchController` are unit-tested
+  for this precisely (`ActivityQueueTests`, `NotchControllerTests`), and the
+  render tests prove both surfaces are geometrically safe independently, but
+  the live *sequence* — volume HUD taking the leading ear, then handing it
+  back to media's artwork after 1.5s — was not watched happen.
+
+## Bottom line
+
+Went further than a plain smoke test where the environment allowed it: a
+real ad-hoc-signed bundle, a real spawned adapter subprocess, confirmed
+stable over time, plus the deliberate negative check (raw debug binary,
+adapter genuinely absent) proving graceful degradation on both sides of
+that boundary. What is not verified is on-screen appearance/interaction —
+the same category every task in this file has deferred to a human or a
+screenshot-capable agent, for the same reason each time.

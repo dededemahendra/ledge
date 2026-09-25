@@ -4,6 +4,7 @@ import ActivityKit
 import NotchKit
 import PowerService
 import HUDService
+import MediaService
 import OSLog
 
 /// Consumes service streams, maintains the queue, drives the controller.
@@ -15,10 +16,17 @@ final class AppModel {
     private let presenter: NotchPresenter
     private let power = PowerService()
     private let hud = HUDService()
+    private let media = MediaService()
 
     private var queue = ActivityQueue()
     private var tasks: [Task<Void, Never>] = []
     private var pruneTimer: Timer?
+    /// The last payload `MediaService` sent, kept around because a
+    /// `NotchIntent.seek(fraction:)` and the 1Hz position tick both need the
+    /// live duration/elapsed/timestamp/rate — none of which `NotchController`
+    /// carries (it only ever gets the already-computed `MediaPresentation`).
+    private var mediaPayload = MediaPayload()
+    private var positionTimer: Timer?
 
     init(presenter: NotchPresenter) {
         self.presenter = presenter
@@ -26,6 +34,7 @@ final class AppModel {
 
     var powerStatus: String { power.availability.statusText }
     var hudStatus: String { hud.availability.statusText }
+    var mediaStatus: String { media.availability.statusText }
     var isSuppressingStockOSD: Bool { hud.isSuppressingStockOSD }
 
     func toggleStockOSDSuppression() {
@@ -47,6 +56,20 @@ final class AppModel {
             }
         })
 
+        let mediaStream = media.start()
+        tasks.append(Task { [weak self] in
+            for await payload in mediaStream {
+                self?.handle(payload)
+            }
+        })
+
+        // The other direction: the panel's buttons/scrubber emit `NotchIntent`s
+        // through the controller; this is the one place they get turned into
+        // outbound `MediaCommand`s.
+        presenter.controller.onIntent = { [weak self] intent in
+            self?.handle(intent)
+        }
+
         // Expiry is driven here, not inside the queue, so the queue stays pure.
         // Built with `Timer(...)` + `RunLoop.main.add(forMode: .common)`,
         // not `Timer.scheduledTimer`, which only schedules on `.default` --
@@ -64,8 +87,10 @@ final class AppModel {
         tasks.removeAll()
         pruneTimer?.invalidate()
         pruneTimer = nil
+        stopPositionTicking()
         hud.stop()
         power.stop()
+        media.stop()
     }
 
     private func handle(_ event: PowerEvent) {
@@ -101,6 +126,95 @@ final class AppModel {
             )
         )
         publish()
+    }
+
+    /// Never logs `payload.title`/`.artist`/`.album` — someone's listening
+    /// history — and doesn't log anything else about this event either,
+    /// matching `handle(_ event: PowerEvent)`/`handle(_ event: HUDEvent)`
+    /// above, neither of which logs on this path.
+    private func handle(_ payload: MediaPayload) {
+        mediaPayload = payload
+
+        guard payload.hasMedia, let title = payload.title else {
+            queue.remove(kind: .media)
+            presenter.controller.setMedia(nil)
+            stopPositionTicking()
+            publish()
+            return
+        }
+
+        queue.insert(
+            ActivityRecord(
+                id: ActivityKind.media.rawValue,
+                kind: .media,
+                insertedAt: Date(),
+                ttl: nil,                     // sticky — the island's resting state
+                title: title,
+                detail: payload.artist
+            )
+        )
+        refreshMediaPresentation()
+        payload.isPlaying ? startPositionTicking() : stopPositionTicking()
+        publish()
+    }
+
+    private func handle(_ intent: NotchIntent) {
+        switch intent {
+        case .togglePlayPause: media.send(.togglePlayPause)
+        case .next:             media.send(.nextTrack)
+        case .previous:         media.send(.previousTrack)
+        case .seek(let fraction):
+            // The scrubber only knows its own width, not the track's
+            // duration — this is the one place both are in scope.
+            guard let duration = mediaPayload.duration, duration > 0 else { return }
+            media.send(.seek(seconds: duration * fraction))
+        }
+    }
+
+    /// 1Hz, and only while something is playing — `MediaService`'s own
+    /// `MediaPosition.elapsed` extrapolates locally from the last known
+    /// `elapsedTime`/`timestamp`/`rate`; the adapter itself is never polled.
+    ///
+    /// Built with `Timer(...)` + `RunLoop.main.add(forMode: .common)`, not
+    /// `Timer.scheduledTimer` — same fix, and same reason, as `pruneTimer`
+    /// above: `.scheduledTimer` only schedules on `.default` mode, which
+    /// stalls while a menu is tracking or **a drag is in progress**, and
+    /// this task adds exactly such a drag — the panel's scrub bar, right
+    /// next to the elapsed-time label this timer drives. `.common` keeps
+    /// that label ticking even while the user is mid-drag on the scrubber.
+    private func startPositionTicking() {
+        guard positionTimer == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshMediaPresentation() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        positionTimer = timer
+    }
+
+    private func stopPositionTicking() {
+        positionTimer?.invalidate()
+        positionTimer = nil
+    }
+
+    private func refreshMediaPresentation() {
+        guard mediaPayload.hasMedia, let title = mediaPayload.title else { return }
+        let elapsed = MediaPosition.elapsed(
+            at: Date(),
+            elapsedTime: mediaPayload.elapsedTime ?? 0,
+            timestamp: mediaPayload.timestamp ?? Date(),
+            rate: mediaPayload.isPlaying ? (mediaPayload.playbackRate ?? 1) : 0,
+            duration: mediaPayload.duration
+        )
+        presenter.controller.setMedia(
+            MediaPresentation(
+                title: title,
+                artist: mediaPayload.artist,
+                artwork: mediaPayload.artworkData,
+                isPlaying: mediaPayload.isPlaying,
+                elapsed: elapsed,
+                duration: mediaPayload.duration
+            )
+        )
     }
 
     private func prune() {

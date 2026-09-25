@@ -8,6 +8,65 @@ public enum NotchState: Sendable, Equatable {
     case expanded
 }
 
+/// Now-playing state for the island's media surface. A pure value type — no
+/// dependency on `MediaService`/`MediaPayload`, so `NotchKit` stays
+/// independent of how the state was sourced (same reasoning as
+/// `NotchController.ActivityDisplay` decoupling this module from
+/// `ActivityKit`). `AppModel` converts `MediaPayload` into this.
+public struct MediaPresentation: Sendable, Equatable {
+    public let title: String
+    public let artist: String?
+    public let artwork: Data?
+    public let isPlaying: Bool
+    public let elapsed: Double
+    public let duration: Double?
+
+    public init(
+        title: String, artist: String?, artwork: Data?,
+        isPlaying: Bool, elapsed: Double, duration: Double?
+    ) {
+        self.title = title
+        self.artist = artist
+        self.artwork = artwork
+        self.isPlaying = isPlaying
+        self.elapsed = elapsed
+        self.duration = duration
+    }
+
+    /// `0...1`, or exactly `0` when duration is unknown or zero — a live
+    /// stream (no duration) must never render a meaningless full bar.
+    public var progress: Double {
+        guard let duration, duration > 0 else { return 0 }
+        return min(1, max(0, elapsed / duration))
+    }
+
+    public var elapsedText: String { Self.clock(max(0, elapsed)) }
+
+    /// `nil` when duration is unknown — there is nothing to count down to.
+    public var remainingText: String? {
+        guard let duration, duration > 0 else { return nil }
+        return "-" + Self.clock(max(0, duration - min(elapsed, duration)))
+    }
+
+    private static func clock(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded(.down))
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+}
+
+/// Playback controls the panel can emit. `AppModel` turns these into
+/// `MediaCommand`s — `NotchKit` stays independent of `MediaService` here too.
+///
+/// `seek` carries a **fraction**, not seconds: the view (the scrub bar) knows
+/// its own width, not the track's duration; only `AppModel`, which holds the
+/// live `MediaPayload`, knows that.
+public enum NotchIntent: Sendable, Equatable {
+    case togglePlayPause
+    case next
+    case previous
+    case seek(fraction: Double)
+}
+
 /// Single source of truth for what the island is doing.
 ///
 /// Deliberately free of timers, AppKit and IO so every transition is testable.
@@ -58,6 +117,20 @@ public final class NotchController {
     public private(set) var activityCount = 0
     public private(set) var activities: [ActivityDisplay] = []
     public private(set) var overflowCount = 0
+
+    /// Live now-playing state, or `nil` when nothing is playing.
+    /// `AppModel` keeps this in step with `MediaService`'s stream and also
+    /// inserts a matching sticky (`ttl: nil`) activity into its queue — the
+    /// two are set together but are deliberately separate fields: `activities`
+    /// carries only what every activity kind has in common, while `media`
+    /// carries the richer artwork/position/duration the panel needs and no
+    /// other kind has.
+    public private(set) var media: MediaPresentation?
+
+    /// Set by whoever owns this controller (`AppModel`) to receive playback
+    /// commands the panel emits. `nil` is a safe no-op default, same reasoning
+    /// as `NotchRootView.onTap`.
+    public var onIntent: ((NotchIntent) -> Void)?
 
     public var metrics: NotchMetrics
     /// `var`, not `let`: this is an always-running background agent, and a
@@ -117,6 +190,22 @@ public final class NotchController {
         self.activities = activities
         self.overflowCount = max(0, overflow)
         setActivityCount(activities.count + max(0, overflow))
+    }
+
+    /// Does NOT touch `state`/`activityCount` itself — `AppModel` drives
+    /// those the usual way, via `setActivities`, by inserting a sticky
+    /// activity of kind `.media` into the same `ActivityQueue` every other
+    /// kind goes through. This just carries the richer presentation data
+    /// (artwork, elapsed/duration) that activity's plain title/detail can't.
+    public func setMedia(_ media: MediaPresentation?) {
+        self.media = media
+    }
+
+    /// Forwards a panel-originated command out to `onIntent`. Public so the
+    /// view layer (`MediaPanelView`, `NotchRootView`'s ears) can call it
+    /// without knowing who — if anyone — is listening.
+    public func emit(_ intent: NotchIntent) {
+        onIntent?(intent)
     }
 
     /// An open panel outranks everything; otherwise activities outrank hover,

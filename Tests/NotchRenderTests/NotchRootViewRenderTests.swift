@@ -437,6 +437,150 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     )
 }
 
+// MARK: - Media panel (Task 8)
+
+/// One-activity size, media alone: the artwork placeholder in the leading
+/// ear is the ONLY new Task 8 surface reachable here — same reasoning as
+/// `hudSymbolInLeadingEarRendersInsideTheIslandAndClearOfTheNotch` above.
+@MainActor
+@Test func mediaArtworkInLeadingEarRendersInsideTheIslandAndClearOfTheNotch() {
+    let controller = makeController()
+    controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    controller.setMedia(
+        MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200)
+    )
+    #expect(controller.state == .activity)
+    #expect(controller.parameters == controller.metrics.oneActivity)
+
+    let result = renderAndClassify(controller)
+    #expect(
+        result.hasContentInsideIsland,
+        """
+        no content pixel found inside the island bounds \(result.islandBounds) \
+        — the artwork placeholder did not render
+        """
+    )
+    #expect(
+        result.contentInsideNotchCount == 0,
+        "\(result.contentInsideNotchCount) content pixel(s) drawn inside the notch rect \(result.holeRect)"
+    )
+    #expect(
+        result.contentOutsideIslandCount == 0,
+        "\(result.contentOutsideIslandCount) content pixel(s) drawn outside the island bounds \(result.islandBounds)"
+    )
+}
+
+/// The realistic concurrent case: a HUD activity (priority 100) with
+/// `barFill` outranks media (priority 10) at one-activity size. This proves
+/// two things at once — the Task 8 guard on `leadingEar`'s media branch
+/// (`.first?.id == "media"`) correctly excludes media's artwork when it is
+/// NOT the topmost activity, and the Task 8 `trailingEar` design change (a
+/// solo `barFill` activity renders a bar, not `compactText`) stays inside
+/// the island at exactly the size where `detailRow`'s own bar is gated off.
+@MainActor
+@Test func hudBarInTrailingEarRendersInsideTheIslandAndClearOfTheNotchAtOneActivitySize() {
+    let controller = makeController()
+    controller.setActivities(
+        [.init(id: "hud", title: "Volume 62%", compactText: "62%", symbolName: "speaker.wave.2.fill", barFill: 0.62)],
+        overflow: 0
+    )
+    controller.setMedia(
+        MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200)
+    )
+    #expect(controller.state == .activity)
+    #expect(controller.parameters == controller.metrics.oneActivity)
+
+    let result = renderAndClassify(controller)
+    #expect(
+        result.hasContentInsideIsland,
+        "no content pixel found inside the island bounds \(result.islandBounds)"
+    )
+    #expect(
+        result.contentInsideNotchCount == 0,
+        "\(result.contentInsideNotchCount) content pixel(s) drawn inside the notch rect \(result.holeRect)"
+    )
+    #expect(
+        result.contentOutsideIslandCount == 0,
+        "\(result.contentOutsideIslandCount) content pixel(s) drawn outside the island bounds \(result.islandBounds)"
+    )
+}
+
+/// The expanded media panel: artwork, title, artist, scrub bar and controls,
+/// all below the hole. Same shape as
+/// `expandedContentRendersInsideTheIslandAndClearOfTheNotch`, but exercising
+/// `MediaPanelView` specifically — that test's fixture never calls
+/// `setMedia`, so it cannot catch a `MediaPanelView` defect on its own.
+@MainActor
+@Test func mediaPanelRendersInsideTheIslandAndClearOfTheNotchWhenExpanded() {
+    let controller = makeController()
+    controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    controller.setMedia(
+        MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 30, duration: 200)
+    )
+    controller.click()
+    #expect(controller.state == .expanded)
+    #expect(controller.parameters == controller.metrics.expanded)
+
+    let result = renderAndClassify(controller)
+    #expect(
+        result.hasContentInsideIsland,
+        """
+        no content pixel found inside the island bounds \(result.islandBounds) \
+        — the media panel did not render
+        """
+    )
+    #expect(
+        result.contentInsideNotchCount == 0,
+        "\(result.contentInsideNotchCount) content pixel(s) drawn inside the notch rect \(result.holeRect)"
+    )
+    #expect(
+        result.contentOutsideIslandCount == 0,
+        "\(result.contentOutsideIslandCount) content pixel(s) drawn outside the island bounds \(result.islandBounds)"
+    )
+}
+
+/// Pins the media panel to its budget exactly like
+/// `twoActivityDetailRowIdealHeightFitsItsBudget` pins the two-activity
+/// case: a rendered/clipped pixel check against the full island (the test
+/// above) cannot see content silently truncated by `.clipShape` — measuring
+/// `detailRow`'s own ideal (UNCLIPPED) height directly, via the same
+/// `detailRowForTesting` seam, is what actually catches a panel that has
+/// grown past its budget (`expanded.height - notchRect.height`), which would
+/// clip away the play/pause row invisibly rather than fail loudly.
+@MainActor
+@Test func mediaPanelIdealHeightFitsTheExpandedBudget() {
+    let controller = makeController()
+    let longTitle = "A Fairly Long Now-Playing Song Title"
+    controller.setActivities([.init(id: "media", title: longTitle, detail: "An Artist Name")], overflow: 0)
+    controller.setMedia(
+        MediaPresentation(
+            title: longTitle, artist: "An Artist Name", artwork: nil,
+            isPlaying: true, elapsed: 30, duration: 200
+        )
+    )
+    controller.click()
+    #expect(controller.state == .expanded)
+
+    let budget = controller.metrics.expanded.height - controller.metrics.notchRect.height
+
+    let renderer = ImageRenderer(content: NotchRootView(controller: controller).detailRowForTesting)
+    renderer.scale = 2
+    renderer.proposedSize = ProposedViewSize(width: controller.parameters.width, height: nil)
+    guard let cgImage = renderer.cgImage else {
+        fatalError("ImageRenderer produced no image for detailRowForTesting")
+    }
+    let idealHeight = CGFloat(cgImage.height) / renderer.scale
+
+    #expect(
+        idealHeight <= budget,
+        """
+        media panel's ideal height \(idealHeight)pt exceeds its \(budget)pt budget at expanded \
+        size — content that doesn't fit is silently clipped downward by `.clipShape`, invisible \
+        to a pixel-level check against the full island
+        """
+    )
+}
+
 // MARK: - Harness self-check
 
 /// Validates the rendering + coordinate-flip pipeline above independently of
