@@ -2443,6 +2443,37 @@ public enum ServiceAvailability: Sendable, Equatable {
 }
 ```
 
+Also close two `ActivityKit` test gaps while that module is open. `ActivityQueue.visible`
+is only deterministic because all five `ActivityKind` priorities happen to be distinct —
+`records` is a `Dictionary`, whose iteration order is randomised per process, so a future
+kind sharing a priority would make the two-slot prefix vary run to run. Nothing currently
+checks that premise. In `Tests/ActivityKitTests/ActivityQueueTests.swift`, rename
+`equalPrioritiesBreakTiesDeterministically` to say what it actually verifies and add the
+invariant guard plus a `Comparable` exercise:
+
+```swift
+@Test func higherPriorityWinsRegardlessOfArrivalOrderOrId() {
+    var q = ActivityQueue()
+    q.insert(record(.device, id: "b", at: t0.addingTimeInterval(1)))
+    q.insert(record(.notification, id: "a", at: t0))
+    // device (50) outranks notification (40) whatever the arrival order or id.
+    #expect(q.visible.map(\.id) == ["b", "a"])
+}
+
+/// `visible`'s determinism depends on this: `records` is a Dictionary with
+/// per-process randomised iteration order, so if two kinds ever shared a
+/// priority the two-slot prefix could vary between runs.
+@Test func everyKindHasADistinctPriority() {
+    let priorities = ActivityKind.allCases.map(\.priority)
+    #expect(Set(priorities).count == priorities.count)
+}
+
+@Test func kindsCompareByPriority() {
+    #expect(ActivityKind.media < ActivityKind.hud)
+    #expect(ActivityKind.hud > ActivityKind.power)
+}
+```
+
 - [ ] **Step 2: Add the `PowerService` targets to `Package.swift`**
 
 ```swift
