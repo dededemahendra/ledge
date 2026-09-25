@@ -309,15 +309,28 @@ growth itself becomes the signal that something happened.
 | State | Size | Content placement |
 | --- | --- | --- |
 | Hidden | — | window ordered out |
-| Peek (hover) | 179 × 38 pt | glanceable hints in both ears |
+| Peek (hover) | 179 × 38 pt | **no content** — see below |
 | 1 activity | ~255 × 32 pt | leading ear: artwork 20 pt; trailing ear: waveform |
 | 2 activities | ~342 × 62 pt | ears keep glanceable glyphs; detail row below the hole |
 | 3+ activities | ~342 × 62 pt | top two by priority, `+N` pip in trailing ear |
 | Expanded (click) | ~390 × 118 pt | full panel below the hole; ears keep glyphs |
 
 Ear width at one activity is ~38 pt per side; at two activities ~81 pt per side.
-**No content may be positioned within the notch rect.** Layout code asserts this
-in debug builds.
+
+**Peek carries no content, and cannot.** Peek is the notch's own width, so `earWidth`
+is exactly 0 and there is no ear to put a hint in. An earlier draft of the table above
+said "glanceable hints in both ears" at peek, which was self-contradictory. Peek is a
+6 pt lip whose whole job is to signal "this surface is live" by growing under the
+cursor. Anything more means widening peek, which is a separate design decision nobody
+has asked for.
+
+**No content may be positioned within the notch rect — and none outside the island.**
+Both halves matter, and the second was missing from an earlier draft: a layout that
+correctly clears the hole can still render content below the island's bottom edge,
+unbacked, over the desktop. Debug builds assert containment inside the island *and*
+exclusion from the hole, and a headless `ImageRenderer` test checks the rendered
+pixels rather than the intent. Nothing else in this design verifies the view layer,
+which is where this project's two worst defects both lived.
 
 Expanded media panel: 60 pt artwork, title, artist, scrub bar with position and
 duration, previous / play-pause / next, and an audio-output picker.
