@@ -66,13 +66,42 @@ enum NotchRenderTestHook {
 public struct NotchRootView: View {
     private let controller: NotchController
 
+    /// The target height from before whichever transition is currently
+    /// running, so `expanding` below reflects whether the island is
+    /// actually growing or shrinking — not which named state it happens to
+    /// be heading to. Picking the spring by destination state name meant a
+    /// shrink into `.activity` (e.g. dismissing an open panel while an
+    /// activity is live, 118 -> 32) used the expand spring's 3.8% overshoot
+    /// and briefly undershot past the 32pt notch cutout, exposing the hole.
+    ///
+    /// Height specifically, not the whole parameter tuple: it is the one
+    /// dimension where an overshoot has a physical consequence (uncovering
+    /// the notch); width/radius/fillet overshoot has no such failure mode,
+    /// and neither is monotonic with "size tier" the way height's floor at
+    /// the notch's own height is.
+    ///
+    /// Spelled out via the underlying `State<Value>` type rather than the
+    /// `@State` attribute: this toolchain's CommandLineTools install has no
+    /// `SwiftUIMacros` plugin (only the full Xcode.app does), so the `@State`
+    /// macro fails to expand here — see `make test`'s own `TESTING_PLUGIN`
+    /// workaround in the Makefile for the same class of issue. `State` the
+    /// type is ordinary, non-macro public API and needs no plugin; this is
+    /// exactly what the attribute would otherwise have synthesized.
+    private var _previousHeight: State<CGFloat>
+    private var previousHeight: CGFloat {
+        get { _previousHeight.wrappedValue }
+        nonmutating set { _previousHeight.wrappedValue = newValue }
+    }
+
     public init(controller: NotchController) {
         self.controller = controller
+        _previousHeight = State(initialValue: controller.parameters.height)
     }
 
     public var body: some View {
         let parameters = controller.parameters
         let shape = NotchShape(parameters)
+        let expanding = parameters.height > previousHeight
 
         ZStack(alignment: .top) {
             shape
@@ -110,16 +139,19 @@ public struct NotchRootView: View {
             alignment: .top
         )
         .animation(
-            NotchAnimation.animation(
-                expanding: controller.state == .expanded || controller.state == .activity,
-                reduceMotion: controller.reduceMotion
-            ),
+            NotchAnimation.animation(expanding: expanding, reduceMotion: controller.reduceMotion),
             value: parameters
         )
         .opacity(controller.isVisible ? 1 : 0)
         .allowsHitTesting(controller.isVisible)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ledge notch island")
+        .onChange(of: parameters) { _, newValue in
+            // Recorded AFTER this transition's spring was already chosen
+            // above, so it becomes the "before" height for whichever
+            // transition comes next.
+            previousHeight = newValue.height
+        }
     }
 
     /// Content lives in the ears and below the hole. Nothing may be drawn
