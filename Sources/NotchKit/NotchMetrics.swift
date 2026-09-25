@@ -10,6 +10,13 @@ public struct NotchMetrics: Sendable, Equatable {
     /// Progress window over which content fades in.
     public static let contentFadeIn: ClosedRange<Double> = 0.45...0.83
 
+    /// `.origin.x` is computed, coordinate-converted (see `NotchGeometry`),
+    /// and tested, but read by no production code — every consumer
+    /// (`NotchShape`, `NotchRootView`) re-derives horizontal placement from
+    /// `screen.frame.midX`/the canvas's own centre instead, i.e. every
+    /// island this metrics value describes is assumed centred on its
+    /// screen. Recorded here, not restructured: only `.width`/`.height` are
+    /// actually load-bearing today.
     public let notchRect: CGRect
 
     public init(notchRect: CGRect) {
