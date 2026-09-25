@@ -15,9 +15,24 @@ public enum NotchState: Sendable, Equatable {
 @MainActor
 @Observable
 public final class NotchController {
+    /// UI-facing projection of an activity. Keeps `NotchKit` independent of
+    /// `ActivityKit`'s storage types.
+    public struct ActivityDisplay: Sendable, Equatable, Identifiable {
+        public let id: String
+        public let title: String
+        public let detail: String?
+        public init(id: String, title: String, detail: String? = nil) {
+            self.id = id
+            self.title = title
+            self.detail = detail
+        }
+    }
+
     public private(set) var state: NotchState = .hidden
     public private(set) var isHovered = false
     public private(set) var activityCount = 0
+    public private(set) var activities: [ActivityDisplay] = []
+    public private(set) var overflowCount = 0
 
     public var metrics: NotchMetrics
     public let reduceMotion: Bool
@@ -60,6 +75,12 @@ public final class NotchController {
     public func setActivityCount(_ count: Int) {
         activityCount = max(0, count)
         recomputeState()
+    }
+
+    public func setActivities(_ activities: [ActivityDisplay], overflow: Int) {
+        self.activities = activities
+        self.overflowCount = max(0, overflow)
+        setActivityCount(activities.count + max(0, overflow))
     }
 
     /// An open panel outranks everything; otherwise activities outrank hover,

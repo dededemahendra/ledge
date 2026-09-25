@@ -127,10 +127,23 @@ private func record(
     #expect(q.visible.map(\.kind) == [.power])
 }
 
-@Test func equalPrioritiesBreakTiesDeterministically() {
+@Test func higherPriorityWinsRegardlessOfArrivalOrderOrId() {
     var q = ActivityQueue()
     q.insert(record(.device, id: "b", at: t0.addingTimeInterval(1)))
     q.insert(record(.notification, id: "a", at: t0))
-    // device (50) outranks notification (40) regardless of arrival order
+    // device (50) outranks notification (40) whatever the arrival order or id.
     #expect(q.visible.map(\.id) == ["b", "a"])
+}
+
+/// `visible`'s determinism depends on this: `records` is a Dictionary with
+/// per-process randomised iteration order, so if two kinds ever shared a
+/// priority the two-slot prefix could vary between runs.
+@Test func everyKindHasADistinctPriority() {
+    let priorities = ActivityKind.allCases.map(\.priority)
+    #expect(Set(priorities).count == priorities.count)
+}
+
+@Test func kindsCompareByPriority() {
+    #expect(ActivityKind.media < ActivityKind.hud)
+    #expect(ActivityKind.hud > ActivityKind.power)
 }

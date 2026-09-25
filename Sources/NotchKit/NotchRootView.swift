@@ -23,6 +23,31 @@ public enum NotchAnimation {
     }
 }
 
+/// Fades island content in as the shape grows, so text never appears before there
+/// is room for it.
+///
+/// Carrying progress as this modifier's own `animatableData` is what makes
+/// SwiftUI's interpolated value visible to `body(content:)` — a view body reading
+/// `controller.parameters` only ever sees the target.
+struct ContentFade: ViewModifier, Animatable {
+    var progress: Double
+    let metrics: NotchMetrics
+
+    // `ViewModifier.body` is @MainActor (inferred onto the whole conforming
+    // type), but `Animatable.animatableData` is a nonisolated requirement —
+    // SwiftUI's animation system interpolates it outside that isolation. This
+    // property only ever touches the plain `Double` above, so it is safe to
+    // exempt from the type's inferred MainActor isolation.
+    nonisolated var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.opacity(metrics.contentOpacity(progress: progress))
+    }
+}
+
 /// The island itself. Content is clipped to the same shape that defines the
 /// silhouette, so nothing can bleed outside during a morph.
 public struct NotchRootView: View {
@@ -41,6 +66,10 @@ public struct NotchRootView: View {
                 .fill(.black)
                 .overlay {
                     islandContent(parameters: parameters)
+                        .modifier(ContentFade(
+                            progress: growthProgress(parameters),
+                            metrics: controller.metrics
+                        ))
                         .clipShape(shape)
                 }
         }
@@ -60,6 +89,17 @@ public struct NotchRootView: View {
         .allowsHitTesting(controller.isVisible)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ledge notch island")
+    }
+
+    /// How far the shape has grown between its resting extremes, 0 at the
+    /// smallest (collapsed) and 1 at the largest (expanded). Feeds `ContentFade`
+    /// so content fades in over the same interpolated progress the shape itself
+    /// is animating through, not a fixed-duration approximation of it.
+    private func growthProgress(_ parameters: NotchShapeParameters) -> Double {
+        let floor = controller.metrics.collapsed.height
+        let ceiling = controller.metrics.expanded.height
+        guard ceiling > floor else { return 1 }
+        return Double((parameters.height - floor) / (ceiling - floor))
     }
 
     /// Content lives in the ears and below the hole. Nothing may be drawn
@@ -92,14 +132,30 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var trailingEar: some View {
-        if controller.activityCount > 2 {
-            Text("+\(controller.activityCount - 2)")
+        if controller.overflowCount > 0 {
+            Text("+\(controller.overflowCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
         }
     }
 
     @ViewBuilder private var detailRow: some View {
-        EmptyView()
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(controller.activities) { activity in
+                Text(activity.title)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+                    .transition(.blurReplace)
+                if let detail = activity.detail {
+                    Text(detail)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

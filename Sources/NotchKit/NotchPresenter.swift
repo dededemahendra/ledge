@@ -67,6 +67,17 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    /// Latest visible activities, rendered by `NotchRootView`.
+    public func setActivities(_ activities: [NotchController.ActivityDisplay], overflow: Int) {
+        controller.setActivities(activities, overflow: overflow)
+        refreshInteractiveRegion()
+        if controller.isVisible {
+            window?.orderFrontRegardless()
+        } else {
+            window?.orderOut(nil)
+        }
+    }
+
     /// Review Focus 2 and 3: no notch, or no built-in screen, means no island.
     private func rebuildForCurrentScreen() {
         guard
