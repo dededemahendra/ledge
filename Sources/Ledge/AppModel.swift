@@ -226,8 +226,32 @@ final class AppModel {
         // expiry indefinitely.
         presenter.reevaluateHoverForExpiry()
         let before = queue.count
+        evictUnavailableServices()
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }
+    }
+
+    /// Spec §9: "Service dies at runtime → its activities are evicted from
+    /// the queue." Polled every 250ms tick here — the same cadence as TTL
+    /// pruning above — rather than reacting to the moment each service
+    /// transitions, because the three services that can report
+    /// `.unavailable` each do so through a different mechanism (`power`: a
+    /// poll finding no battery/power sources; `hud`: computed once at
+    /// `start()`; `media`: its restart policy giving up after repeated
+    /// adapter failures), some of which produce no event at all on the
+    /// stream `AppModel` would otherwise be listening on. Polling
+    /// `availability` here is the one place that catches all three
+    /// uniformly, so a dead service's activity cannot sit on the island
+    /// forever.
+    ///
+    /// Unconditional, unlike TTL expiry: a service that no longer exists is
+    /// a correctness problem, not a UX nicety hover should be able to pin to
+    /// the island indefinitely — `remove(kind:)` itself has no hover
+    /// parameter to honour.
+    private func evictUnavailableServices() {
+        if !power.availability.isAvailable { queue.remove(kind: .power) }
+        if !hud.availability.isAvailable { queue.remove(kind: .hud) }
+        if !media.availability.isAvailable { queue.remove(kind: .media) }
     }
 
     private func publish() {
