@@ -30,15 +30,15 @@ import Foundation
     #expect(OSDSuppressor.helperBundleIdentifier == "com.apple.OSDUIHelper")
 }
 
-// Review Focus 3: recovery must not depend on a clean shutdown.
-@Test func launchRecoveryResumesUnconditionallyWhenNotSuppressing() {
-    let actions = OSDSuppressionPolicy.launchRecoveryActions(pids: [42], willSuppress: false)
+// Review Focus 3: recovery must not depend on a clean shutdown, or on what
+// this run is about to do next. Previously pinned as two cases — "not
+// suppressing" and "about to suppress" — each passing a `willSuppress: Bool`
+// that `launchRecoveryActions` ignored by design. That parameter advertised a
+// choice that did not exist, so it was dropped from the signature; the two
+// cases collapse into this one, which still pins the same resume-
+// unconditionally outcome.
+@Test func launchRecoveryAlwaysResumesUnconditionally() {
+    let actions = OSDSuppressionPolicy.launchRecoveryActions(pids: [42])
     #expect(actions == [.resume(42)],
-            "a previous crash may have left the helper stopped")
-}
-
-@Test func launchRecoveryStillResumesFirstEvenWhenAboutToSuppress() {
-    let actions = OSDSuppressionPolicy.launchRecoveryActions(pids: [42], willSuppress: true)
-    #expect(actions == [.resume(42)],
-            "always hand the system back a working helper, then re-suppress on the next sweep")
+            "a previous crash may have left the helper stopped; recovery must hand back a working helper before this run decides whether to suppress again")
 }

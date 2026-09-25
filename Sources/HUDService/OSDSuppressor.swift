@@ -22,13 +22,13 @@ public struct OSDSuppressionPolicy: Sendable {
     /// At launch, always resume first. A previous crash may have left the helper
     /// `SIGSTOP`ped, and the user's system HUD would be dead until reboot.
     ///
-    /// `willSuppress` is deliberately ignored: the whole point of launch
-    /// recovery is that it does not depend on what this run is about to do.
-    /// Kept as a parameter (rather than dropped) so the two call sites this
-    /// task's tests pin — "not suppressing" and "about to suppress" — both
-    /// read as an explicit assertion that the answer is the same either way,
-    /// not an accident of only ever being called one way.
-    public static func launchRecoveryActions(pids: [pid_t], willSuppress: Bool) -> [OSDAction] {
+    /// Takes no `willSuppress` parameter: an earlier revision carried one that
+    /// its body never read (dead by design, the whole point of launch recovery
+    /// being that it must not depend on what this run is about to do), which
+    /// only advertised a choice that did not exist. Dropped instead of kept —
+    /// a run that wants to suppress does so on its own next sweep via
+    /// `setSuppressing(true)`, same as any other run.
+    public static func launchRecoveryActions(pids: [pid_t]) -> [OSDAction] {
         pids.map { .resume($0) }
     }
 }
@@ -84,7 +84,7 @@ public final class OSDSuppressor {
     /// other run.
     public func recoverAtLaunch() {
         let pids = Self.helperPIDs()
-        Self.apply(OSDSuppressionPolicy.launchRecoveryActions(pids: pids, willSuppress: false))
+        Self.apply(OSDSuppressionPolicy.launchRecoveryActions(pids: pids))
         if !pids.isEmpty {
             Self.log.info("launch recovery resumed \(pids.count) helper process(es)")
         }
