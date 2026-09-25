@@ -27,7 +27,8 @@ struct MediaPanelView: View {
     /// hook, so pixel classification stays two-colour there.
     let accent: Color
     /// Pairs the compact ear's 20pt artwork with the 60pt one below into a
-    /// single morphing element across expand/collapse. The pair is exclusive
+    /// single morphing element across expand/collapse. 64pt with 11pt
+    /// continuous corners — Alcove-scale prominence. The pair is exclusive
     /// — `NotchRootView.leadingEar` hides its copy at `.expanded` — which is
     /// the precondition that makes `matchedGeometryEffect`'s hero semantics
     /// valid here at all; see the call-site comment there.
@@ -122,7 +123,7 @@ struct MediaPanelView: View {
             if let data = media.artwork, let image = NSImage(data: data) {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
                     .fill(contentColor.opacity(0.18))
                     .overlay {
                         Image(systemName: "music.note")
@@ -131,14 +132,14 @@ struct MediaPanelView: View {
                     }
             }
         }
-        .frame(width: 60, height: 60)
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .frame(width: 64, height: 64)
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         // Depth: a soft shadow beneath and a hairline catching light on the
         // edge, so the sleeve reads as an object sitting on the card rather
         // than a flat texture. The placeholder gets the identical treatment
         // so the two states don't jump when artwork arrives.
         .overlay {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.45), radius: 6, y: 2)

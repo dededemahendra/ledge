@@ -191,19 +191,42 @@ public struct NotchRootView: View {
 
         let expanded = controller.state == .expanded
         let showEffects = expanded && !visualEffectsSuppressed
+        let artBackdrop: NSImage? = showEffects
+            ? controller.media?.artwork.flatMap(NSImage.init(data:))
+            : nil
 
         ZStack(alignment: .top) {
             shape
                 .fill(.black)
-                // Translucency (redesign brief): the expanded card reads as a
-                // material, not a flat slab — desktop blur underneath, with
-                // the black fill dropped to 62% over it. Compact stays fully
+                // The expanded card reads as a material, not a flat slab.
+                // With artwork playing, the card's background IS the album
+                // art — blurred, saturated, darkened — so the whole surface
+                // takes the track's colour identity, the way Alcove's card
+                // does; the black fill drops to 30% over it (the backdrop
+                // carries its own darkening). Without artwork it falls back
+                // to desktop blur under a 62% fill. Compact stays fully
                 // opaque on purpose: sitting flush against the real notch,
-                // anything but pure black breaks the illusion that island and
-                // bezel are one object.
-                .opacity(showEffects ? 0.62 : 1)
+                // anything but pure black breaks the illusion that island
+                // and bezel are one object.
+                .opacity(showEffects ? (artBackdrop != nil ? 0.30 : 0.62) : 1)
                 .background {
-                    if showEffects {
+                    if let artBackdrop {
+                        Image(nsImage: artBackdrop)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(
+                                width: NotchMetrics.canvasSize.width,
+                                height: NotchMetrics.canvasSize.height
+                            )
+                            // Overscan before blurring so the island's strip at
+                            // the canvas's top edge samples dense image, not the
+                            // blur's transparent edge vignette.
+                            .scaleEffect(1.4)
+                            .blur(radius: 48)
+                            .saturation(1.5)
+                            .overlay(Color.black.opacity(0.30))
+                            .clipShape(shape)
+                    } else if showEffects {
                         VibrancyBackdrop().clipShape(shape)
                     }
                 }
@@ -493,17 +516,23 @@ public struct NotchRootView: View {
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {
-                // Compact now-playing progress. The redesign brief asked for a
-                // progress indicator "around the notch edge" in the compact
-                // state — physically impossible here: a bar along the island's
-                // bottom edge would cross the notch cutout, where there are no
-                // pixels and where the no-content invariant (debug assertion +
-                // `NotchRenderTests`) forbids drawing regardless. This ear was
-                // media's documented dead slot, so the sliver lives here
-                // instead: same accent as the expanded card, advanced by the
-                // same 1Hz tick. At `.expanded` the panel's own scrubber takes
-                // over and this yields to the fallback below.
-                compactMediaProgress(media.progress)
+                // Compact now-playing, spec §6's original "trailing ear:
+                // waveform": animated visualizer bars while playing (static
+                // pose under Reduce Motion), and the accent progress sliver
+                // while paused — life when there is sound, position when
+                // there is not. The brief's notch-edge progress ring stays
+                // impossible: it would draw across the cutout, where there
+                // are no pixels and the no-content invariant forbids drawing
+                // regardless. At `.expanded` the panel takes over and this
+                // yields to the fallback below.
+                if media.isPlaying {
+                    AudioVisualizerBars(
+                        color: effectiveAccent,
+                        isAnimating: !controller.reduceMotion
+                    )
+                } else {
+                    compactMediaProgress(media.progress)
+                }
             } else {
                 // Not decorative — load-bearing. An activity with neither
                 // `barFill` nor `compactText` (exactly media's shape: title +
@@ -610,13 +639,14 @@ public struct NotchRootView: View {
                 artworkNamespace: artworkNamespace,
                 emit: { controller.emit($0) }
             )
-            // Matches the sibling branch's own technique below: `islandContent`'s
-            // `detailRow.frame(maxWidth: .infinity)` has no `alignment`, so
-            // without this the panel — which otherwise just hugs its own
-            // (artwork + text) content width — would be CENTRED in the
-            // island's full width instead of starting flush at the leading
-            // edge like every other piece of island content does.
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // `.leading` keeps the panel flush at the island's leading edge
+            // like every other piece of island content; `maxHeight: .infinity`
+            // fills the budget frame so the card floats vertically CENTRED in
+            // it (~97pt of content in a 108pt budget) instead of hugging the
+            // notch with all the slack pooled at the bottom. Overflow safety
+            // is unchanged: the call-site budget frame is still top-aligned,
+            // so anything past the budget clips downward, never into the ears.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: 2) {
                 if controller.state == .expanded {
