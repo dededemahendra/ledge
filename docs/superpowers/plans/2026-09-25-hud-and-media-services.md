@@ -18,6 +18,14 @@ Everything in the Phases 0–2 plan's Global Constraints still applies — inclu
 
 - **Run tests through `make test`, never bare `swift test`.** Where a step says `swift test --filter SomeTests`, run `make test FILTER=SomeTests`; where it says `swift test`, run `make test`. Bare `swift test` fails intermittently (measured: 5/12 runs) because swift-testing's macro plugin lives in a `plugins/testing/` subdirectory that is not on the compiler's default plugin search path. The Makefile's `TESTFLAGS` supplies it and makes runs deterministic (12/12).
 
+- **⚠️ Every `NotchRootView` snippet in this plan is STALE and must be treated as ADDITIVE, never as a replacement.** These snippets were written before Plan A executed. Plan A's whole-branch review found two Critical defects in that file, and closing them changed it substantially. The shipped file now contains, all load-bearing:
+  - `.overlay(alignment: .top)` — without the alignment, **all island content renders 100–145pt below the island, over the desktop**. A `Shape` fill occupies the whole 640×320 canvas, so the default `.center` centres content in the canvas rather than in the island.
+  - `ContentFade` driven by `progress: controller.isVisible ? 1 : 0` — a height-ratio version put **content at opacity 0 in four of five states**.
+  - `detailTitle` rendering only `activities.first` outside `.expanded` — a `ForEach` over all activities needs 47pt in a 30pt budget and gets silently truncated.
+  - the `expanding` pick falling back to width when heights tie, `textAnimation(reduceMotion:)` on both text-swap sites, and the `compactText` trailing ear.
+
+  Where a step below says "Replace `leadingEar` and `detailRow`", it means **integrate the new capability into the shipped implementations**. Read the current `Sources/NotchKit/NotchRootView.swift` first and add to it. Copying a snippet from this plan over the shipped file reintroduces defects that took two review rounds to find. `Tests/NotchRenderTests` is mutation-proven and will catch the alignment and opacity regressions — if it goes red, you have overwritten something.
+
 Additionally:
 
 - **No permission is requested by any task in this plan.** Volume and brightness are observed by value. If an implementation finds itself needing Accessibility or Input Monitoring, stop and report rather than adding a prompt.
@@ -1323,7 +1331,12 @@ In `Sources/NotchKit/NotchController.swift`, replace the `ActivityDisplay` struc
 
 - [ ] **Step 5: Render symbol and bar in `Sources/NotchKit/NotchRootView.swift`**
 
-Replace `leadingEar` and `detailRow`:
+**Integrate into — do not overwrite —** the shipped `leadingEar` and `detailRow`
+(see the stale-snippet warning in Global Constraints). Read
+`Sources/NotchKit/NotchRootView.swift` first. The HUD additions here are the
+`symbolName` glyph and the `barFill` bar; everything already in those properties
+stays. In particular keep `detailTitle`'s one-activity cap and the `compactText`
+trailing ear:
 
 ```swift
     @ViewBuilder private var leadingEar: some View {
@@ -2866,7 +2879,8 @@ struct MediaPanelView: View {
 
 - [ ] **Step 5: Show media in `NotchRootView`**
 
-Replace `leadingEar` and `detailRow` so media takes the leading ear when present,
+**Integrate into — do not overwrite —** the shipped `leadingEar` and `detailRow`
+(see the stale-snippet warning in Global Constraints), so media takes the leading ear when present,
 and the expanded state shows the panel:
 
 ```swift
