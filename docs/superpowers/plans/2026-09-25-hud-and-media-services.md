@@ -289,21 +289,42 @@ public struct HUDEventDeriver: Sendable {
 
     public mutating func volumeChanged(level: Double, muted: Bool) -> HUDEvent? {
         let clamped = min(1, max(0, level))
-        defer { lastVolume = clamped; lastMuted = muted }
 
-        guard let lastVolume, let lastMuted else { return nil }   // baseline
+        // Baseline: record and stay silent.
+        guard let lastVolume, let lastMuted else {
+            self.lastVolume = clamped
+            self.lastMuted = muted
+            return nil
+        }
+
         let levelMoved = abs(clamped - lastVolume) >= Self.minimumDelta
         let muteToggled = muted != lastMuted
-        guard levelMoved || muteToggled else { return nil }
+        guard levelMoved || muteToggled else {
+            // Deliberately does NOT rebaseline. Comparing against the last value
+            // *observed* rather than the last one *fired* lets a slow Control Centre
+            // slider drag creep the baseline in lockstep with the input, so volume
+            // can move 20% -> 80% with zero HUD events. Float jitter cannot exploit
+            // a fixed last-fired baseline, because noise oscillates rather than
+            // accumulating.
+            return nil
+        }
+
+        self.lastVolume = clamped
+        self.lastMuted = muted
         return .volume(level: clamped, muted: muted)
     }
 
     public mutating func brightnessChanged(level: Double) -> HUDEvent? {
         let clamped = min(1, max(0, level))
-        defer { lastBrightness = clamped }
 
-        guard let lastBrightness else { return nil }              // baseline
-        guard abs(clamped - lastBrightness) >= Self.minimumDelta else { return nil }
+        guard let lastBrightness else {                           // baseline
+            self.lastBrightness = clamped
+            return nil
+        }
+        guard abs(clamped - lastBrightness) >= Self.minimumDelta else {
+            return nil                                            // see volumeChanged
+        }
+        self.lastBrightness = clamped
         return .brightness(level: clamped)
     }
 }
