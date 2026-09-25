@@ -5,7 +5,6 @@ import Foundation
 private func description(
     percent: Int = 87,
     state: String = "AC Power",
-    charging: Bool = true,
     charged: Bool = false,
     timeToFull: Int = 24
 ) -> [String: Any] {
@@ -13,7 +12,6 @@ private func description(
         "Current Capacity": percent,
         "Max Capacity": 100,
         "Power Source State": state,
-        "Is Charging": charging,
         "Is Charged": charged,
         "Time to Full Charge": timeToFull,
     ]
@@ -23,24 +21,22 @@ private func description(
     let s = try #require(PowerSnapshot.parse(description()))
     #expect(s.percent == 87)
     #expect(s.isPluggedIn)
-    #expect(s.isCharging)
     #expect(s.isCharged == false)
     #expect(s.timeToFullMinutes == 24)
 }
 
 @Test func parsesABatterySource() throws {
     let s = try #require(PowerSnapshot.parse(
-        description(percent: 41, state: "Battery Power", charging: false, timeToFull: -1)
+        description(percent: 41, state: "Battery Power", timeToFull: -1)
     ))
     #expect(s.percent == 41)
     #expect(s.isPluggedIn == false)
-    #expect(s.isCharging == false)
     #expect(s.timeToFullMinutes == nil, "a negative estimate means unknown, not -1 minutes")
 }
 
 @Test func parsesAFullyChargedSource() throws {
     let s = try #require(PowerSnapshot.parse(
-        description(percent: 100, charging: false, charged: true, timeToFull: 0)
+        description(percent: 100, charged: true, timeToFull: 0)
     ))
     #expect(s.isCharged)
     #expect(s.percent == 100)
