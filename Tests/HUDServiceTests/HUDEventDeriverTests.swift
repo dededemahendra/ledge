@@ -86,3 +86,58 @@ import Testing
             "muted must yield \"Muted\", not a percentage")
     #expect(HUDEvent.brightness(level: 0.25).compactText == "25%")
 }
+
+// Regression: the old implementation rebaselined `last*` unconditionally via
+// `defer`, so each reading was compared against the immediately preceding
+// *observed* value rather than the last one that actually fired. A slow
+// Control Centre slider drag produces a stream of sub-`minimumDelta` deltas —
+// each individually too small to fire, and each moving the baseline — so
+// volume could move from 40% to 80% while zero HUD events fired.
+@Test func slowDragAcrossManySubThresholdVolumeStepsStillFiresAtLeastOnce() {
+    var d = HUDEventDeriver()
+    _ = d.volumeChanged(level: 0.40, muted: false)   // baseline
+
+    var firedCount = 0
+    var level = 0.40
+    while level < 0.80 {
+        level += 0.002
+        if d.volumeChanged(level: level, muted: false) != nil {
+            firedCount += 1
+        }
+    }
+
+    #expect(firedCount > 0,
+            "a slow slider drag from 40% to 80% in sub-threshold steps must fire at least one HUD event")
+}
+
+// Same defect class, same fix shape, applied to brightness.
+@Test func slowDragAcrossManySubThresholdBrightnessStepsStillFiresAtLeastOnce() {
+    var d = HUDEventDeriver()
+    _ = d.brightnessChanged(level: 0.40)   // baseline
+
+    var firedCount = 0
+    var level = 0.40
+    while level < 0.80 {
+        level += 0.002
+        if d.brightnessChanged(level: level) != nil {
+            firedCount += 1
+        }
+    }
+
+    #expect(firedCount > 0,
+            "a slow brightness drag from 40% to 80% in sub-threshold steps must fire at least one HUD event")
+}
+
+// Nothing currently pins the boundary as inclusive (`>=` vs `>`).
+@Test func minimumDeltaBoundaryFiresInclusively() {
+    var d = HUDEventDeriver()
+    _ = d.volumeChanged(level: 0.40, muted: false)
+    let boundary = 0.40 + HUDEventDeriver.minimumDelta
+    #expect(d.volumeChanged(level: boundary, muted: false) == .volume(level: boundary, muted: false))
+}
+
+// Only muted, 0.0 and 0.8 were covered; the two middle bands were not.
+@Test func symbolNameCoversTheMiddleBands() {
+    #expect(HUDEvent.volume(level: 0.2, muted: false).symbolName == "speaker.wave.1.fill")
+    #expect(HUDEvent.volume(level: 0.5, muted: false).symbolName == "speaker.wave.2.fill")
+}
