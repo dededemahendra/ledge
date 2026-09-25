@@ -134,6 +134,18 @@ private func makeController(reduceMotion: Bool = false) -> NotchController {
     #expect(c.state == .expanded)
 }
 
+@MainActor
+@Test func clickDoesNothingWithoutAnIsland() {
+    // On a Mac with no notch (or mid display-hot-plug gap), metrics carries
+    // a zero notch rect. Without this guard, the menu bar's "Toggle Panel"
+    // latches `state = .expanded` with no window ever created to show it,
+    // and `recomputeState()` early-returns on `.expanded` forever after —
+    // hover becomes permanently inert until Toggle Panel is pressed again.
+    let c = NotchController(metrics: NotchMetrics(notchRect: .zero))
+    c.click()
+    #expect(c.state == .hidden)
+}
+
 // `dismiss()` re-derives rather than assigning `.hidden`, so it has three
 // reachable outcomes. All three are pinned here: without these, a `dismiss()`
 // rewritten as `state = isHovered ? .peek : .hidden` — silently dropping the

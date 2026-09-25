@@ -177,6 +177,11 @@ public final class NotchPresenter {
             // is correct, not stale, and recomputeState still allows that.
             controller.setHovered(false)
             controller.dismiss()
+            // Zeroed, not left stale: makes `NotchController.click()`'s
+            // no-island guard correctly reject a "Toggle Panel" press that
+            // lands during this exact gap too, not only on a permanently
+            // notch-less Mac.
+            controller.metrics = NotchMetrics(notchRect: .zero)
             window?.orderOut(nil)
             window = nil
             return

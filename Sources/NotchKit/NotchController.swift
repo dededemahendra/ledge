@@ -75,7 +75,14 @@ public final class NotchController {
         recomputeState()
     }
 
+    /// A no-op with no island to expand (zero-width notch rect — no notch on
+    /// this Mac, or a display-hot-plug gap). Without this guard, "Toggle
+    /// Panel" latches `.expanded` with no window ever created to show it,
+    /// and `recomputeState()`'s very first line returns early on
+    /// `.expanded` forever after — hover becomes permanently inert until
+    /// Toggle Panel is pressed again.
     public func click() {
+        guard metrics.notchRect.width > 0 else { return }
         state = .expanded
     }
 
