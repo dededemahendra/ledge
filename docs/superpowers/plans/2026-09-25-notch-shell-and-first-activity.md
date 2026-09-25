@@ -1243,6 +1243,38 @@ private func makeController(reduceMotion: Bool = false) -> NotchController {
     c.click()
     #expect(c.state == .expanded)
 }
+
+// `dismiss()` re-derives rather than assigning `.hidden`, so it has three
+// reachable outcomes. All three are pinned here: without these, a `dismiss()`
+// rewritten as `state = isHovered ? .peek : .hidden` — silently dropping the
+// activity fallback — would pass the whole suite.
+
+@MainActor
+@Test func dismissWithALiveActivityLandsOnActivity() {
+    let c = makeController()
+    c.setHovered(true)
+    c.setActivityCount(1)
+    c.click()
+    #expect(c.state == .expanded)
+    c.dismiss()
+    #expect(c.state == .activity, "a live activity outranks hover once the panel closes")
+}
+
+@MainActor
+@Test func dismissWithNothingToFallBackToLandsOnHidden() {
+    let c = makeController()
+    c.click()                     // hover never set, no activities
+    c.dismiss()
+    #expect(c.state == .hidden)
+}
+
+@MainActor
+@Test func activityCountNeverGoesNegative() {
+    let c = makeController()
+    c.setActivityCount(-5)
+    #expect(c.activityCount == 0)
+    #expect(c.state == .hidden)
+}
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
