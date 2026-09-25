@@ -5,10 +5,12 @@ let package = Package(
     name: "Ledge",
     platforms: [.macOS("27.0")],
     targets: [
-        .executableTarget(name: "Ledge", dependencies: ["NotchKit"], path: "Sources/Ledge"),
+        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit"], path: "Sources/Ledge"),
         .target(name: "NotchKit"),
+        .target(name: "ActivityKit"),
         .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
         .testTarget(name: "NotchWindowTests", dependencies: ["NotchKit"]),
+        .testTarget(name: "ActivityKitTests", dependencies: ["ActivityKit"]),
     ],
     swiftLanguageModes: [.v6]
 )
