@@ -1538,9 +1538,13 @@ public final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
     public override func hitTest(_ point: NSPoint) -> NSView? {
         guard let interactivePath else { return nil }
-        // `point` arrives in the superview's coordinates.
-        let local = convert(point, from: superview)
-        guard interactivePath.contains(local) else { return nil }
+        // `point` arrives in the SUPERVIEW's coordinates, which are y-up, and
+        // `setInteractiveShape` already flipped the path into that same y-up
+        // space — so compare directly. Do NOT `convert(point, from: superview)`:
+        // `NSHostingView.isFlipped` is true while its superview's is not, so
+        // converting would apply a second flip and break containment for every
+        // point.
+        guard interactivePath.contains(point) else { return nil }
         return super.hitTest(point)
     }
 
@@ -1587,7 +1591,6 @@ public final class NotchWindow: NSPanel {
             defer: false
         )
 
-        level = Self.normalLevel
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         backgroundColor = .clear
         isOpaque = false
@@ -1599,6 +1602,12 @@ public final class NotchWindow: NSPanel {
         becomesKeyOnlyIfNeeded = true
         ignoresMouseEvents = false      // hit testing decides, not a blanket flag
         contentView = hostingView
+
+        // ORDER MATTERS: `isFloatingPanel = true` resets `level` to `.floating`
+        // as a documented AppKit side effect, so assigning the level earlier
+        // would be silently clobbered and the island would draw BELOW the menu
+        // bar. Set it last.
+        level = Self.normalLevel
 
         reposition(for: screen)
     }
