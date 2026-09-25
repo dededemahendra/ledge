@@ -11,6 +11,7 @@ let package = Package(
         .target(name: "PowerService", dependencies: ["ActivityKit"]),
         .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
         .testTarget(name: "NotchWindowTests", dependencies: ["NotchKit"]),
+        .testTarget(name: "NotchRenderTests", dependencies: ["NotchKit"]),
         .testTarget(name: "ActivityKitTests", dependencies: ["ActivityKit"]),
         .testTarget(name: "PowerServiceTests", dependencies: ["PowerService"]),
     ],

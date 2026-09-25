@@ -48,6 +48,19 @@ struct ContentFade: ViewModifier, Animatable {
     }
 }
 
+#if DEBUG
+/// Test-only seam, reachable only via `@testable import` (never `public`):
+/// when set, island content paints with this colour instead of white, so
+/// `NotchRenderTests` can classify rendered pixels by colour instead of by
+/// brightness/anti-aliasing heuristics. `nil` on every real code path —
+/// nothing outside `NotchRenderTests` ever assigns it, and the whole type
+/// compiles out of release builds.
+@MainActor
+enum NotchRenderTestHook {
+    static var contentColor: Color?
+}
+#endif
+
 /// The island itself. Content is clipped to the same shape that defines the
 /// silhouette, so nothing can bleed outside during a morph.
 public struct NotchRootView: View {
@@ -64,10 +77,28 @@ public struct NotchRootView: View {
         ZStack(alignment: .top) {
             shape
                 .fill(.black)
-                .overlay {
+                // `.overlay`'s default alignment is `.center`: a `Shape` fill
+                // occupies its ENTIRE proposed canvas (640x320), not the
+                // island's own drawn extent, so uncentred content here would
+                // render 100+pt below the island, over the desktop, in every
+                // state but the tallest. `.top` is what makes it land where
+                // the island actually is.
+                .overlay(alignment: .top) {
                     islandContent(parameters: parameters)
                         .modifier(ContentFade(
-                            progress: growthProgress(parameters),
+                            // `ContentFade` is `Animatable`: handing it a
+                            // plain 0/1 target lets SwiftUI interpolate this
+                            // modifier's own `animatableData` across whatever
+                            // morph is already running (driven by the
+                            // `.animation(value: parameters)` below), so
+                            // `contentOpacity`'s 0.45...0.83 window is read
+                            // against the TRANSITION's own progress — not
+                            // against a height normalised over the global
+                            // collapsed...expanded span, which is 0 at both
+                            // `.hidden` and one activity (they share a height)
+                            // and never reaches the fade-in window at two
+                            // activities either.
+                            progress: controller.isVisible ? 1 : 0,
                             metrics: controller.metrics
                         ))
                         .clipShape(shape)
@@ -91,23 +122,16 @@ public struct NotchRootView: View {
         .accessibilityLabel("Ledge notch island")
     }
 
-    /// How far the shape has grown between its resting extremes, 0 at the
-    /// smallest (collapsed) and 1 at the largest (expanded). Feeds `ContentFade`
-    /// so content fades in over the same interpolated progress the shape itself
-    /// is animating through, not a fixed-duration approximation of it.
-    private func growthProgress(_ parameters: NotchShapeParameters) -> Double {
-        let floor = controller.metrics.collapsed.height
-        let ceiling = controller.metrics.expanded.height
-        guard ceiling > floor else { return 1 }
-        return Double((parameters.height - floor) / (ceiling - floor))
-    }
-
     /// Content lives in the ears and below the hole. Nothing may be drawn
     /// inside `controller.metrics.notchRect` — there are no pixels there.
     @ViewBuilder
     private func islandContent(parameters: NotchShapeParameters) -> some View {
         let notch = controller.metrics.notchRect
         let ear = controller.metrics.earWidth(forIslandWidth: parameters.width)
+
+        #if DEBUG
+        let _ = assertContentStaysInsideIslandAndClearOfNotch(parameters: parameters, notch: notch, ear: ear)
+        #endif
 
         VStack(spacing: 0) {
             HStack(spacing: 0) {
@@ -118,16 +142,64 @@ public struct NotchRootView: View {
             if parameters.height > notch.height + 8 {
                 detailRow
                     .frame(maxWidth: .infinity)
-                    .frame(height: parameters.height - notch.height)
+                    // `alignment: .top`, not the default `.center`: if the
+                    // detail row's content is ever taller than its budget
+                    // (e.g. two priority-2 activities each with a title),
+                    // the excess must overflow DOWNWARD, where the
+                    // `.clipShape` below trims it invisibly — never upward,
+                    // which would paint over the ear row and the notch
+                    // rect itself. Caught by `NotchRenderTests`.
+                    .frame(height: parameters.height - notch.height, alignment: .top)
             }
         }
         .frame(width: parameters.width, alignment: .top)
-        .foregroundStyle(.white)
+        .foregroundStyle(contentColor)
+    }
+
+    /// Spec §6/§10: content must stay inside the island's own rect and clear
+    /// of the notch rect. Pure arithmetic against the exact values that size
+    /// the frames above (no `GeometryReader` needed — the layout is fully
+    /// determined by `parameters`/`notch`/`ear`), so this is cheap enough to
+    /// run on every body evaluation in debug builds. This is the always-on
+    /// canary during `make dev`; `NotchRenderTests` is the version of this
+    /// check that can actually fail a CI run on rendered pixels.
+    #if DEBUG
+    private func assertContentStaysInsideIslandAndClearOfNotch(
+        parameters: NotchShapeParameters, notch: CGRect, ear: CGFloat
+    ) {
+        let island = CGRect(x: 0, y: 0, width: parameters.width, height: parameters.height)
+        let hole = CGRect(x: ear, y: 0, width: notch.width, height: notch.height)
+        let regions: [(String, CGRect)] = [
+            ("leading ear", CGRect(x: 0, y: 0, width: ear, height: notch.height)),
+            ("trailing ear", CGRect(x: ear + notch.width, y: 0, width: ear, height: notch.height)),
+            ("detail row", CGRect(
+                x: 0, y: notch.height,
+                width: parameters.width, height: max(0, parameters.height - notch.height)
+            )),
+        ]
+        for (label, rect) in regions where rect.width > 0 && rect.height > 0 {
+            assert(island.contains(rect), "\(label) must stay inside the island rect")
+            if hole.width > 0, hole.height > 0 {
+                assert(!rect.intersects(hole), "\(label) must not draw over the notch")
+            }
+        }
+    }
+    #endif
+
+    /// White in production; overridden to a solid test colour only inside
+    /// `NotchRenderTests`, which cannot reach this file except via
+    /// `@testable import`. See `NotchRenderTestHook`.
+    private var contentColor: Color {
+        #if DEBUG
+        NotchRenderTestHook.contentColor ?? .white
+        #else
+        .white
+        #endif
     }
 
     @ViewBuilder private var leadingEar: some View {
         if controller.activityCount > 0 {
-            Circle().fill(.white.opacity(0.28)).padding(6)
+            Circle().fill(contentColor.opacity(0.28)).padding(6)
         }
     }
 
@@ -158,7 +230,7 @@ public struct NotchRootView: View {
                 if let detail = activity.detail {
                     Text(detail)
                         .font(.system(size: 9))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(contentColor.opacity(0.6))
                         .lineLimit(1)
                 }
             }
