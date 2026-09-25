@@ -136,6 +136,15 @@ public struct NotchRootView: View {
             Text("+\(controller.overflowCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
+        } else if let compact = controller.activities.first?.compactText {
+            // At one activity the island is notch-height and `detailRow` is gated
+            // off, so this ear is the ONLY place a value can appear. Without it the
+            // island widens, shows a glyph, and says nothing.
+            Text(compact)
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+                .lineLimit(1)
+                .transition(.blurReplace)
         }
     }
 

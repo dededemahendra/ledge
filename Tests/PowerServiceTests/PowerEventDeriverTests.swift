@@ -92,3 +92,16 @@ private func snapshot(
     #expect(PowerEvent.fullyCharged.activityTitle == "Fully charged")
     #expect(PowerEvent.lowBattery(percent: 9).activityTitle == "Low battery · 9%")
 }
+
+/// `compactText` is the ONLY place a value can appear while a single activity
+/// holds the island at notch height (the trailing ear) — `detailRow` is gated
+/// off at that size. Pinning all four cases, including that a fully-charged
+/// battery (which may not literally be reported at 100% by IOKit) still reads
+/// "100%" rather than some other number.
+@Test func compactTextIsAFewGlanceableCharacters() {
+    #expect(PowerEvent.pluggedIn(percent: 87, timeToFullMinutes: 24).compactText == "87%")
+    #expect(PowerEvent.pluggedIn(percent: 87, timeToFullMinutes: nil).compactText == "87%")
+    #expect(PowerEvent.unplugged(percent: 87).compactText == "87%")
+    #expect(PowerEvent.fullyCharged.compactText == "100%")
+    #expect(PowerEvent.lowBattery(percent: 9).compactText == "9%")
+}

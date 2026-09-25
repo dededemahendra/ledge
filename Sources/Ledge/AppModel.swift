@@ -53,7 +53,8 @@ final class AppModel {
                 kind: .power,
                 insertedAt: Date(),
                 ttl: ActivityKind.power.defaultTTL,
-                title: event.activityTitle
+                title: event.activityTitle,
+                compactText: event.compactText
             )
         )
         publish()
@@ -67,7 +68,9 @@ final class AppModel {
 
     private func publish() {
         let display = queue.visible.map {
-            NotchController.ActivityDisplay(id: $0.id, title: $0.title, detail: $0.detail)
+            NotchController.ActivityDisplay(
+                id: $0.id, title: $0.title, detail: $0.detail, compactText: $0.compactText
+            )
         }
         // `setActivities` sets the count itself — do not also call
         // `setActivityCount`, or overflow gets counted twice.

@@ -9,6 +9,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     public let ttl: TimeInterval?
     public let title: String
     public let detail: String?
+    /// Very short glanceable form (e.g. "87%") for layouts with no room for
+    /// `title` — see `NotchController.ActivityDisplay.compactText`.
+    public let compactText: String?
 
     public init(
         id: String,
@@ -16,7 +19,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         insertedAt: Date,
         ttl: TimeInterval?,
         title: String,
-        detail: String? = nil
+        detail: String? = nil,
+        compactText: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -24,6 +28,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.ttl = ttl
         self.title = title
         self.detail = detail
+        self.compactText = compactText
     }
 
     public var isSticky: Bool { ttl == nil }

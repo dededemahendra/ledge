@@ -21,6 +21,18 @@ public enum PowerEvent: Sendable, Equatable {
             return "Low battery · \(percent)%"
         }
     }
+
+    /// Glanceable form for the trailing ear, which is the only place text can
+    /// appear while a single activity holds the island at notch height. The ear
+    /// is ~38pt wide, so this stays to a few characters.
+    public var compactText: String {
+        switch self {
+        case .pluggedIn(let percent, _): return "\(percent)%"
+        case .unplugged(let percent):    return "\(percent)%"
+        case .fullyCharged:              return "100%"
+        case .lowBattery(let percent):   return "\(percent)%"
+        }
+    }
 }
 
 /// Turns a stream of snapshots into the handful of moments worth showing.

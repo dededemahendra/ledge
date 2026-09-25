@@ -170,7 +170,7 @@ inserted into `AppModel`'s queue, so no spurious charging activity was
 announced. This is the one check in this document backed by something
 stronger than "reasoned, not observed."
 
-## Finding: a single activity cannot show its title text
+## Finding (fixed in fix round 1): a single activity showed no text at all
 
 While implementing Step 11, tracing the actual geometry turned up something
 worth flagging before, not after, a human sits down to run check 1 and 2.
@@ -182,52 +182,61 @@ worth flagging before, not after, a human sits down to run check 1 and 2.
 `parameters.height > notch.height + 8`. Since `oneActivity.height` **equals**
 `notch.height`, that condition is `x > x + 8`, which is false for any `x` —
 not a near-miss depending on hardware measurements, a structural
-impossibility. `AppModel` only ever feeds one `.power` record at a time, so
-`queue.visible.count == 1` for the common lone-charging-event case, which
-drives `NotchController` to exactly the `oneActivity` size.
+impossibility, and true since Task 3 (confirmed: with the original hardcoded
+`height: 32` it was equally `32 > 40`, false). `AppModel` only ever feeds one
+`.power` record at a time, so `queue.visible.count == 1` for the common
+lone-charging-event case, which drives `NotchController` to exactly the
+`oneActivity` size — where, as originally shipped, `trailingEar` only ever
+tested `overflowCount > 0` and `leadingEar` only ever drew an anonymous dot.
+Net effect as originally shipped: the island sized and timed correctly but
+showed **no text anywhere** for the single most common case.
 
-Net effect: plugging in or unplugging the charger with nothing else active
-will grow the island to the correct `~255 × 32pt` size and show the leading-ear
-dot (`activityCount > 0`), but **the title text itself
-(`"Charging · NN% · NN min to full"`) will not be visible** — there is no
-vertical room below the hole at that size, by design, regardless of this
-task's `detailRow`/`ContentFade` wiring. Text only appears once a second
-activity is concurrently queued (`twoActivities`, 62pt tall, has room).
+**Fixed in fix round 1**, without touching `NotchMetrics` or
+`NotchController`'s state→size mapping (both remain Tasks 2/3's reviewed,
+pinned-by-test surface; spec §6's "1 activity = compact ears-only" is a
+deliberate choice — layout C over layout B — not a bug, so growing the
+island for one activity was rejected as the fix). Instead, `PowerEvent` now
+exposes `compactText` (e.g. `"87%"` — a few characters, sized for the
+trailing ear's ~38pt width, not the full title), threaded through
+`ActivityRecord.compactText` → `NotchController.ActivityDisplay.compactText`
+→ `NotchRootView.trailingEar`. The trailing ear now shows the overflow pip
+when there's overflow, else the first activity's `compactText` when there is
+one. See `Sources/PowerService/PowerEventDeriver.swift`,
+`Sources/ActivityKit/ActivityRecord.swift`,
+`Sources/NotchKit/NotchController.swift`, `Sources/NotchKit/NotchRootView.swift`.
 
-This is not something Task 8 fixes: `NotchMetrics`'s resting sizes and
-`NotchController`'s state→size mapping are Tasks 3 and 2's reviewed,
-pinned-by-test surface, out of this task's file list, and spec §6 reads as a
-deliberate choice (1 activity = compact ears-only, glyph-like content — the
-spec's own example is media's "artwork; waveform", which doesn't exist yet
-either). Changing either would mean breaking or rewriting currently-passing,
-previously-reviewed tests on my own authority, which this task does not ask
-for. Flagging it here instead: **checks 1 and 2 below, even if a human ran
-them today, would show the correctly-sized, correctly-timed island with no
-readable text — only the dot** — until a second simultaneous activity exists
-(HUD or media, both future work). This is a real product question (what,
-if anything, a lone power/HUD/notification/device activity should show in
-the ears, absent artwork) rather than a Task 8 implementation bug, but it
-means check 1/2's literal wording will not be satisfied by this diff.
+Revised expectation for checks 1 and 2 below: a human running them today
+should see the island widen to `oneActivity` size, the leading-ear dot, and
+**the percentage in the trailing ear** (e.g. `"87%"`) — not the full
+sentence (`"Charging · 87% · 24 min to full"`), which still only appears once
+a second activity is concurrently queued (`twoActivities`, 62pt tall, has
+room for `detailRow`). That remains a real, unaddressed product question for
+a future task (what a lone HUD/notification/device activity — no
+`compactText` producer of its own yet — should show), not something this fix
+round expands scope to cover.
 
 ## The six checks
 
 1. **Plug in the charger → island morphs out showing `Charging · NN% · NN min
    to full`, then collapses after ~3s.**
    Not eye-verified (no charger to physically toggle in this session, no
-   screenshot). **Additionally, per the finding above, the text portion of
-   this check is predicted not to pass even under human observation** for a
-   lone charging event — only the sizing/motion/dot would show. Supporting
-   evidence for the parts that should work: `PowerEventDeriverTests
-   .plugInIsReported` and `.eventTitlesAreHumanReadable` pin the event and its
-   exact title string; `ActivityQueueTests` covers the 3s TTL
+   screenshot). **Revised expectation per the finding above (now fixed):** a
+   lone charging event shows the island at `oneActivity` size, the
+   leading-ear dot, and `"NN%"` in the trailing ear — not the full sentence,
+   which needs a second concurrent activity to have room. Supporting
+   evidence: `PowerEventDeriverTests.plugInIsReported`,
+   `.eventTitlesAreHumanReadable`, and the new
+   `.compactTextIsAFewGlanceableCharacters` pin the event and both its full
+   and compact text; `ActivityQueueTests` covers the 3s TTL
    (`ActivityKind.power.defaultTTL == 3`) and its expiry; `NotchControllerTests
    .activityShowsWithoutHoverAndRestsOnActivityState` pins hidden→activity on
    a nonzero count. None of this substitutes for watching it happen.
 
 2. **Unplug → island shows `On battery · NN%`, then collapses.**
-   Not eye-verified, same constraints as (1), same text-visibility caveat
-   from the finding above. Supporting evidence: `PowerEventDeriverTests
-   .unplugIsReported`.
+   Not eye-verified, same constraints as (1), same revised expectation (a
+   lone unplug event shows `"NN%"` in the trailing ear, not the full
+   sentence). Supporting evidence: `PowerEventDeriverTests.unplugIsReported`
+   and `.compactTextIsAFewGlanceableCharacters`.
 
 3. **Plug in, then hover the island as it is about to collapse → it stays
    until the cursor leaves.**
@@ -277,8 +286,10 @@ Five of six checks remain by-eye-only and unverified in this session, same
 structural reason as Task 6 (no input injection, no screenshot, no
 Accessibility grant, no local signing identity). Check 5 is now backed by a
 live log observation rather than pure reasoning — a step up from Task 6's
-all-reasoned baseline. The geometry finding above means a human running
-check 1 or 2 today should expect the island to size and time correctly but
-**not** show readable text for a lone power activity; that is a traced,
-reasoned prediction, not a guess, and is a strong reason to route this
-specific point back to review rather than to further "unverified" hedging.
+all-reasoned baseline. The geometry finding above (fix round 1) means a human
+running check 1 or 2 today should expect the island to size and time
+correctly **and** show a short percentage in the trailing ear for a lone
+power activity — not the full sentence, which still needs a second
+concurrent activity. That revised expectation is a traced, reasoned
+prediction plus 19/19 `PowerServiceTests` green, not a guess, but it is still
+not an eye-verified observation of pixels on a real screen.

@@ -21,10 +21,19 @@ public final class NotchController {
         public let id: String
         public let title: String
         public let detail: String?
-        public init(id: String, title: String, detail: String? = nil) {
+        /// Very short glanceable form for the trailing ear — "87%", "50%".
+        ///
+        /// Required, not decorative: at one activity the island stays exactly
+        /// notch-height, so `detailRow` is gated off and `title` has nowhere to
+        /// render. Without this the common single-activity case shows a glyph and
+        /// no words at all. The ear is only ~38pt wide, so this must stay to a
+        /// few characters — the full `title` will not fit.
+        public let compactText: String?
+        public init(id: String, title: String, detail: String? = nil, compactText: String? = nil) {
             self.id = id
             self.title = title
             self.detail = detail
+            self.compactText = compactText
         }
     }
 
