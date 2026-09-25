@@ -33,9 +33,15 @@ final class AppModel {
         })
 
         // Expiry is driven here, not inside the queue, so the queue stays pure.
-        pruneTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        // Built with `Timer(...)` + `RunLoop.main.add(forMode: .common)`,
+        // not `Timer.scheduledTimer`, which only schedules on `.default` --
+        // TTL expiry would otherwise stall while a menu is tracking or a
+        // drag is in progress (same fix as PowerService's run-loop source).
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.prune() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        pruneTimer = timer
     }
 
     func stop() {
