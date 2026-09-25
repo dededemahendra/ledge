@@ -5,6 +5,7 @@ import Foundation
 private func description(
     percent: Int = 87,
     state: String = "AC Power",
+    charging: Bool = true,
     charged: Bool = false,
     timeToFull: Int = 24
 ) -> [String: Any] {
@@ -12,6 +13,7 @@ private func description(
         "Current Capacity": percent,
         "Max Capacity": 100,
         "Power Source State": state,
+        "Is Charging": charging,
         "Is Charged": charged,
         "Time to Full Charge": timeToFull,
     ]
@@ -21,25 +23,42 @@ private func description(
     let s = try #require(PowerSnapshot.parse(description()))
     #expect(s.percent == 87)
     #expect(s.isPluggedIn)
+    #expect(s.isCharging)
     #expect(s.isCharged == false)
     #expect(s.timeToFullMinutes == 24)
 }
 
 @Test func parsesABatterySource() throws {
     let s = try #require(PowerSnapshot.parse(
-        description(percent: 41, state: "Battery Power", timeToFull: -1)
+        description(percent: 41, state: "Battery Power", charging: false, timeToFull: -1)
     ))
     #expect(s.percent == 41)
     #expect(s.isPluggedIn == false)
+    #expect(s.isCharging == false)
     #expect(s.timeToFullMinutes == nil, "a negative estimate means unknown, not -1 minutes")
 }
 
 @Test func parsesAFullyChargedSource() throws {
     let s = try #require(PowerSnapshot.parse(
-        description(percent: 100, charged: true, timeToFull: 0)
+        description(percent: 100, charging: false, charged: true, timeToFull: 0)
     ))
     #expect(s.isCharged)
+    #expect(s.isCharging == false, "done charging once full")
     #expect(s.percent == 100)
+}
+
+/// The headline defect this fix-wave item exists to fix: AC attached, but
+/// macOS is holding off charging — optimised battery charging short of
+/// 100%, or a thermal hold. `isPluggedIn` must stay true (the AC
+/// relationship hasn't changed) while `isCharging` is false; conflating the
+/// two is exactly what made the island lie and say "Charging" here.
+@Test func parsesAPluggedButNotChargingSource() throws {
+    let s = try #require(PowerSnapshot.parse(
+        description(percent: 95, charging: false)
+    ))
+    #expect(s.isPluggedIn)
+    #expect(s.isCharging == false)
+    #expect(s.isCharged == false)
 }
 
 @Test func percentIsScaledAgainstMaxCapacity() throws {

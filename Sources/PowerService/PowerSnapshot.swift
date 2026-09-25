@@ -1,30 +1,29 @@
 import Foundation
 
 /// One reading of the system's power state.
-///
-/// Does NOT carry IOKit's "Is Charging" flag: it was parsed, stored, and
-/// compared, but read by nothing — `PowerEventDeriver` only ever consumes
-/// `isPluggedIn`/`isCharged`. Deleted rather than kept "for later": a
-/// plugged-but-not-charging distinction (100% on AC, a thermal hold) is a
-/// real thing a future task could want, but it is trivial to re-add a
-/// parsed field when something actually consumes it, whereas carrying
-/// dead-but-tested surface area indefinitely has a real, if small,
-/// ongoing cost — every future change to this type has to keep an unused
-/// field consistent for no functional benefit.
 public struct PowerSnapshot: Sendable, Equatable {
     public let percent: Int
     public let isPluggedIn: Bool
+    /// Whether the battery is actively charging right now, straight off
+    /// IOKit's `"Is Charging"` key. Distinct from `isPluggedIn`: macOS can
+    /// report AC attached but NOT charging — optimised battery charging
+    /// holding short of 100%, or a thermal hold — and `PowerEvent.activityTitle`
+    /// depends on telling the two apart rather than claiming "Charging"
+    /// whenever the machine is merely plugged in.
+    public let isCharging: Bool
     public let isCharged: Bool
     public let timeToFullMinutes: Int?
 
     public init(
         percent: Int,
         isPluggedIn: Bool,
+        isCharging: Bool,
         isCharged: Bool,
         timeToFullMinutes: Int?
     ) {
         self.percent = percent
         self.isPluggedIn = isPluggedIn
+        self.isCharging = isCharging
         self.isCharged = isCharged
         self.timeToFullMinutes = timeToFullMinutes
     }
@@ -43,6 +42,7 @@ public struct PowerSnapshot: Sendable, Equatable {
 
         let state = description["Power Source State"] as? String
         let isPluggedIn = state == "AC Power"
+        let isCharging = description["Is Charging"] as? Bool ?? false
         let isCharged = description["Is Charged"] as? Bool ?? false
 
         let rawTimeToFull = description["Time to Full Charge"] as? Int
@@ -51,6 +51,7 @@ public struct PowerSnapshot: Sendable, Equatable {
         return PowerSnapshot(
             percent: percent,
             isPluggedIn: isPluggedIn,
+            isCharging: isCharging,
             isCharged: isCharged,
             timeToFullMinutes: timeToFull
         )

@@ -5,12 +5,14 @@ import Foundation
 private func snapshot(
     _ percent: Int,
     plugged: Bool,
+    charging: Bool = false,
     charged: Bool = false,
     toFull: Int? = nil
 ) -> PowerSnapshot {
     PowerSnapshot(
         percent: percent,
         isPluggedIn: plugged,
+        isCharging: charging,
         isCharged: charged,
         timeToFullMinutes: toFull
     )
@@ -25,8 +27,49 @@ private func snapshot(
 @Test func plugInIsReported() {
     var d = PowerEventDeriver()
     _ = d.events(for: snapshot(50, plugged: false))
-    let events = d.events(for: snapshot(50, plugged: true, toFull: 42))
-    #expect(events == [.pluggedIn(percent: 50, timeToFullMinutes: 42)])
+    let events = d.events(for: snapshot(50, plugged: true, charging: true, toFull: 42))
+    #expect(events == [.pluggedIn(percent: 50, isCharging: true, timeToFullMinutes: 42)])
+}
+
+/// The headline defect this fix-wave item exists to fix: 95% on AC, but
+/// macOS reports "AC attached; not charging" (optimised battery charging,
+/// or a thermal hold). The event — and therefore the title — must say so
+/// rather than claiming "Charging".
+@Test func plugInWhileNotChargingIsReportedAsOnAC() {
+    var d = PowerEventDeriver()
+    _ = d.events(for: snapshot(95, plugged: false))
+    let events = d.events(for: snapshot(95, plugged: true, charging: false))
+    #expect(events == [.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil)])
+    #expect(events.first?.activityTitle == "On AC · 95%")
+}
+
+/// Optional fix-wave addition: nothing used to fire when the state flips
+/// between charging and held (optimised-charging hold, thermal hold)
+/// WITHOUT an intervening unplug/replug — the island would keep showing
+/// whatever label it last had, indefinitely. `PowerEventDeriver` now
+/// re-fires `.pluggedIn` with the fresh `isCharging` value whenever it
+/// changes while still plugged in.
+@Test func chargingAndHeldToggleWhileAlreadyPluggedInIsReported() {
+    var d = PowerEventDeriver()
+    _ = d.events(for: snapshot(95, plugged: true, charging: true, toFull: 24))
+
+    let held = d.events(for: snapshot(95, plugged: true, charging: false))
+    #expect(held == [.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil)])
+    #expect(held.first?.activityTitle == "On AC · 95%")
+
+    let resumed = d.events(for: snapshot(95, plugged: true, charging: true, toFull: 20))
+    #expect(resumed == [.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20)])
+    #expect(resumed.first?.activityTitle == "Charging · 95% · 20 min to full")
+}
+
+/// The steady-state case right next to the addition above: repeated
+/// readings that change neither plug state nor charging state must still
+/// emit nothing, exactly like `steadyStateEmitsNothing`.
+@Test func steadyChargingStateEmitsNothing() {
+    var d = PowerEventDeriver()
+    _ = d.events(for: snapshot(50, plugged: true, charging: true))
+    #expect(d.events(for: snapshot(51, plugged: true, charging: true)).isEmpty)
+    #expect(d.events(for: snapshot(52, plugged: true, charging: true)).isEmpty)
 }
 
 @Test func unplugIsReported() {
@@ -82,13 +125,30 @@ private func snapshot(
 }
 
 @Test func eventTitlesAreHumanReadable() {
-    #expect(PowerEvent.pluggedIn(percent: 87, timeToFullMinutes: 24).activityTitle
+    #expect(PowerEvent.pluggedIn(percent: 87, isCharging: true, timeToFullMinutes: 24).activityTitle
             == "Charging · 87% · 24 min to full")
-    #expect(PowerEvent.pluggedIn(percent: 87, timeToFullMinutes: nil).activityTitle
+    #expect(PowerEvent.pluggedIn(percent: 87, isCharging: true, timeToFullMinutes: nil).activityTitle
             == "Charging · 87%")
     #expect(PowerEvent.unplugged(percent: 87).activityTitle == "On battery · 87%")
     #expect(PowerEvent.fullyCharged.activityTitle == "Fully charged")
     #expect(PowerEvent.lowBattery(percent: 9).activityTitle == "Low battery · 9%")
+}
+
+/// The two `.pluggedIn` title branches (fix-wave item 1): actually charging
+/// says so, with or without an estimate; plugged-but-not-charging must never
+/// say "Charging" and never shows a stale/irrelevant estimate.
+@Test func pluggedInTitleTellsChargingFromHeldApart() {
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 24).activityTitle
+            == "Charging · 95% · 24 min to full")
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: nil).activityTitle
+            == "Charging · 95%")
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).activityTitle
+            == "On AC · 95%")
+    #expect(
+        PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: 24).activityTitle
+            == "On AC · 95%",
+        "not charging means no time-to-full estimate, even if IOKit somehow still reports one"
+    )
 }
 
 /// `compactText` is the ONLY place a value can appear while a single activity
@@ -97,8 +157,8 @@ private func snapshot(
 /// battery (which may not literally be reported at 100% by IOKit) still reads
 /// "100%" rather than some other number.
 @Test func compactTextIsAFewGlanceableCharacters() {
-    #expect(PowerEvent.pluggedIn(percent: 87, timeToFullMinutes: 24).compactText == "87%")
-    #expect(PowerEvent.pluggedIn(percent: 87, timeToFullMinutes: nil).compactText == "87%")
+    #expect(PowerEvent.pluggedIn(percent: 87, isCharging: true, timeToFullMinutes: 24).compactText == "87%")
+    #expect(PowerEvent.pluggedIn(percent: 87, isCharging: false, timeToFullMinutes: nil).compactText == "87%")
     #expect(PowerEvent.unplugged(percent: 87).compactText == "87%")
     #expect(PowerEvent.fullyCharged.compactText == "100%")
     #expect(PowerEvent.lowBattery(percent: 9).compactText == "9%")

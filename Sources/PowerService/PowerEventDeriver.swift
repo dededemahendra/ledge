@@ -1,14 +1,23 @@
 import Foundation
 
 public enum PowerEvent: Sendable, Equatable {
-    case pluggedIn(percent: Int, timeToFullMinutes: Int?)
+    case pluggedIn(percent: Int, isCharging: Bool, timeToFullMinutes: Int?)
     case unplugged(percent: Int)
     case fullyCharged
     case lowBattery(percent: Int)
 
+    /// `isPluggedIn` alone used to drive this ("Charging · N%" whenever AC was
+    /// attached), which is simply false whenever macOS is holding off charging
+    /// — optimised battery charging short of 100%, or a thermal hold. Only the
+    /// `isCharging` branch may say "Charging"; the other tells the truth
+    /// ("On AC") and drops the time-to-full estimate, which means nothing
+    /// while nothing is actually charging.
     public var activityTitle: String {
         switch self {
-        case .pluggedIn(let percent, let minutes):
+        case .pluggedIn(let percent, let isCharging, let minutes):
+            guard isCharging else {
+                return "On AC · \(percent)%"
+            }
             if let minutes {
                 return "Charging · \(percent)% · \(minutes) min to full"
             }
@@ -24,13 +33,14 @@ public enum PowerEvent: Sendable, Equatable {
 
     /// Glanceable form for the trailing ear, which is the only place text can
     /// appear while a single activity holds the island at notch height. The ear
-    /// is ~38pt wide, so this stays to a few characters.
+    /// is ~38pt wide, so this stays to a few characters. Bare percentage either
+    /// way — charging vs. held is a distinction `activityTitle` alone carries.
     public var compactText: String {
         switch self {
-        case .pluggedIn(let percent, _): return "\(percent)%"
-        case .unplugged(let percent):    return "\(percent)%"
-        case .fullyCharged:              return "100%"
-        case .lowBattery(let percent):   return "\(percent)%"
+        case .pluggedIn(let percent, _, _): return "\(percent)%"
+        case .unplugged(let percent):       return "\(percent)%"
+        case .fullyCharged:                 return "100%"
+        case .lowBattery(let percent):      return "\(percent)%"
         }
     }
 }
@@ -61,11 +71,25 @@ public struct PowerEventDeriver: Sendable {
             if snapshot.isPluggedIn {
                 events.append(.pluggedIn(
                     percent: snapshot.percent,
+                    isCharging: snapshot.isCharging,
                     timeToFullMinutes: snapshot.timeToFullMinutes
                 ))
             } else {
                 events.append(.unplugged(percent: snapshot.percent))
             }
+        } else if snapshot.isPluggedIn, snapshot.isCharging != previous.isCharging {
+            // Optional fix-wave addition: without this, nothing fires when the
+            // state flips between charging and held (optimised-charging hold,
+            // thermal hold) WITHOUT an intervening unplug/replug, so the island
+            // would keep showing whatever label it last had. Re-fires the same
+            // `.pluggedIn` event with the fresh `isCharging` value/estimate;
+            // `ActivityQueue` coalesces it into the existing `.power` activity
+            // by kind and restarts its TTL, same as any other update.
+            events.append(.pluggedIn(
+                percent: snapshot.percent,
+                isCharging: snapshot.isCharging,
+                timeToFullMinutes: snapshot.timeToFullMinutes
+            ))
         }
 
         if snapshot.isCharged, !firedFullyCharged {
