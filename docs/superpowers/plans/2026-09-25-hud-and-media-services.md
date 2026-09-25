@@ -14,7 +14,11 @@
 
 ## Global Constraints
 
-Everything in the Phases 0–2 plan's Global Constraints still applies. Additionally:
+Everything in the Phases 0–2 plan's Global Constraints still applies — including this one, which is easy to miss and affects every step below:
+
+- **Run tests through `make test`, never bare `swift test`.** Where a step says `swift test --filter SomeTests`, run `make test FILTER=SomeTests`; where it says `swift test`, run `make test`. Bare `swift test` fails intermittently (measured: 5/12 runs) because swift-testing's macro plugin lives in a `plugins/testing/` subdirectory that is not on the compiler's default plugin search path. The Makefile's `TESTFLAGS` supplies it and makes runs deterministic (12/12).
+
+Additionally:
 
 - **No permission is requested by any task in this plan.** Volume and brightness are observed by value. If an implementation finds itself needing Accessibility or Input Monitoring, stop and report rather than adding a prompt.
 - Verified on this machine, use as given:
