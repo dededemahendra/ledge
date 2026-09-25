@@ -7,8 +7,13 @@ public protocol ScreenDescribing: Sendable {
     var frame: CGRect { get }
     var safeAreaTopInset: CGFloat { get }
     /// Right edge of the menu bar area to the left of the notch.
+    ///
+    /// Reported in **global desktop coordinates**, the same space as `frame` —
+    /// Apple documents `NSScreen.auxiliaryTopLeftArea` as "specified in global
+    /// screen coordinates". `NotchGeometry` subtracts `frame.minX` to convert.
     var auxiliaryTopLeftMaxX: CGFloat? { get }
     /// Left edge of the menu bar area to the right of the notch.
+    /// Also in global desktop coordinates — see above.
     var auxiliaryTopRightMinX: CGFloat? { get }
     var isBuiltIn: Bool { get }
 }

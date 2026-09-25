@@ -19,9 +19,15 @@ public enum NotchGeometry {
             let trailingEdge = screen.auxiliaryTopRightMinX
         else { return nil }
 
+        // Width is a difference of two global values, so the desktop offset
+        // cancels and it needs no adjustment.
         let width = trailingEdge - leadingEdge
         guard width > 0 else { return nil }
 
-        return CGRect(x: leadingEdge, y: 0, width: width, height: height)
+        // The auxiliary edges arrive in global desktop coordinates, so subtract
+        // the screen's own origin to land in the screen-relative space this
+        // function promises. A no-op on the primary display, where frame.minX is
+        // 0; not a no-op for a built-in panel docked beside an external primary.
+        return CGRect(x: leadingEdge - screen.frame.minX, y: 0, width: width, height: height)
     }
 }
