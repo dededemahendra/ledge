@@ -83,11 +83,16 @@ public struct NotchRootView: View {
     /// activity is live, 118 -> 32) used the expand spring's 3.8% overshoot
     /// and briefly undershot past the 32pt notch cutout, exposing the hole.
     ///
-    /// Height specifically, not the whole parameter tuple: it is the one
-    /// dimension where an overshoot has a physical consequence (uncovering
-    /// the notch); width/radius/fillet overshoot has no such failure mode,
-    /// and neither is monotonic with "size tier" the way height's floor at
-    /// the notch's own height is.
+    /// Height is the primary signal — it is the one dimension where an
+    /// overshoot has a physical consequence (uncovering the notch) — but it
+    /// is not sufficient on its own: `.hidden` -> one activity grows 179 ->
+    /// 255 in WIDTH at EQUAL height (`NotchMetrics.oneActivity` deliberately
+    /// tracks `notchRect.height`, same as `.collapsed`), so a height-only
+    /// comparison misclassified the app's single most common grow
+    /// transition as a collapse. `previousWidth` below exists only to break
+    /// that tie; it is not consulted otherwise, so a shrink that happens to
+    /// widen (none exists among the app's states today, but nothing rules
+    /// one out) still reads as a collapse from its height alone.
     ///
     /// Spelled out via the underlying `State<Value>` type rather than the
     /// `@State` attribute: this toolchain's CommandLineTools install has no
@@ -102,16 +107,27 @@ public struct NotchRootView: View {
         nonmutating set { _previousHeight.wrappedValue = newValue }
     }
 
+    /// See `previousHeight` above — same reasoning, same toolchain
+    /// workaround, kept in the view (not `NotchController`) per spec §4.
+    private var _previousWidth: State<CGFloat>
+    private var previousWidth: CGFloat {
+        get { _previousWidth.wrappedValue }
+        nonmutating set { _previousWidth.wrappedValue = newValue }
+    }
+
     public init(controller: NotchController, onTap: @escaping () -> Void = {}) {
         self.controller = controller
         self.onTap = onTap
         _previousHeight = State(initialValue: controller.parameters.height)
+        _previousWidth = State(initialValue: controller.parameters.width)
     }
 
     public var body: some View {
         let parameters = controller.parameters
         let shape = NotchShape(parameters)
-        let expanding = parameters.height > previousHeight
+        let expanding = parameters.height == previousHeight
+            ? parameters.width > previousWidth
+            : parameters.height > previousHeight
 
         ZStack(alignment: .top) {
             shape
@@ -164,9 +180,10 @@ public struct NotchRootView: View {
         .accessibilityLabel("Ledge notch island")
         .onChange(of: parameters) { _, newValue in
             // Recorded AFTER this transition's spring was already chosen
-            // above, so it becomes the "before" height for whichever
+            // above, so it becomes the "before" height/width for whichever
             // transition comes next.
             previousHeight = newValue.height
+            previousWidth = newValue.width
         }
     }
 
