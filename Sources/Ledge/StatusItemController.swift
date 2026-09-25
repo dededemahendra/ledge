@@ -14,7 +14,14 @@ final class StatusItemController {
         )
         item.menu = menu
         addSeparator()
-        addItem(title: "Quit Ledge") { NSApp.terminate(nil) }
+        // Appended directly, NOT via `addItem(title:action:)` below: this
+        // call is what ESTABLISHES the trailing separator + Quit pair that
+        // method's own doc comment promises to stay above of. Routing it
+        // through `addItem` too was the bug — `addItem` unconditionally
+        // appended, so the shipped menu read
+        // `power, app, ─, Quit Ledge, Toggle Panel`, with Quit stuck in the
+        // middle and whatever action item was added last ending up below it.
+        menu.addItem(makeItem(title: "Quit Ledge") { NSApp.terminate(nil) })
     }
 
     func addSeparator() {
@@ -23,6 +30,14 @@ final class StatusItemController {
 
     /// Inserts an item above the trailing separator + Quit pair.
     func addItem(title: String, action: @escaping () -> Void) {
+        // `- 2`: the separator and Quit Ledge are always the last two items
+        // by construction (`init` above), so this is where "above them"
+        // always is, regardless of how many status rows or action items
+        // have been added in between.
+        menu.insertItem(makeItem(title: title, action: action), at: max(0, menu.items.count - 2))
+    }
+
+    private func makeItem(title: String, action: @escaping () -> Void) -> NSMenuItem {
         let entry = NSMenuItem(title: title, action: #selector(Trampoline.fire), keyEquivalent: "")
         let trampoline = Trampoline(action)
         entry.target = trampoline
@@ -31,7 +46,7 @@ final class StatusItemController {
         // as long as the item is in the menu. Without it the closure would be
         // deallocated the moment this method returns.
         entry.representedObject = trampoline
-        menu.addItem(entry)
+        return entry
     }
 
     /// Updates (or creates) a status row identified by `key`, e.g. "power".
