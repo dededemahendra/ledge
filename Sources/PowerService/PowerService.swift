@@ -93,6 +93,18 @@ public final class PowerService {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
         runLoopSource = nil
+        // Clear `onTermination` before `finish()`: `finish()` invokes it
+        // SYNCHRONOUSLY on whichever thread calls `teardown()`, and that
+        // handler schedules `Task { @MainActor in self?.stop() }`. Left in
+        // place, a second `start()` (which calls `stop()` -> `teardown()` on
+        // the FIRST continuation before installing the second) would queue a
+        // `stop()` task that runs after the second continuation and run-loop
+        // source are already installed — tearing both back down and killing
+        // power monitoring permanently. The handler's only job is to react
+        // to a termination this class did not itself initiate (e.g. the
+        // consumer dropping the stream); a termination `teardown()` itself
+        // drives needs no such reaction.
+        continuation?.onTermination = nil
         continuation?.finish()
         continuation = nil
     }
