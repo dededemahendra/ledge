@@ -20,6 +20,21 @@ import SwiftUI
     #expect(NotchAnimation.animation(expanding: false, reduceMotion: false) == NotchAnimation.collapse)
 }
 
+/// Pins `textAnimation`'s reduce-motion branching. Does NOT (and cannot,
+/// from a unit test) prove the `.blurReplace` transition it drives actually
+/// plays at runtime — that needs a live, in-progress animation, which
+/// neither this nor `NotchRenderTests`' single-frame `ImageRenderer` can
+/// observe. This is the same class of limitation already on record for
+/// spring selection (see `NotchRootView.body`'s `expanding` comment): the
+/// constants/branching are pinned; the live behaviour is reasoned, not
+/// observed.
+@Test func textAnimationHonoursReduceMotion() {
+    #expect(NotchAnimation.textAnimation(reduceMotion: true) == NotchAnimation.reduced)
+    #expect(NotchAnimation.textAnimation(reduceMotion: false) == NotchAnimation.textCrossfade)
+    #expect(NotchAnimation.textAnimation(reduceMotion: false) != NotchAnimation.expand)
+    #expect(NotchAnimation.textAnimation(reduceMotion: false) != NotchAnimation.collapse)
+}
+
 @Test func expandOvershootsAndCollapseBarelyDoes() {
     // overshoot = exp(-zeta * pi / sqrt(1 - zeta^2))
     func overshoot(_ zeta: Double) -> Double {

@@ -266,6 +266,54 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     )
 }
 
+// MARK: - Detail row budget
+
+/// Pins the fix for the two-activity detail row overflowing its budget.
+/// `twoActivities.height - notchRect.height` gives `detailRow` a 30pt
+/// budget below the hole; showing every activity's title (let alone title
+/// + detail) measures 38-51pt, which was silently clipped away downward by
+/// `.clipShape` — invisible to a pixel check against the parent view (the
+/// three tests above), since a clipped pixel is simply an absent pixel, not
+/// a failure. Measuring `detailRow`'s own ideal (UNCLIPPED) size directly,
+/// via the `detailRowForTesting` seam, is what actually catches content
+/// that grows past its budget.
+@MainActor
+@Test func twoActivityDetailRowIdealHeightFitsItsBudget() {
+    let controller = makeController()
+    controller.setActivities(
+        [
+            .init(id: "power", title: "Charging · 42%", detail: "24 min to full", compactText: "42%"),
+            .init(id: "device", title: "AirPods Pro connected"),
+        ],
+        overflow: 0
+    )
+    #expect(controller.state == .activity)
+    #expect(controller.parameters == controller.metrics.twoActivities)
+
+    let budget = controller.metrics.twoActivities.height - controller.metrics.notchRect.height
+
+    let renderer = ImageRenderer(content: NotchRootView(controller: controller).detailRowForTesting)
+    renderer.scale = 2
+    // Height left unconstrained (`nil`): the point is the subtree's own
+    // IDEAL height, not whatever a fixed proposed height would force it
+    // into. Width is fixed to match what `islandContent` actually gives it
+    // in production (see `detailRowForTesting`'s doc comment).
+    renderer.proposedSize = ProposedViewSize(width: controller.parameters.width, height: nil)
+    guard let cgImage = renderer.cgImage else {
+        fatalError("ImageRenderer produced no image for detailRowForTesting")
+    }
+    let idealHeight = CGFloat(cgImage.height) / renderer.scale
+
+    #expect(
+        idealHeight <= budget,
+        """
+        detailRow's ideal height \(idealHeight)pt exceeds its \(budget)pt budget at two-activity \
+        size — content that doesn't fit is silently clipped downward by `.clipShape`, invisible \
+        to a pixel-level check against the full island
+        """
+    )
+}
+
 // MARK: - Harness self-check
 
 /// Validates the rendering + coordinate-flip pipeline above independently of

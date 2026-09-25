@@ -21,6 +21,20 @@ public enum NotchAnimation {
         if reduceMotion { return reduced }
         return expanding ? expand : collapse
     }
+
+    /// For in-place text swaps (the trailing ear's `compactText`, a detail
+    /// row's `title`) — spec §5's "`.blurReplace` transition for text
+    /// swaps." A spring reads wrong here: a spring is for something moving
+    /// or resizing, and text swapping in place is neither, so `expand`/
+    /// `collapse`'s overshoot would look like a glitch, not motion. Short
+    /// enough not to lag behind the glanceable values it announces (a
+    /// percentage ticking down, say).
+    public static let textCrossfadeDuration: Double = 0.2
+    public static let textCrossfade = Animation.easeInOut(duration: textCrossfadeDuration)
+
+    public static func textAnimation(reduceMotion: Bool) -> Animation {
+        reduceMotion ? reduced : textCrossfade
+    }
 }
 
 /// Fades island content in as the shape grows, so text never appears before there
@@ -290,27 +304,92 @@ public struct NotchRootView: View {
                 // a fresh view for `.blurReplace` to animate.
                 .id(compact)
                 .transition(.blurReplace)
+                // `.transition` needs an ANIMATED transaction to actually
+                // play, not just the insertion/removal `.id` gives it above.
+                // The only animation in scope, `.animation(value: parameters)`
+                // on the root view, attaches only when `parameters` itself
+                // changes — a percent tick (87% -> 86%) changes `compact`
+                // but leaves `parameters` equal, so without this, nothing
+                // attaches and the swap is instantaneous. Keyed on `compact`
+                // specifically, so only an actual value change animates.
+                .animation(
+                    NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                    value: compact
+                )
         }
     }
 
+    /// Budget below the hole is tight: at two (or three+, which shares the
+    /// same `twoActivities` size) activities it is `twoActivities.height -
+    /// notch.height` = 30pt. Measured ideal height of every activity's
+    /// title+detail stacked: 51pt; even titles-only (no detail lines): 38pt.
+    /// Both blow the budget — growing the island to fit was rejected (62pt
+    /// is the spec value; "ears first, grow down only when crowded" was
+    /// chosen over "grow to fit text"), and so was accepting truncation
+    /// (silently clipping the state spec §6 says shows the top two is not a
+    /// defensible resting state). So only the highest-priority activity's
+    /// TITLE (no detail) renders here — both activities stay represented
+    /// regardless, each via its own ear (`leadingEar`/`trailingEar`).
+    /// `.expanded` has far more room (86pt) and shows every activity in
+    /// full. Pinned by `NotchRenderTests`'
+    /// `twoActivityDetailRowIdealHeightFitsItsBudget`, which measures this
+    /// subtree's own ideal (unclipped) height directly — a rendered/clipped
+    /// pixel check can't see content silently truncated by `.clipShape`.
     @ViewBuilder private var detailRow: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(controller.activities) { activity in
-                Text(activity.title)
-                    .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
-                    .id(activity.title)   // see trailingEar's `.id(compact)` above
-                    .transition(.blurReplace)
-                if let detail = activity.detail {
-                    Text(detail)
-                        .font(.system(size: 9))
-                        .foregroundStyle(contentColor.opacity(0.6))
-                        .lineLimit(1)
+            if controller.state == .expanded {
+                ForEach(controller.activities) { activity in
+                    detailTitle(activity.title)
+                    if let detail = activity.detail {
+                        Text(detail)
+                            .font(.system(size: 9))
+                            .foregroundStyle(contentColor.opacity(0.6))
+                            .lineLimit(1)
+                    }
                 }
+            } else if let activity = controller.activities.first {
+                detailTitle(activity.title)
             }
         }
         .padding(.horizontal, 14)
-        .padding(.bottom, 8)
+        .padding(.bottom, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    /// One activity title, keyed and transitioned exactly like `trailingEar`'s
+    /// `compact` text above. `.transition` alone only supplies the
+    /// insertion/removal `.id(title)` creates; it still needs an ANIMATED
+    /// transaction to actually play, which `.animation(value: parameters)`
+    /// on the root view does NOT supply for a title change on its own (a
+    /// title changing leaves `parameters` — state/activityCount/metrics —
+    /// equal, so that root-level animation never attaches). This local
+    /// `.animation(value:)` supplies one directly, keyed on the title
+    /// itself so only an actual change animates.
+    private func detailTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .medium))
+            .lineLimit(1)
+            .id(title)
+            .transition(.blurReplace)
+            .animation(
+                NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                value: title
+            )
+    }
+
+    #if DEBUG
+    /// Test-only seam (see `NotchRenderTestHook` above): lets
+    /// `NotchRenderTests` measure `detailRow`'s own ideal (UNCLIPPED)
+    /// height in isolation, at the exact width it receives in production
+    /// (`islandContent`'s `.frame(width: parameters.width, ...)`). A
+    /// pixel-level check against the full, clipped `NotchRootView` cannot
+    /// see this: `.clipShape` hides any overflow instead of erroring, which
+    /// is exactly how the previous top-alignment fix converted "bleeds
+    /// upward into the notch" into "silently truncated downward" without
+    /// either automated check catching it. Reachable only via
+    /// `@testable import` (never `public`).
+    var detailRowForTesting: some View {
+        detailRow.frame(width: controller.parameters.width, alignment: .top)
+    }
+    #endif
 }
