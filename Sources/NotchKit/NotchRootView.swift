@@ -161,12 +161,11 @@ public struct NotchRootView: View {
         return accent
     }
 
-    /// The three purely-visual expanded-card effects (desktop-blur material,
-    /// hairline border, drop shadow) are suppressed while the render-test
-    /// hook is active: `ImageRenderer` draws `NSViewRepresentable` as empty,
-    /// a half-outside stroke and a soft shadow ring would both pollute the
-    /// silhouette-match test's fill classification, and none of the three is
-    /// what those tests exist to pin (geometry and content placement are).
+    /// The purely-visual expanded-card effects (hairline border, drop
+    /// shadow) are suppressed while the render-test hook is active: a
+    /// half-outside stroke or a soft shadow ring would pollute the
+    /// silhouette-match test's fill classification, and neither is what
+    /// those tests exist to pin (geometry and content placement are).
     private var visualEffectsSuppressed: Bool {
         #if DEBUG
         NotchRenderTestHook.contentColor != nil
@@ -191,45 +190,16 @@ public struct NotchRootView: View {
 
         let expanded = controller.state == .expanded
         let showEffects = expanded && !visualEffectsSuppressed
-        let artBackdrop: NSImage? = showEffects
-            ? controller.media?.artwork.flatMap(NSImage.init(data:))
-            : nil
 
         ZStack(alignment: .top) {
             shape
+                // Flat, fully opaque black in every state — the real Alcove
+                // card is a flat slab, and it has to be: the island sits
+                // flush against the actual notch, and any translucency or
+                // artwork tint on the surface breaks the illusion that
+                // island and bezel are one object. Depth comes from the
+                // hairline + shadow below, not from the fill.
                 .fill(.black)
-                // The expanded card reads as a material, not a flat slab.
-                // With artwork playing, the card's background IS the album
-                // art — blurred, saturated, darkened — so the whole surface
-                // takes the track's colour identity, the way Alcove's card
-                // does; the black fill drops to 30% over it (the backdrop
-                // carries its own darkening). Without artwork it falls back
-                // to desktop blur under a 62% fill. Compact stays fully
-                // opaque on purpose: sitting flush against the real notch,
-                // anything but pure black breaks the illusion that island
-                // and bezel are one object.
-                .opacity(showEffects ? (artBackdrop != nil ? 0.30 : 0.62) : 1)
-                .background {
-                    if let artBackdrop {
-                        Image(nsImage: artBackdrop)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(
-                                width: NotchMetrics.canvasSize.width,
-                                height: NotchMetrics.canvasSize.height
-                            )
-                            // Overscan before blurring so the island's strip at
-                            // the canvas's top edge samples dense image, not the
-                            // blur's transparent edge vignette.
-                            .scaleEffect(1.4)
-                            .blur(radius: 48)
-                            .saturation(1.5)
-                            .overlay(Color.black.opacity(0.30))
-                            .clipShape(shape)
-                    } else if showEffects {
-                        VibrancyBackdrop().clipShape(shape)
-                    }
-                }
                 // `.overlay`'s default alignment is `.center`: a `Shape` fill
                 // occupies its ENTIRE proposed canvas (640x320), not the
                 // island's own drawn extent, so uncentred content here would
@@ -620,7 +590,7 @@ public struct NotchRootView: View {
     /// (spec §6: "ears keep glyphs" at Expanded too).
     ///
     /// `matchedGeometryEffect` pairs the ear's 20pt artwork with the panel's
-    /// 60pt one (id `Self.artworkGeometryID`), so expanding morphs one sleeve
+    /// 56pt one (id `Self.artworkGeometryID`), so expanding morphs one sleeve
     /// between the two slots instead of crossfading two unrelated images.
     /// This was previously dropped — correctly, at the time — because both
     /// copies stayed visible together at `.expanded`, and pairing two

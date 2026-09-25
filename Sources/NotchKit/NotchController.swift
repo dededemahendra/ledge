@@ -64,6 +64,11 @@ public enum NotchIntent: Sendable, Equatable {
     case togglePlayPause
     case next
     case previous
+    // Stateless toggles: the adapter accepts them but `MediaPayload` does not
+    // yet decode shuffleMode/repeatMode, so the buttons fire without showing
+    // an active state. Decode-and-highlight is a later, separate step.
+    case toggleShuffle
+    case toggleRepeat
     case seek(fraction: Double)
 }
 

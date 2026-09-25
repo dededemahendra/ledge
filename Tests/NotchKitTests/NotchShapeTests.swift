@@ -21,7 +21,7 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.twoActivities.width == 342)
     #expect(metrics.twoActivities.height == 62)
     #expect(metrics.expanded.width == 390)
-    #expect(metrics.expanded.height == 140)   // 118 -> 140, media redesign
+    #expect(metrics.expanded.height == 168)   // 118 -> 140 -> 168, matching Alcove's card proportions
     #expect(metrics.expanded.bottomRadius == 26)
     #expect(metrics.expanded.outerFillet == 13)
 }
@@ -82,7 +82,7 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
 
 @Test func interpolationIsMonotonicAndBounded() {
     let a = NotchShapeParameters(width: 179, height: 32, bottomRadius: 9, outerFillet: 0)
-    let b = NotchShapeParameters(width: 390, height: 140, bottomRadius: 26, outerFillet: 13)
+    let b = NotchShapeParameters(width: 390, height: 168, bottomRadius: 26, outerFillet: 13)
     var previousWidth = a.width
     var previousHeight = a.height
     for step in 0...10 {
@@ -126,7 +126,7 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
     let bounds = NotchShape(metrics.expanded).path(in: canvas).boundingRect
     #expect(abs(bounds.width - (390 + 2 * 13)) < 0.5)
-    #expect(abs(bounds.height - 140) < 0.5)
+    #expect(abs(bounds.height - 168) < 0.5)
 }
 
 @Test func pathIsAlwaysWeldedToTheTopEdge() {

@@ -8,6 +8,8 @@ import Testing
     #expect(MediaCommand.togglePlayPause.adapterArguments == ["send", "2"])
     #expect(MediaCommand.nextTrack.adapterArguments == ["send", "4"])
     #expect(MediaCommand.previousTrack.adapterArguments == ["send", "5"])
+    #expect(MediaCommand.toggleShuffle.adapterArguments == ["send", "6"])
+    #expect(MediaCommand.toggleRepeat.adapterArguments == ["send", "7"])
 }
 
 @Test func seekConvertsSecondsToMicroseconds() {

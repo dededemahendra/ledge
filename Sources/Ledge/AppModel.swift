@@ -163,6 +163,8 @@ final class AppModel {
         case .togglePlayPause: media.send(.togglePlayPause)
         case .next:             media.send(.nextTrack)
         case .previous:         media.send(.previousTrack)
+        case .toggleShuffle:    media.send(.toggleShuffle)
+        case .toggleRepeat:     media.send(.toggleRepeat)
         case .seek(let fraction):
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.

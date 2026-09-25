@@ -1,19 +1,27 @@
 import AppKit
 import SwiftUI
 
-/// The expanded media card: artwork, title/artist, an accent-tinted scrubber
-/// with live drag tracking, and prev/play/next with the play button as the
-/// visual focal point. Rendered by `NotchRootView.detailRow` only at
-/// `.expanded` size, entirely **below** the notch cutout — never inside
-/// `controller.metrics.notchRect`, which has no pixels.
+/// The expanded media card, laid out to match Alcove's structure (from the
+/// user's screenshot of the real thing):
 ///
-/// Layout budget is hard: `expanded.height - notchRect.height` = 108pt on
-/// the measured display. Measured ideal height of everything below — title
-/// (~18) + artist(~16) + scrub block(~19) + controls(28) + spacings/padding
-/// ≈ 97pt against a 108pt budget (`expanded.height` was raised 118 → 140
-/// during this redesign — the compact states must never grow, but expanded
-/// is the deliberate full-panel state and its container serves its panel).
-/// Pinned by `NotchRenderTests.mediaPanelIdealHeightFitsTheExpandedBudget`.
+///   row 1 — artwork · title/artist · visualizer, edge to edge
+///   row 2 — full-width scrubber with the times INLINE at its ends
+///   row 3 — five controls on their own centred row:
+///           shuffle · previous · play/pause · next · repeat
+///
+/// Flat black card — Alcove's is, and anything else beside the real notch
+/// reads as a different object. The play glyph is simply LARGER than its
+/// neighbours (no circle chip); shuffle/repeat are real (`send 6`/`send 7`
+/// in the adapter) but stateless for now — `MediaPayload` does not yet
+/// decode shuffleMode/repeatMode, so they fire without an active highlight.
+/// Alcove's fifth icon is screen-mirroring, which has no backing capability
+/// here, so repeat takes that slot rather than shipping a dead button.
+///
+/// Layout budget is hard: `expanded.height - notchRect.height` = 136pt on
+/// the measured display (expanded was raised 118 → 140 → 168 to carry this
+/// card at Alcove's own proportions, ~342×169 measured from the screenshot).
+/// Ideal height of the rows below ≈ 124pt. Pinned by
+/// `NotchRenderTests.mediaPanelIdealHeightFitsTheExpandedBudget`.
 struct MediaPanelView: View {
     let media: MediaPresentation
     let reduceMotion: Bool
@@ -21,14 +29,11 @@ struct MediaPanelView: View {
     /// threaded through from `NotchRootView.contentColor` so exactly one
     /// place decides it.
     let contentColor: Color
-    /// Dominant-ish colour pulled from the artwork (`ArtworkAccent`), owned
-    /// and cached by `NotchRootView` so the compact ear's progress sliver and
-    /// this card always agree. Equals `contentColor` under the render-test
-    /// hook, so pixel classification stays two-colour there.
+    /// Artwork-derived (`ArtworkAccent`), kept for the compact ear's paused
+    /// progress sliver. The card itself is white-on-black like Alcove's.
     let accent: Color
-    /// Pairs the compact ear's 20pt artwork with the 60pt one below into a
-    /// single morphing element across expand/collapse. 64pt with 11pt
-    /// continuous corners — Alcove-scale prominence. The pair is exclusive
+    /// Pairs the compact ear's 20pt artwork with the 56pt one below into a
+    /// single morphing element across expand/collapse. The pair is exclusive
     /// — `NotchRootView.leadingEar` hides its copy at `.expanded` — which is
     /// the precondition that makes `matchedGeometryEffect`'s hero semantics
     /// valid here at all; see the call-site comment there.
@@ -68,7 +73,21 @@ struct MediaPanelView: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        VStack(spacing: 7) {
+            headerRow
+            scrubRow
+            controlsRow
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+        .foregroundStyle(contentColor)
+    }
+
+    // MARK: - Row 1: artwork · title/artist · visualizer
+
+    private var headerRow: some View {
+        HStack(alignment: .center, spacing: 10) {
             artwork
                 .matchedGeometryEffect(id: NotchRootView.artworkGeometryID, in: artworkNamespace)
                 // Track-change crossfade, same keyed-`.id` + local-animation
@@ -79,12 +98,11 @@ struct MediaPanelView: View {
                 .transition(.blurReplace)
                 .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: media.title)
 
-            VStack(alignment: .leading, spacing: 1) {
-                // Typography as a set, not defaults: rounded family matching
-                // the system's own media surfaces; hierarchy from weight +
-                // size + opacity together. Title tracking pulled in a touch —
-                // tracking is size-specific, and semibold rounded at 15pt
-                // reads slightly loose at 0.
+            VStack(alignment: .leading, spacing: 2) {
+                // Typography as a set: rounded family matching the system's
+                // own media surfaces; hierarchy from weight + size + opacity
+                // together. Tracking is size-specific — semibold rounded at
+                // 15pt reads slightly loose at 0.
                 Text(media.title)
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .tracking(-0.2)
@@ -96,34 +114,32 @@ struct MediaPanelView: View {
                 if let artist = media.artist {
                     Text(artist)
                         .font(.system(size: 13, weight: .regular, design: .rounded))
-                        .foregroundStyle(contentColor.opacity(0.68))
+                        .foregroundStyle(contentColor.opacity(0.62))
                         .lineLimit(1)
                         .id(artist)
                         .transition(.blurReplace)
                         .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: artist)
                 }
-
-                scrubBlock
-                    .padding(.top, 4)
-
-                controls
-                    .padding(.top, 2)
             }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 0)
-        .padding(.bottom, 6)
-        .foregroundStyle(contentColor)
-    }
 
-    // MARK: - Artwork
+            Spacer(minLength: 8)
+
+            // Alcove parks its equalizer glyph top-right of the card. White
+            // like the rest of the card; animated only while actually playing.
+            AudioVisualizerBars(
+                color: contentColor.opacity(0.85),
+                isAnimating: media.isPlaying && !reduceMotion
+            )
+            .opacity(media.isPlaying ? 1 : 0.35)
+        }
+    }
 
     @ViewBuilder private var artwork: some View {
         Group {
             if let data = media.artwork, let image = NSImage(data: data) {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(contentColor.opacity(0.18))
                     .overlay {
                         Image(systemName: "music.note")
@@ -132,35 +148,38 @@ struct MediaPanelView: View {
                     }
             }
         }
-        .frame(width: 64, height: 64)
-        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         // Depth: a soft shadow beneath and a hairline catching light on the
         // edge, so the sleeve reads as an object sitting on the card rather
         // than a flat texture. The placeholder gets the identical treatment
         // so the two states don't jump when artwork arrives.
         .overlay {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.45), radius: 6, y: 2)
     }
 
-    // MARK: - Scrubber
+    // MARK: - Row 2: full-width scrubber, times inline at the ends
 
-    /// Bar + timestamps as ONE gesture surface (~19pt tall), so the hit
-    /// target meets the ~10pt-slop rule without the bar itself growing past
-    /// its 3.5pt visual weight — a 3.5pt-tall drag target on its own is
-    /// nearly unhittable.
-    private var scrubBlock: some View {
+    private var scrubRow: some View {
         let dragging = dragFraction != nil
 
-        return VStack(spacing: 3) {
+        return HStack(spacing: 8) {
+            // Fixed-width slots so the bar doesn't resize as digits tick
+            // over or the remaining count changes length.
+            Text(media.elapsedText)
+                .frame(width: 34, alignment: .leading)
+
             GeometryReader { geometry in
                 let fraction = dragFraction.map(Double.init) ?? media.progress
                 ZStack(alignment: .leading) {
-                    Capsule().fill(contentColor.opacity(0.18))
+                    Capsule().fill(contentColor.opacity(0.22))
                     Capsule()
-                        .fill(accent)
+                        // White fill, like Alcove's — the accent stays in the
+                        // compact ear where it carries the track's identity.
+                        .fill(contentColor)
                         .frame(width: max(0, geometry.size.width * fraction))
                         // Smooths the 1Hz position tick into a continuous
                         // slide — but ONLY while not dragging: during a drag
@@ -171,26 +190,26 @@ struct MediaPanelView: View {
                             value: media.progress
                         )
                 }
+                // Grab affordance: the bar thickens under the pointer,
+                // vertically centred in the 18pt gesture strip. Critically
+                // damped — a state change, not a thrown object.
+                .frame(height: dragging ? 6 : 3.5)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .animation(
+                    reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 1.0),
+                    value: dragging
+                )
                 .contentShape(Rectangle())
                 .highPriorityGesture(scrubGesture(width: geometry.size.width))
             }
-            // Grab affordance: the bar thickens under the pointer. Critically
-            // damped — this is a state change, not a thrown object.
-            .frame(height: dragging ? 6 : 3.5)
-            .animation(
-                reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 1.0),
-                value: dragging
-            )
+            .frame(height: 18)   // the whole strip is the hit target (~10pt slop rule)
 
-            HStack {
-                Text(media.elapsedText)
-                Spacer()
-                if let remaining = media.remainingText { Text(remaining) }
-            }
-            .font(.system(size: 10, design: .rounded))
-            .monospacedDigit()
-            .foregroundStyle(contentColor.opacity(0.55))
+            Text(media.remainingText ?? "")
+                .frame(width: 34, alignment: .trailing)
         }
+        .font(.system(size: 10, design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(contentColor.opacity(0.55))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Playback position")
         .accessibilityValue(media.elapsedText)
@@ -220,19 +239,26 @@ struct MediaPanelView: View {
             }
     }
 
-    // MARK: - Controls
+    // MARK: - Row 3: shuffle · previous · play/pause · next · repeat
 
-    /// Play/pause is the primary action and looks like it: a 28pt filled
-    /// circle behind a 20pt glyph, flanked by 15pt skips at reduced opacity.
-    /// Grouped tight (14pt) and centred under the text column.
-    private var controls: some View {
-        HStack(spacing: 14) {
-            skipButton("backward.fill", label: "Previous", .previous)
+    /// Five controls spread evenly on their own full-width row like Alcove's,
+    /// the play glyph simply larger than its neighbours — hierarchy from
+    /// size, no chip behind it. Symmetric: mode toggles at the edges,
+    /// transport inside, play in the middle.
+    private var controlsRow: some View {
+        HStack(spacing: 0) {
+            controlButton("shuffle", label: "Shuffle", size: 13, opacity: 0.6, .toggleShuffle)
+                .frame(maxWidth: .infinity)
+            controlButton("backward.fill", label: "Previous", size: 17, opacity: 0.9, .previous)
+                .frame(maxWidth: .infinity)
             playPauseButton
-            skipButton("forward.fill", label: "Next", .next)
+                .frame(maxWidth: .infinity)
+            controlButton("forward.fill", label: "Next", size: 17, opacity: 0.9, .next)
+                .frame(maxWidth: .infinity)
+            controlButton("repeat", label: "Repeat", size: 13, opacity: 0.6, .toggleRepeat)
+                .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 28)
+        .frame(height: 30)
     }
 
     private var playPauseButton: some View {
@@ -240,28 +266,28 @@ struct MediaPanelView: View {
         return Button {
             emit(.togglePlayPause)
         } label: {
-            ZStack {
-                Circle().fill(contentColor.opacity(0.14))
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .semibold))
-                    .id(symbol)
-                    .transition(.blurReplace)
-                    .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: symbol)
-            }
-            .frame(width: 28, height: 28)
+            Image(systemName: symbol)
+                .font(.system(size: 24, weight: .semibold))
+                .id(symbol)
+                .transition(.blurReplace)
+                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: symbol)
+                .frame(width: 34, height: 30)   // hit slop beyond the glyph
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
         .accessibilityLabel(media.isPlaying ? "Pause" : "Play")
     }
 
-    private func skipButton(_ symbol: String, label: String, _ intent: NotchIntent) -> some View {
+    private func controlButton(
+        _ symbol: String, label: String, size: CGFloat, opacity: Double, _ intent: NotchIntent
+    ) -> some View {
         Button {
             emit(intent)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .opacity(0.85)
-                .frame(width: 24, height: 24)   // hit slop beyond the glyph
+                .font(.system(size: size, weight: .semibold))
+                .opacity(opacity)
+                .frame(width: 30, height: 30)   // hit slop beyond the glyph
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))

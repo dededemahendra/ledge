@@ -7,6 +7,8 @@ public enum MediaCommand: Sendable, Equatable {
     case togglePlayPause
     case nextTrack
     case previousTrack
+    case toggleShuffle
+    case toggleRepeat
     case seek(seconds: Double)
 
     public var adapterArguments: [String] {
@@ -16,6 +18,8 @@ public enum MediaCommand: Sendable, Equatable {
         case .togglePlayPause:  return ["send", "2"]
         case .nextTrack:        return ["send", "4"]
         case .previousTrack:    return ["send", "5"]
+        case .toggleShuffle:    return ["send", "6"]
+        case .toggleRepeat:     return ["send", "7"]
         case .seek(let seconds):
             // The adapter requires a positive integer number of microseconds.
             let micros = Int((max(0, seconds) * 1_000_000).rounded())

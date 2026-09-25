@@ -75,7 +75,7 @@ public struct NotchMetrics: Sendable, Equatable {
             // expanded — the deliberate full-panel state exists to fit its
             // panel. Pinned by NotchRenderTests'
             // mediaPanelIdealHeightFitsTheExpandedBudget.
-            height: atLeastNotchHeight(140),
+            height: atLeastNotchHeight(168),
             bottomRadius: 26,
             outerFillet: 13
         )

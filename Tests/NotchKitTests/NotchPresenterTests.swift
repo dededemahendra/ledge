@@ -13,7 +13,7 @@ import CoreGraphics
 /// elsewhere (`NotchShapeTests`), hardcoded here to keep this file decoupled
 /// from `NotchMetrics`/notch-rect specifics — only the shape parameters
 /// themselves matter for this geometry.
-private let testParameters = NotchShapeParameters(width: 390, height: 140, bottomRadius: 26, outerFillet: 13)
+private let testParameters = NotchShapeParameters(width: 390, height: 168, bottomRadius: 26, outerFillet: 13)
 private let testScreenFrame = CGRect(x: 0, y: 0, width: 1470, height: 956)
 
 /// The naive region the OLD `reevaluateHover` tested, reconstructed here
@@ -69,16 +69,16 @@ private func naiveRect(_ parameters: NotchShapeParameters) -> CGRect {
 /// path, so there is a corner region where the controller believes it is
 /// hovered — suppressing TTL expiry — while clicks pass through."
 ///
-/// local (126, 139) sits 1pt inside the naive rect's bottom-left corner —
+/// local (126, 167) sits 1pt inside the naive rect's bottom-left corner —
 /// comfortably inside the plain `width x height` box — but is outside the
-/// circle rounding that corner (radius 26 centred at (151, 114) for the
-/// 140pt-tall expanded card), so it is cut off by the actual path. Point
-/// re-derived when `expanded.height` moved 118 -> 140 in the media
-/// redesign; the geometry argument is identical, translated 22pt down.
+/// circle rounding that corner (radius 26 centred at (151, 142) for the
+/// 168pt-tall expanded card), so it is cut off by the actual path. Point
+/// re-derived each time `expanded.height` moved (118 -> 140 -> 168); the
+/// geometry argument is identical, just translated down with the corner.
 @Test func roundedBottomCornerIsInsideTheNaiveRectButOutsideTheRealPath() {
     let global = CGPoint(
         x: testScreenFrame.midX + 126 - NotchPresenter.canvas.width / 2,
-        y: testScreenFrame.maxY - 139
+        y: testScreenFrame.maxY - 167
     )
     let local = NotchPresenter.localPoint(global, on: testScreenFrame)
 

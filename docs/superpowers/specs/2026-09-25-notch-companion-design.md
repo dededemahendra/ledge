@@ -241,7 +241,7 @@ bezel.
 | Parameter | Collapsed | Expanded |
 | --- | --- | --- |
 | width | 179 pt | up to 390 pt |
-| height | 32 pt | 140 pt |
+| height | 32 pt | 168 pt |
 | bottom corner radius | 9 pt | 26 pt |
 | outer fillet radius | 0 pt | 13 pt |
 
@@ -313,7 +313,7 @@ growth itself becomes the signal that something happened.
 | 1 activity | ~255 × 32 pt | leading ear: artwork 20 pt; trailing ear: waveform |
 | 2 activities | ~342 × 62 pt | ears keep glanceable glyphs; detail row below the hole |
 | 3+ activities | ~342 × 62 pt | top two by priority, `+N` pip in trailing ear |
-| Expanded (click) | ~390 × 140 pt | full panel below the hole; ears keep glyphs |
+| Expanded (click) | ~390 × 168 pt | full panel below the hole; ears keep glyphs |
 
 Ear width at one activity is ~38 pt per side; at two activities ~81 pt per side.
 
