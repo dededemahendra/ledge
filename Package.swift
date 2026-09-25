@@ -8,6 +8,7 @@ let package = Package(
         .executableTarget(name: "Ledge", dependencies: ["NotchKit"], path: "Sources/Ledge"),
         .target(name: "NotchKit"),
         .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
+        .testTarget(name: "NotchWindowTests", dependencies: ["NotchKit"]),
     ],
     swiftLanguageModes: [.v6]
 )
