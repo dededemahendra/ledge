@@ -44,7 +44,11 @@ public final class NotchController {
     public private(set) var overflowCount = 0
 
     public var metrics: NotchMetrics
-    public let reduceMotion: Bool
+    /// `var`, not `let`: this is an always-running background agent, and a
+    /// user who flips Reduce Motion while it is running must not have to
+    /// quit and relaunch to get the crossfade. `NotchPresenter` keeps this
+    /// in step with `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`.
+    public var reduceMotion: Bool
 
     public init(metrics: NotchMetrics, reduceMotion: Bool = false) {
         self.metrics = metrics

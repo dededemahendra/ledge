@@ -13,6 +13,11 @@ public final class NotchPresenter {
     private var trackingMonitor: Any?
     private var clickOutsideMonitor: Any?
     private var escapeMonitor: Any?
+    /// Registered on `NSWorkspace.shared.notificationCenter`, NOT
+    /// `NotificationCenter.default` like `observers` — a token from one
+    /// center cannot be removed via the other, so this is tracked and torn
+    /// down separately.
+    private var reduceMotionObserver: NSObjectProtocol?
 
     public init() {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -34,6 +39,18 @@ public final class NotchPresenter {
                 MainActor.assumeIsolated { self?.rebuildForCurrentScreen() }
             }
         )
+
+        // Reduce Motion, spec §5: read once at init is not enough for an
+        // always-running agent — a user who flips it while Ledge is already
+        // running must get the crossfade without quitting and relaunching.
+        reduceMotionObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.controller.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            }
+        }
 
         // Mouse tracking: the window is click-through, so hover is observed globally
         // and filtered against the island rect. Mouse-moved monitors need no permission.
@@ -90,6 +107,10 @@ public final class NotchPresenter {
     public func stop() {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
+        if let reduceMotionObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(reduceMotionObserver)
+        }
+        reduceMotionObserver = nil
         if let trackingMonitor { NSEvent.removeMonitor(trackingMonitor) }
         trackingMonitor = nil
         if let clickOutsideMonitor { NSEvent.removeMonitor(clickOutsideMonitor) }
