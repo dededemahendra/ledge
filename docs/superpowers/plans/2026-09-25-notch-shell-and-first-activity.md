@@ -288,7 +288,6 @@ import AppKit
 final class StatusItemController {
     private let item: NSStatusItem
     private let menu = NSMenu()
-    private var handlers: [ObjectIdentifier: () -> Void] = [:]
 
     init() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -310,8 +309,11 @@ final class StatusItemController {
         let entry = NSMenuItem(title: title, action: #selector(Trampoline.fire), keyEquivalent: "")
         let trampoline = Trampoline(action)
         entry.target = trampoline
+        // `target` is weak in AppKit's target-action pattern, so this strong
+        // `representedObject` reference is what keeps the trampoline alive for
+        // as long as the item is in the menu. Without it the closure would be
+        // deallocated the moment this method returns.
         entry.representedObject = trampoline
-        handlers[ObjectIdentifier(trampoline)] = action
         menu.addItem(entry)
     }
 
