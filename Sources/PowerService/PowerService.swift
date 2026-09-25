@@ -13,13 +13,38 @@ public final class PowerService {
     public private(set) var availability: ServiceAvailability = .available
 
     private var deriver = PowerEventDeriver()
-    private var runLoopSource: CFRunLoopSource?
-    private var continuation: AsyncStream<PowerEvent>.Continuation?
+    // `nonisolated(unsafe)`: both are touched from `deinit`, which is always
+    // nonisolated even for a `@MainActor` class (deallocation can happen
+    // from any thread) — see `deinit`/`teardown()` below. Safe without
+    // further synchronisation because by the time `deinit` runs, nothing
+    // else can be concurrently touching `self`, and neither
+    // `CFRunLoopRemoveSource` nor `AsyncStream.Continuation.finish()` were
+    // ever actually relying on Swift's actor isolation for thread safety —
+    // only reaching the stored properties from a nonisolated context needed
+    // the annotation.
+    private nonisolated(unsafe) var runLoopSource: CFRunLoopSource?
+    private nonisolated(unsafe) var continuation: AsyncStream<PowerEvent>.Continuation?
 
     public init() {}
 
+    deinit {
+        // Released without `stop()`, the run-loop source would otherwise go
+        // on firing into freed memory — its callback dereferences exactly
+        // the `self` this deinit is in the middle of tearing down (see
+        // `Unmanaged.passUnretained(self)` below).
+        teardown()
+    }
+
     public func start() -> AsyncStream<PowerEvent> {
-        AsyncStream { continuation in
+        // Idempotent: a second call supersedes the first cleanly instead of
+        // orphaning its `for await` forever (the old `continuation` gets
+        // overwritten with no `.finish()`) while leaking a second run-loop
+        // source (only the latest is ever tracked, so the first is never
+        // removed). Safe to call unconditionally — on the very first call
+        // there is nothing yet to tear down.
+        stop()
+
+        return AsyncStream { continuation in
             self.continuation = continuation
 
             let context = Unmanaged.passUnretained(self).toOpaque()
@@ -35,7 +60,10 @@ public final class PowerService {
             }
 
             runLoopSource = source
-            CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
+            // `.commonModes`, not `.defaultMode`: the default mode alone
+            // stalls while a menu is tracking or a drag is in progress, so
+            // power events would queue up silently until the user let go.
+            CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
 
             continuation.onTermination = { [weak self] _ in
                 // Without an explicit capture here, this closure (stored
@@ -50,8 +78,19 @@ public final class PowerService {
     }
 
     public func stop() {
+        teardown()
+    }
+
+    /// The actual teardown, factored out so both `stop()` (`@MainActor`,
+    /// inherited from the class) and `deinit` (always nonisolated) can
+    /// reach it without an isolation mismatch — nonisolated code can always
+    /// call further nonisolated code directly, and `@MainActor` code can
+    /// always call a nonisolated function too, so nothing here needs
+    /// `MainActor.assumeIsolated`'s runtime check (which would trap if
+    /// `deinit` ever happened to run on a background thread).
+    private nonisolated func teardown() {
         if let runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .defaultMode)
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
         runLoopSource = nil
         continuation?.finish()
@@ -64,6 +103,7 @@ public final class PowerService {
             let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef]
         else {
             Self.log.debug("no power sources returned")
+            availability = .unavailable(reason: "no power sources reported")
             return
         }
 
@@ -71,14 +111,28 @@ public final class PowerService {
             guard
                 let raw = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue()
                     as? [String: Any],
+                // Mirrors kIOPSTypeKey/kIOPSInternalBatteryType (IOPSKeys.h)
+                // as plain string literals, matching how every other IOKit
+                // dictionary key in `PowerSnapshot.parse` is already
+                // spelled here rather than via the imported C constants.
+                // Without this filter, a connected UPS also satisfies
+                // `PowerSnapshot.parse` and would shadow the real battery.
+                raw["Type"] as? String == "InternalBattery",
                 let snapshot = PowerSnapshot.parse(raw)
             else { continue }
 
+            availability = .available
             for event in deriver.events(for: snapshot) {
                 Self.log.debug("power event: \(String(describing: event), privacy: .public)")
                 continuation?.yield(event)
             }
-            return   // internal battery is the first source
+            return   // internal battery is the only source we track
         }
+
+        // No internal battery among the reported sources (a desktop Mac, or
+        // a UPS-only setup): this service will never emit anything. Spec §9
+        // wants that said, not left sitting at the default `.available`.
+        Self.log.debug("no internal battery among reported power sources")
+        availability = .unavailable(reason: "no internal battery")
     }
 }
