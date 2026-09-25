@@ -1601,13 +1601,13 @@ public final class NotchWindow: NSPanel {
         isFloatingPanel = true
         becomesKeyOnlyIfNeeded = true
         ignoresMouseEvents = false      // hit testing decides, not a blanket flag
-        contentView = hostingView
 
         // ORDER MATTERS: `isFloatingPanel = true` resets `level` to `.floating`
-        // as a documented AppKit side effect, so assigning the level earlier
+        // as a documented AppKit side effect, so assigning the level before it
         // would be silently clobbered and the island would draw BELOW the menu
-        // bar. Set it last.
+        // bar. Set the level after `isFloatingPanel`, never before.
         level = Self.normalLevel
+        contentView = hostingView
 
         reposition(for: screen)
     }
@@ -1615,7 +1615,12 @@ public final class NotchWindow: NSPanel {
     public override var canBecomeKey: Bool { false }
     public override var canBecomeMain: Bool { false }
 
+    /// Swapping content invalidates the interactive region for exactly the reason
+    /// `reposition(for:)` does: a path computed for the previous content would go
+    /// on claiming clicks over what is now empty canvas. The caller sets a fresh
+    /// shape immediately afterwards.
     public func setContent(_ content: AnyView) {
+        interactivePath = nil
         hostingView.rootView = content
     }
 
