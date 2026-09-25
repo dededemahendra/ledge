@@ -218,6 +218,13 @@ final class AppModel {
     }
 
     private func prune() {
+        // Fix-wave item 3: ask the presenter to re-evaluate hover against
+        // current geometry FIRST, unconditionally, rather than only trusting
+        // whatever `.mouseMoved`/geometry-change last left `isHovered` at —
+        // see `NotchPresenter.reevaluateHoverForExpiry()`'s doc comment for
+        // why a missed mouse event could otherwise latch it and freeze all
+        // expiry indefinitely.
+        presenter.reevaluateHoverForExpiry()
         let before = queue.count
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }

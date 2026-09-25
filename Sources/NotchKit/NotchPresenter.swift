@@ -157,6 +157,31 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    /// Re-evaluates hover against the CURRENT geometry and resyncs the window
+    /// accordingly. `AppModel.prune()` calls this on every 250ms tick,
+    /// unconditionally — fix-wave item 3.
+    ///
+    /// Without this, `isHovered` only updates on `.mouseMoved`
+    /// (`updateHover()`) or a geometry change (`syncWindowToVisibility()`'s
+    /// other callers, per that method's own doc comment). A genuinely missed
+    /// `.mouseMoved` event — the cursor warped programmatically, Mission
+    /// Control, secure input, waking from sleep with the pointer somewhere
+    /// new — could then leave `isHovered` latched `true` forever, and
+    /// because `ActivityQueue.prune(hovered:)` honours it, every activity
+    /// would stop expiring indefinitely. Self-locking: the mutation that
+    /// would clear it is the very expiry it is suppressing.
+    ///
+    /// Just forwards to `syncWindowToVisibility()`, the existing single
+    /// choke point for this. Safe to call every tick without recursion risk:
+    /// `reevaluateHover()` itself never calls back into
+    /// `syncWindowToVisibility()` (see that method's doc comment), and each
+    /// step here is cheap when nothing has actually changed — a
+    /// `Path.contains` check, then re-asserting the window's current
+    /// order/interactive region.
+    public func reevaluateHoverForExpiry() {
+        syncWindowToVisibility()
+    }
+
     /// Review Focus 2 and 3: no notch, or no built-in screen, means no island.
     private func rebuildForCurrentScreen() {
         guard
