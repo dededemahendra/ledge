@@ -166,6 +166,19 @@ public final class NotchPresenter {
             let rect = NotchGeometry.notchRect(for: screen.snapshot())
         else {
             Self.log.info("no notched built-in display; island hidden")
+            // Sleep/display-hot-plug case: if the built-in display
+            // disappears while the panel is open (or an activity is live)
+            // and later returns, a new window must not resurrect stale
+            // state with no user action. `setHovered(false)` first, THEN
+            // `dismiss()`: `dismiss()` re-derives via `recomputeState()`,
+            // which reads `isHovered` — clearing hover first means that
+            // re-derive never briefly lands on a stale `.peek`.
+            // `dismiss()` is a no-op unless `state == .expanded`, so this is
+            // safe to call unconditionally. A live activity legitimately
+            // reappearing once the window comes back (still within its TTL)
+            // is correct, not stale, and recomputeState still allows that.
+            controller.setHovered(false)
+            controller.dismiss()
             window?.orderOut(nil)
             window = nil
             return
