@@ -5,7 +5,9 @@ let package = Package(
     name: "Ledge",
     platforms: [.macOS("27.0")],
     targets: [
-        .executableTarget(name: "Ledge", path: "Sources/Ledge")
+        .executableTarget(name: "Ledge", dependencies: ["NotchKit"], path: "Sources/Ledge"),
+        .target(name: "NotchKit"),
+        .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
     ],
     swiftLanguageModes: [.v6]
 )
