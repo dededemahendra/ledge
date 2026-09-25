@@ -35,15 +35,42 @@ public struct NotchMetrics: Sendable, Equatable {
     }
 
     public var oneActivity: NotchShapeParameters {
-        NotchShapeParameters(width: 255, height: 32, bottomRadius: 12, outerFillet: 6)
+        // Height tracks the hardware, not a literal: with a single activity the
+        // island stays exactly notch-height. Hardcoding 32 would make the island
+        // SHORTER than the cutout on a scaling mode with a taller notch, so it
+        // would shrink at the moment it is supposed to grow and would stop
+        // covering the hole.
+        NotchShapeParameters(
+            width: 255,
+            height: notchRect.height,
+            bottomRadius: 12,
+            outerFillet: 6
+        )
     }
 
     public var twoActivities: NotchShapeParameters {
-        NotchShapeParameters(width: 342, height: 62, bottomRadius: 20, outerFillet: 10)
+        NotchShapeParameters(
+            width: 342,
+            height: atLeastNotchHeight(62),
+            bottomRadius: 20,
+            outerFillet: 10
+        )
     }
 
     public var expanded: NotchShapeParameters {
-        NotchShapeParameters(width: 390, height: 118, bottomRadius: 26, outerFillet: 13)
+        NotchShapeParameters(
+            width: 390,
+            height: atLeastNotchHeight(118),
+            bottomRadius: 26,
+            outerFillet: 13
+        )
+    }
+
+    /// The spec's target heights assume the measured 32pt notch. On a display
+    /// scaling mode with a taller notch the island must still cover the cutout,
+    /// so every target is floored at the notch's own height.
+    private func atLeastNotchHeight(_ target: CGFloat) -> CGFloat {
+        max(target, notchRect.height)
     }
 
     /// Ear width available beside the hole at a given island width.

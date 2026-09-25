@@ -28,8 +28,56 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
 
 @Test func earWidthLeavesRoomBesideTheHole() {
     let metrics = NotchMetrics(notchRect: measuredNotch)
-    #expect((metrics.oneActivity.width - 179) / 2 == 38)
-    #expect((metrics.twoActivities.width - 179) / 2 == 81.5)
+    // Exercise the public function later tasks consume, not the arithmetic inline.
+    #expect(metrics.earWidth(forIslandWidth: metrics.oneActivity.width) == 38)
+    #expect(metrics.earWidth(forIslandWidth: metrics.twoActivities.width) == 81.5)
+    #expect(metrics.earWidth(forIslandWidth: 100) == 0, "narrower than the notch leaves no ear")
+}
+
+/// The spec's target heights assume the measured 32pt notch. A scaling mode with
+/// a taller notch must not make the island shrink, nor leave the cutout uncovered.
+@Test func restingHeightsNeverShrinkAndAlwaysCoverTheCutout() {
+    // A "more space" scaling mode: notch 208 x 37, matching NotchGeometry's fixture.
+    let tall = NotchMetrics(notchRect: CGRect(x: 751, y: 0, width: 208, height: 37))
+
+    #expect(tall.collapsed.width == 208, "collapsed size tracks the hardware")
+    #expect(tall.collapsed.height == 37)
+    #expect(tall.peek.height > tall.collapsed.height, "peek grows, never shrinks")
+
+    let chain = [
+        tall.collapsed.height,
+        tall.oneActivity.height,
+        tall.twoActivities.height,
+        tall.expanded.height,
+    ]
+    for height in chain {
+        #expect(height >= 37, "the island may never be shorter than the cutout it covers")
+    }
+    #expect(chain == chain.sorted(), "the island must never shrink as it reveals more")
+}
+
+/// Bounding-box assertions are fixed by the arc's endpoints, so a CONVEX fillet of
+/// the same radius and endpoints would satisfy them identically. This pins the
+/// curvature direction itself.
+@Test func outerFilletsAreConcaveNotConvex() {
+    let metrics = NotchMetrics(notchRect: measuredNotch)
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let p = metrics.expanded
+    let path = NotchShape(p).path(in: canvas)
+
+    let left = canvas.midX - p.width / 2
+    let top = canvas.minY
+
+    // Halfway along the diagonal between the flat top edge and the point where the
+    // fillet meets the body's side. A concave fillet scoops this out of the shape;
+    // a convex one would include it.
+    let scooped = CGPoint(x: left - p.outerFillet / 2, y: top + p.outerFillet / 2)
+    #expect(path.contains(scooped) == false,
+            "the fillet must curve away from the body, not bulge into it")
+
+    // Controls: the body is filled, and the flat top edge spans the fillet flare.
+    #expect(path.contains(CGPoint(x: canvas.midX, y: top + p.height / 2)))
+    #expect(path.contains(CGPoint(x: left, y: top + 1)))
 }
 
 @Test func interpolationIsMonotonicAndBounded() {
