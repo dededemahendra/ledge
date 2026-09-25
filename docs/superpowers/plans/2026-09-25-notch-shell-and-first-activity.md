@@ -3050,6 +3050,57 @@ In `Sources/NotchKit/NotchRootView.swift`, replace `detailRow` and `trailingEar`
 `AppModel.publish()` from Step 10 already produces `[ActivityDisplay]`, so nothing
 in `AppModel` changes here — this step only adds the `NotchKit` side it calls into.
 
+**Also wire up `NotchMetrics.contentOpacity`, which until now has been defined,
+unit-tested and used by nothing.** This task is the first to put real content in
+the island, so it is the first task where the spec's content-fade requirement
+(opacity ramps over animation progress `0.45 → 0.83`, so text never appears before
+there is room for it) can actually be violated.
+
+It has to be an `Animatable` modifier. `NotchController.parameters` exposes the
+*target* geometry and SwiftUI interpolates only inside `NotchShape.animatableData`,
+so a plain view body never observes intermediate progress. A duration-based
+`.delay()` approximation is not an acceptable substitute — it drifts from the real
+spring and breaks under interruption or reversal.
+
+Add to `Sources/NotchKit/NotchRootView.swift`:
+
+```swift
+/// Fades island content in as the shape grows, so text never appears before there
+/// is room for it.
+///
+/// Carrying progress as this modifier's own `animatableData` is what makes
+/// SwiftUI's interpolated value visible to `body(content:)` — a view body reading
+/// `controller.parameters` only ever sees the target.
+struct ContentFade: ViewModifier, Animatable {
+    var progress: Double
+    let metrics: NotchMetrics
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.opacity(metrics.contentOpacity(progress: progress))
+    }
+}
+```
+
+and apply it to the island content, deriving progress from how far the shape has
+grown between its resting extremes:
+
+```swift
+    private func growthProgress(_ parameters: NotchShapeParameters) -> Double {
+        let floor = controller.metrics.collapsed.height
+        let ceiling = controller.metrics.expanded.height
+        guard ceiling > floor else { return 1 }
+        return Double((parameters.height - floor) / (ceiling - floor))
+    }
+```
+
+`progress` then changes in step with `parameters`, so the existing
+`.animation(_:value: parameters)` interpolates it without further wiring.
+
 - [ ] **Step 12: Wire `AppModel` into `AppDelegate`**
 
 In `Sources/Ledge/AppDelegate.swift`, after creating the presenter:
