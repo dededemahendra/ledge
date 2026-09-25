@@ -53,7 +53,12 @@ public final class NotchWindow: NSPanel {
     public override var canBecomeKey: Bool { false }
     public override var canBecomeMain: Bool { false }
 
+    /// Swapping content invalidates the interactive region for exactly the reason
+    /// `reposition(for:)` does: a path computed for the previous content would go
+    /// on claiming clicks over what is now empty canvas. The caller sets a fresh
+    /// shape immediately afterwards.
     public func setContent(_ content: AnyView) {
+        interactivePath = nil
         hostingView.rootView = content
     }
 

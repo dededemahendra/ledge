@@ -1,5 +1,6 @@
 import Testing
 import AppKit
+import SwiftUI
 import CoreGraphics
 @testable import NotchKit
 
@@ -30,6 +31,7 @@ private func makeWindow() throws -> NotchWindow {
     #expect(w.isFloatingPanel)
     #expect(w.styleMask.contains(.borderless))
     #expect(w.styleMask.contains(.nonactivatingPanel))
+    #expect(w.ignoresMouseEvents == false, "hit testing decides what is claimed, not a blanket flag")
 }
 
 @MainActor
@@ -97,6 +99,16 @@ private func makeWindow() throws -> NotchWindow {
     w.reposition(for: screen)
     #expect(w.interactivePath == nil,
             "a path from the previous geometry would claim clicks in the wrong place")
+    #expect(w.hostingView.hitTest(CGPoint(x: 300, y: 150)) == nil)
+}
+
+@MainActor
+@Test func swappingContentClearsTheStaleInteractivePath() throws {
+    let w = try makeWindow()
+    w.interactivePath = CGPath(rect: CGRect(x: 0, y: 0, width: 600, height: 300), transform: nil)
+    w.setContent(AnyView(Color.clear))
+    #expect(w.interactivePath == nil,
+            "a path from the previous content would claim clicks over empty canvas")
     #expect(w.hostingView.hitTest(CGPoint(x: 300, y: 150)) == nil)
 }
 
