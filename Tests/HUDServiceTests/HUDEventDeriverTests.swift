@@ -65,13 +65,12 @@ import Testing
     #expect(HUDEvent.volume(level: 0.5, muted: true).barFill == 0,
             "a muted bar must read as empty even at level 0.5")
     #expect(HUDEvent.volume(level: 0.5, muted: true).symbolName == "speaker.slash.fill")
-    #expect(HUDEvent.volume(level: 0.0, muted: false).symbolName == "speaker.fill")
-    #expect(HUDEvent.volume(level: 0.8, muted: false).symbolName == "speaker.wave.3.fill")
     #expect(HUDEvent.brightness(level: 0.25).barFill == 0.25)
     #expect(HUDEvent.brightness(level: 0.25).symbolName == "sun.max.fill")
-    #expect(HUDEvent.volume(level: 0.5, muted: false).activityTitle == "Volume 50%")
+    #expect(HUDEvent.volume(level: 0.5, muted: false).activityTitle == "Volume",
+            "no digits — the bar beside the title carries the value")
     #expect(HUDEvent.volume(level: 0.5, muted: true).activityTitle == "Muted")
-    #expect(HUDEvent.brightness(level: 0.06).activityTitle == "Brightness 6%")
+    #expect(HUDEvent.brightness(level: 0.06).activityTitle == "Brightness")
 }
 
 /// `compactText` is the ONLY place a value can appear while a single activity holds
@@ -136,8 +135,13 @@ import Testing
     #expect(d.volumeChanged(level: boundary, muted: false) == .volume(level: boundary, muted: false))
 }
 
-// Only muted, 0.0 and 0.8 were covered; the two middle bands were not.
-@Test func symbolNameCoversTheMiddleBands() {
-    #expect(HUDEvent.volume(level: 0.2, muted: false).symbolName == "speaker.wave.1.fill")
-    #expect(HUDEvent.volume(level: 0.5, muted: false).symbolName == "speaker.wave.2.fill")
+/// The level symbol is CONSTANT across the whole range — the level renders
+/// through SF Symbols variable-value (`variableValue: barFill` at the ear),
+/// not by swapping band symbols (wave.1/2/3), which fired a crossfade at
+/// every band edge mid-slide. Only mute, a real state change, swaps glyphs.
+@Test func levelSymbolIsConstantSoTheGlyphNeverSwapsMidSlide() {
+    for level in [0.0, 0.2, 0.5, 0.8, 1.0] {
+        #expect(HUDEvent.volume(level: level, muted: false).symbolName == "speaker.wave.3.fill")
+        #expect(HUDEvent.brightness(level: level).symbolName == "sun.max.fill")
+    }
 }

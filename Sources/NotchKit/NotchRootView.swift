@@ -357,18 +357,23 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if let symbol = controller.activities.first?.symbolName {
+        if let activity = controller.activities.first, let symbol = activity.symbolName {
+            // `variableValue` lights the symbol's own level layers (speaker
+            // waves, sun rays) from `barFill` — the macOS-OSD way to show a
+            // level in a glyph. Non-HUD symbols carry no `barFill` (nil) and
+            // no variable layers, so this is inert for them.
+            //
             // Keyed and animated exactly like `trailingEar`'s `compact` text and
             // `detailTitle`'s title below: `AppModel` gives every HUD record the
-            // same id ("hud"), so a symbol changing (e.g. wave.1 -> wave.2 as
-            // volume rises, or the mute slash toggling) is an in-place update to
-            // the SAME view, not an insertion — `.transition` only plays on
-            // insertion/removal, so it needs this value-keyed `.id` to register
-            // as one, and a local `.animation(value:)` to get an actually-
-            // animated transaction (the root view's `.animation(value:
+            // same id ("hud"), so a symbol changing (now only the mute slash
+            // toggling — the level symbol itself is constant) is an in-place
+            // update to the SAME view, not an insertion — `.transition` only
+            // plays on insertion/removal, so it needs this value-keyed `.id` to
+            // register as one, and a local `.animation(value:)` to get an
+            // actually-animated transaction (the root view's `.animation(value:
             // parameters)` does not attach for a symbol change alone, since
             // `parameters` — state/activityCount/metrics — stays equal).
-            Image(systemName: symbol)
+            Image(systemName: symbol, variableValue: activity.barFill)
                 .font(.system(size: 13, weight: .medium))
                 .id(symbol)
                 .transition(.blurReplace)
@@ -526,8 +531,13 @@ public struct NotchRootView: View {
     /// `barFill`'s progress bar in the trailing ear — same visual language as
     /// `detailBar` below, just narrower (the ear is ~38pt wide at
     /// one-activity size, versus the full island width `detailBar` gets).
-    /// Unanimated on value change, matching `detailBar`'s own precedent
-    /// exactly: neither bar explicitly animates a `barFill` change today.
+    /// The fill ANIMATES between values: volume/brightness keys step in
+    /// sixteenths, and an unanimated bar jumps those steps — a short
+    /// critically-damped spring turns them into one continuous slide, the
+    /// same "state change, not thrown object" tuning as the scrubber's
+    /// thickening. Local `.animation(value: fill)`, because the root's
+    /// `.animation(value: parameters)` never attaches for a fill change
+    /// alone (same reason every text swap above carries its own).
     private func trailingBar(_ fill: Double) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -535,6 +545,10 @@ public struct NotchRootView: View {
                 Capsule()
                     .fill(contentColor)
                     .frame(width: geometry.size.width * fill)
+                    .animation(
+                        controller.reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 1.0),
+                        value: fill
+                    )
             }
         }
         .frame(height: 4)
@@ -682,6 +696,11 @@ public struct NotchRootView: View {
                 Capsule()
                     .fill(contentColor)
                     .frame(width: geometry.size.width * fill)
+                    // Same slide-not-jump tuning as `trailingBar` above.
+                    .animation(
+                        controller.reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 1.0),
+                        value: fill
+                    )
             }
         }
         .frame(height: 4)

@@ -12,28 +12,28 @@ public enum HUDEvent: Sendable, Equatable {
         }
     }
 
+    /// One CONSTANT symbol per kind, not a band ladder (wave.1/2/3): the ear
+    /// renders it with SF Symbols variable-value (`variableValue: barFill`),
+    /// so the waves/rays light up with the level the way macOS's own OSD
+    /// draws it — and the glyph itself never swaps mid-slide, which kept
+    /// firing a crossfade at every band edge. Mute stays its own symbol:
+    /// that IS a state change, and the crossfade is right there.
     public var symbolName: String {
         switch self {
-        case .volume(_, true):
-            return "speaker.slash.fill"
-        case .volume(let level, false):
-            if level <= 0.001 { return "speaker.fill" }
-            if level < 0.34 { return "speaker.wave.1.fill" }
-            if level < 0.67 { return "speaker.wave.2.fill" }
-            return "speaker.wave.3.fill"
-        case .brightness:
-            return "sun.max.fill"
+        case .volume(_, true):  return "speaker.slash.fill"
+        case .volume(_, false): return "speaker.wave.3.fill"
+        case .brightness:       return "sun.max.fill"
         }
     }
 
+    /// No digits: this renders next to a bar that already shows the level,
+    /// and neither macOS's OSD nor Alcove numbers theirs. The word carries
+    /// the kind, the bar carries the value.
     public var activityTitle: String {
         switch self {
-        case .volume(_, true):
-            return "Muted"
-        case .volume(let level, false):
-            return "Volume \(Int((level * 100).rounded()))%"
-        case .brightness(let level):
-            return "Brightness \(Int((level * 100).rounded()))%"
+        case .volume(_, true):  return "Muted"
+        case .volume(_, false): return "Volume"
+        case .brightness:       return "Brightness"
         }
     }
 
