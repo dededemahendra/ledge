@@ -109,7 +109,7 @@ private func makeController(reduceMotion: Bool = false) -> NotchController {
     c.click()
     #expect(c.parameters == c.metrics.expanded)
     c.metrics = NotchMetrics(notchRect: CGRect(x: 751, y: 0, width: 208, height: 37))
-    #expect(c.parameters.height == 118, "expanded target is fixed by the spec")
+    #expect(c.parameters.height == 140, "expanded target is fixed by the spec")
     #expect(c.metrics.collapsed.width == 208, "collapsed follows the new hardware geometry")
 }
 

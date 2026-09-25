@@ -1,10 +1,14 @@
 import SwiftUI
 
-/// Motion constants. Chosen by comparing candidates against "which would you
-/// still tolerate on the fiftieth repeat" — see spec §5.
+/// Motion constants. The original 0.35/0.72 pair was chosen by comparing
+/// candidates against "which would you still tolerate on the fiftieth
+/// repeat" (spec §5); the expand spring was later retuned to 0.4/0.8 at the
+/// user's explicit request during the media-player redesign — a touch wider
+/// and calmer, with roughly 1.5% overshoot instead of 3.8%. Collapse stays
+/// deliberately duller: closing should not draw attention.
 public enum NotchAnimation {
-    public static let expandResponse: Double = 0.35
-    public static let expandDamping: Double = 0.72
+    public static let expandResponse: Double = 0.4
+    public static let expandDamping: Double = 0.8
     public static let collapseResponse: Double = 0.30
     public static let collapseDamping: Double = 0.92
     public static let reducedDuration: Double = 0.15
@@ -129,6 +133,48 @@ public struct NotchRootView: View {
         nonmutating set { _previousWidth.wrappedValue = newValue }
     }
 
+    /// Hero-pair id for the compact-ear ↔ panel artwork morph.
+    static let artworkGeometryID = "media-artwork"
+
+    /// See `previousHeight` above for why this is the spelled-out property
+    /// wrapper type rather than the attribute. `Namespace` is a
+    /// `DynamicProperty` like `State`, installed by reflection the same way.
+    private var _artworkNamespace: Namespace = Namespace()
+    private var artworkNamespace: Namespace.ID { _artworkNamespace.wrappedValue }
+
+    /// Accent derived from the current artwork (`ArtworkAccent`), cached here
+    /// so the compact ear's progress sliver and the expanded card always
+    /// agree, and recomputed only when the artwork actually changes (see the
+    /// `.onChange` in `body`) — never per frame.
+    private var _accent: State<Color> = State(initialValue: ArtworkAccent.fallback)
+    private var accent: Color {
+        get { _accent.wrappedValue }
+        nonmutating set { _accent.wrappedValue = newValue }
+    }
+
+    /// Under `NotchRenderTests` the accent collapses to `contentColor`, so
+    /// pixel classification there stays strictly two-colour.
+    private var effectiveAccent: Color {
+        #if DEBUG
+        if NotchRenderTestHook.contentColor != nil { return contentColor }
+        #endif
+        return accent
+    }
+
+    /// The three purely-visual expanded-card effects (desktop-blur material,
+    /// hairline border, drop shadow) are suppressed while the render-test
+    /// hook is active: `ImageRenderer` draws `NSViewRepresentable` as empty,
+    /// a half-outside stroke and a soft shadow ring would both pollute the
+    /// silhouette-match test's fill classification, and none of the three is
+    /// what those tests exist to pin (geometry and content placement are).
+    private var visualEffectsSuppressed: Bool {
+        #if DEBUG
+        NotchRenderTestHook.contentColor != nil
+        #else
+        false
+        #endif
+    }
+
     public init(controller: NotchController, onTap: @escaping () -> Void = {}) {
         self.controller = controller
         self.onTap = onTap
@@ -143,9 +189,24 @@ public struct NotchRootView: View {
             ? parameters.width > previousWidth
             : parameters.height > previousHeight
 
+        let expanded = controller.state == .expanded
+        let showEffects = expanded && !visualEffectsSuppressed
+
         ZStack(alignment: .top) {
             shape
                 .fill(.black)
+                // Translucency (redesign brief): the expanded card reads as a
+                // material, not a flat slab — desktop blur underneath, with
+                // the black fill dropped to 62% over it. Compact stays fully
+                // opaque on purpose: sitting flush against the real notch,
+                // anything but pure black breaks the illusion that island and
+                // bezel are one object.
+                .opacity(showEffects ? 0.62 : 1)
+                .background {
+                    if showEffects {
+                        VibrancyBackdrop().clipShape(shape)
+                    }
+                }
                 // `.overlay`'s default alignment is `.center`: a `Shape` fill
                 // occupies its ENTIRE proposed canvas (640x320), not the
                 // island's own drawn extent, so uncentred content here would
@@ -172,7 +233,25 @@ public struct NotchRootView: View {
                         ))
                         .clipShape(shape)
                 }
+                // Hairline separating the floating card from the desktop
+                // behind it. Plain `.stroke` (centred on the path, half a
+                // point outside) rather than `strokeBorder` — `NotchShape` is
+                // not `InsettableShape`, and at 9% white the half-pixel
+                // outside the silhouette is invisible against the shadow.
+                .overlay {
+                    shape.stroke(
+                        Color.white.opacity(showEffects ? 0.09 : 0),
+                        lineWidth: 1
+                    )
+                }
         }
+        // Flatten before shadowing so the island casts ONE silhouette shadow
+        // rather than every layer casting its own.
+        .compositingGroup()
+        .shadow(
+            color: .black.opacity(showEffects ? 0.5 : 0),
+            radius: 16, y: 6
+        )
         .frame(
             width: NotchMetrics.canvasSize.width,
             height: NotchMetrics.canvasSize.height,
@@ -198,6 +277,14 @@ public struct NotchRootView: View {
             // transition comes next.
             previousHeight = newValue.height
             previousWidth = newValue.width
+        }
+        // Accent recomputes only when the artwork itself changes — a 1×1
+        // draw, once per track, never per frame. See `ArtworkAccent`.
+        .onChange(of: controller.media?.artwork) { _, artwork in
+            accent = ArtworkAccent.accent(from: artwork)
+        }
+        .onAppear {
+            accent = ArtworkAccent.accent(from: controller.media?.artwork)
         }
     }
 
@@ -306,13 +393,28 @@ public struct NotchRootView: View {
             // media's artwork here while `trailingEar` below (which also
             // only ever reads `.first`) showed the OTHER activity's value —
             // two ears telling two different stories.
-            mediaArtwork(media)
-                .id(media.title)
-                .transition(.blurReplace)
-                .animation(
-                    NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
-                    value: media.title
-                )
+            if controller.state == .expanded {
+                // The panel owns the artwork at `.expanded`: this slot yields
+                // it entirely, which is what turns the pair below into a true
+                // insert/remove hand-off — the precondition
+                // `matchedGeometryEffect`'s hero semantics require. Earlier
+                // code dropped the effect precisely because both copies used
+                // to stay visible together; hiding this one is what made it
+                // valid. `Color.clear`, not `EmptyView`: an `EmptyView` here
+                // collapses the ear's width reservation and re-centres the
+                // whole ears row into the notch — the exact trap documented
+                // on `trailingEar`'s own fallback branch.
+                Color.clear
+            } else {
+                mediaArtwork(media)
+                    .matchedGeometryEffect(id: Self.artworkGeometryID, in: artworkNamespace)
+                    .id(media.title)
+                    .transition(.blurReplace)
+                    .animation(
+                        NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                        value: media.title
+                    )
+            }
         } else if controller.activityCount > 0 {
             Circle().fill(contentColor.opacity(0.28)).padding(6)
         }
@@ -388,6 +490,20 @@ public struct NotchRootView: View {
                         NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                         value: compact
                     )
+            } else if activity.id == Self.mediaActivityID,
+                      let media = controller.media,
+                      controller.state != .expanded {
+                // Compact now-playing progress. The redesign brief asked for a
+                // progress indicator "around the notch edge" in the compact
+                // state — physically impossible here: a bar along the island's
+                // bottom edge would cross the notch cutout, where there are no
+                // pixels and where the no-content invariant (debug assertion +
+                // `NotchRenderTests`) forbids drawing regardless. This ear was
+                // media's documented dead slot, so the sliver lives here
+                // instead: same accent as the expanded card, advanced by the
+                // same 1Hz tick. At `.expanded` the panel's own scrubber takes
+                // over and this yields to the fallback below.
+                compactMediaProgress(media.progress)
             } else {
                 // Not decorative — load-bearing. An activity with neither
                 // `barFill` nor `compactText` (exactly media's shape: title +
@@ -426,6 +542,28 @@ public struct NotchRootView: View {
         .padding(.horizontal, 4)
     }
 
+    /// See the `trailingEar` media branch for why this exists and why it is
+    /// here rather than along the island's bottom edge. Accent-tinted so the
+    /// compact and expanded states visibly belong to the same track.
+    private func compactMediaProgress(_ progress: Double) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(contentColor.opacity(0.15))
+                Capsule()
+                    .fill(effectiveAccent)
+                    .frame(width: max(0, geometry.size.width * progress))
+                    // The same 1Hz-tick smoothing the panel's scrubber uses —
+                    // a continuous slide, not per-second jumps.
+                    .animation(
+                        controller.reduceMotion ? nil : .linear(duration: 1),
+                        value: progress
+                    )
+            }
+        }
+        .frame(height: 2.5)
+        .padding(.horizontal, 5)
+    }
+
     /// Budget below the hole is tight: at two (or three+, which shares the
     /// same `twoActivities` size) activities it is `twoActivities.height -
     /// notch.height` = 30pt. Measured ideal height of every activity's
@@ -452,25 +590,24 @@ public struct NotchRootView: View {
     /// stays fully visible via the ears, which render regardless of state
     /// (spec §6: "ears keep glyphs" at Expanded too).
     ///
-    /// No `matchedGeometryEffect` between this panel's 60pt artwork and
-    /// `leadingEar`'s 20pt one, despite spec §5 naming that effect: the two
-    /// are simultaneously and PERSISTENTLY visible together whenever this
-    /// branch is showing (ears never disappear, even here), not a transient
-    /// insert/remove pair — `matchedGeometryEffect`'s hero-transition
-    /// semantics assume the latter. Forcing an `isSource` pairing between two
-    /// views that both stay on screen makes the non-source view adopt the
-    /// SOURCE's frame outright: mark the ear source and the panel's artwork
-    /// would be forced down to a 20x20pt image inside a spec-mandated 60pt
-    /// slot; mark the panel source and the ear would be forced up to 60pt,
-    /// blowing out the compact layout. Either direction is a visible
-    /// regression of exactly the shape this codebase's render tests exist to
-    /// catch, in exchange for an animation nicety. Dropped, not attempted.
+    /// `matchedGeometryEffect` pairs the ear's 20pt artwork with the panel's
+    /// 60pt one (id `Self.artworkGeometryID`), so expanding morphs one sleeve
+    /// between the two slots instead of crossfading two unrelated images.
+    /// This was previously dropped — correctly, at the time — because both
+    /// copies stayed visible together at `.expanded`, and pairing two
+    /// persistently-visible views makes the non-source adopt the source's
+    /// frame outright. The redesign resolved that precondition instead of
+    /// fighting it: `leadingEar` now yields its artwork slot entirely at
+    /// `.expanded` (see its media branch), so the pair really is a transient
+    /// insert/remove hand-off, which is the case hero semantics are for.
     @ViewBuilder private var detailRow: some View {
         if controller.state == .expanded, let media = controller.media {
             MediaPanelView(
                 media: media,
                 reduceMotion: controller.reduceMotion,
                 contentColor: contentColor,
+                accent: effectiveAccent,
+                artworkNamespace: artworkNamespace,
                 emit: { controller.emit($0) }
             )
             // Matches the sibling branch's own technique below: `islandContent`'s

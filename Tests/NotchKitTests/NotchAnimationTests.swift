@@ -3,8 +3,10 @@ import SwiftUI
 @testable import NotchKit
 
 @Test func springParametersMatchTheSpec() {
-    #expect(NotchAnimation.expandResponse == 0.35)
-    #expect(NotchAnimation.expandDamping == 0.72)
+    // Expand retuned 0.35/0.72 -> 0.4/0.8 at the user's explicit request
+    // during the media-player redesign. Collapse deliberately unchanged.
+    #expect(NotchAnimation.expandResponse == 0.4)
+    #expect(NotchAnimation.expandDamping == 0.8)
     #expect(NotchAnimation.collapseResponse == 0.30)
     #expect(NotchAnimation.collapseDamping == 0.92)
     #expect(NotchAnimation.reducedDuration == 0.15)
@@ -43,7 +45,7 @@ import SwiftUI
     }
     let expand = overshoot(NotchAnimation.expandDamping)
     let collapse = overshoot(NotchAnimation.collapseDamping)
-    #expect(expand > 0.03 && expand < 0.05, "one small confident overshoot, ~3.8%")
+    #expect(expand > 0.010 && expand < 0.025, "one small confident overshoot, ~1.5% at damping 0.8")
     #expect(collapse < 0.005, "closing must not draw attention")
     #expect(expand > collapse)
 }

@@ -67,7 +67,15 @@ public struct NotchMetrics: Sendable, Equatable {
     public var expanded: NotchShapeParameters {
         NotchShapeParameters(
             width: 390,
-            height: atLeastNotchHeight(118),
+            // 118 -> 140 during the media-player redesign: the richer card
+            // (15pt rounded title, focal 26pt play button, scrub block with
+            // live-drag affordance) measures ~97pt of ideal height, and 118's
+            // 86pt budget silently clipped its control row. Growing was ruled
+            // out for the COMPACT states (layout C, "ears first"), never for
+            // expanded — the deliberate full-panel state exists to fit its
+            // panel. Pinned by NotchRenderTests'
+            // mediaPanelIdealHeightFitsTheExpandedBudget.
+            height: atLeastNotchHeight(140),
             bottomRadius: 26,
             outerFillet: 13
         )
