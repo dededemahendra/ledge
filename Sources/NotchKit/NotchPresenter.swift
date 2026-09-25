@@ -151,12 +151,10 @@ public final class NotchPresenter {
     /// Latest visible activities, rendered by `NotchRootView`.
     public func setActivities(_ activities: [NotchController.ActivityDisplay], overflow: Int) {
         controller.setActivities(activities, overflow: overflow)
-        refreshInteractiveRegion()
-        if controller.isVisible {
-            window?.orderFrontRegardless()
-        } else {
-            window?.orderOut(nil)
-        }
+        // Was its own copy of `syncWindowToVisibility()`'s body; consolidated
+        // so an activity expiring goes through the same hover re-evaluation
+        // every other mutation does — see item 8 in the fix-wave report.
+        syncWindowToVisibility()
     }
 
     /// Review Focus 2 and 3: no notch, or no built-in screen, means no island.
@@ -205,7 +203,18 @@ public final class NotchPresenter {
     /// Spec §5: "Ordered out entirely when state is `.hidden`, so idle
     /// compositing cost is zero" — enforced here as the single choke point so
     /// every caller (rebuild, hover, `toggle()`) gets it for free.
+    ///
+    /// Also the single choke point for re-evaluating hover against the
+    /// CURRENT geometry, not just on the next mouse-moved event: if the
+    /// island shrinks under a stationary cursor (`toggle()` closing the
+    /// panel, or an activity expiring via `setActivities`), `isHovered`
+    /// would otherwise stay latched true — and `AppModel.prune()` reads
+    /// that flag to suppress ALL expiry, so a stale `true` hangs activities
+    /// indefinitely on an idle machine until the mouse next moves. Calls
+    /// `reevaluateHover()`, never `updateHover()`, specifically to avoid
+    /// recursing back into this method.
     private func syncWindowToVisibility() {
+        reevaluateHover()
         refreshInteractiveRegion()
         guard let window else { return }
         if controller.isVisible {
@@ -223,17 +232,26 @@ public final class NotchPresenter {
             return
         }
         let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
-        // Claim a little more than is drawn when collapsed, for hover forgiveness.
-        var parameters = controller.parameters
-        if controller.state == .hidden || controller.state == .peek {
-            parameters.width += 8
-            parameters.height += 4
-        }
-        window.setInteractiveShape(NotchShape(parameters), in: canvas)
+        window.setInteractiveShape(NotchShape(forgivingParameters()), in: canvas)
     }
 
-    /// Only acts when hover actually crosses the island's boundary.
-    ///
+    /// Claim/detect a little more than is actually drawn when collapsed or
+    /// peeking, for hover forgiveness — those are the narrow, easy-to-miss
+    /// states; `.activity`/`.expanded` are already big targets. The ONE
+    /// definition either hover detection (`reevaluateHover`) or the claimed
+    /// interactive region (`refreshInteractiveRegion`) uses: they used to
+    /// each apply their own version of this (+8/+4 gated to hidden/peek in
+    /// one, ±4/+4 unconditional in the other), leaving a 4pt band at
+    /// `.activity`/`.expanded` where the controller believed it was
+    /// hovered — suppressing TTL expiry — but clicks passed through.
+    private func forgivingParameters() -> NotchShapeParameters {
+        var parameters = controller.parameters
+        guard controller.state == .hidden || controller.state == .peek else { return parameters }
+        parameters.width += 8
+        parameters.height += 4
+        return parameters
+    }
+
     /// Global `.mouseMoved` monitors fire at high frequency for the whole
     /// screen. The brief's version recomputed the interactive path and
     /// reordered the window on *every* such event for as long as the island
@@ -243,21 +261,37 @@ public final class NotchPresenter {
     /// case (moving around inside, or outside, the region) a single cheap
     /// `CGRect.contains` check with no further work.
     private func updateHover() {
-        guard let screen = NSScreen.builtIn else { return }
+        if reevaluateHover() {
+            syncWindowToVisibility()
+        }
+    }
+
+    /// Recomputes whether the cursor is within the island's (forgiveness-
+    /// widened) region and updates `controller.isHovered` if that disagrees
+    /// with the last known value. Returns whether it changed.
+    ///
+    /// Deliberately does NOT call `syncWindowToVisibility()` itself: it is
+    /// called FROM `syncWindowToVisibility()` (so geometry changes
+    /// re-evaluate hover too — see that method's doc comment), and calling
+    /// back into it unconditionally here would recurse. `updateHover()`
+    /// (the mouse-moved path) calls both, in order, itself.
+    @discardableResult
+    private func reevaluateHover() -> Bool {
+        guard let screen = NSScreen.builtIn else { return false }
         let mouse = NSEvent.mouseLocation
-        let parameters = controller.parameters
+        let parameters = forgivingParameters()
 
         // Island hit region in global screen coordinates.
         let region = CGRect(
-            x: screen.frame.midX - parameters.width / 2 - 4,
-            y: screen.frame.maxY - parameters.height - 4,
-            width: parameters.width + 8,
-            height: parameters.height + 4
+            x: screen.frame.midX - parameters.width / 2,
+            y: screen.frame.maxY - parameters.height,
+            width: parameters.width,
+            height: parameters.height
         )
 
         let hovered = region.contains(mouse)
-        guard hovered != controller.isHovered else { return }
+        guard hovered != controller.isHovered else { return false }
         controller.setHovered(hovered)
-        syncWindowToVisibility()
+        return true
     }
 }
