@@ -43,9 +43,13 @@ echo "Minting self-signed code-signing certificate '$IDENTITY'..."
 
 echo "Importing into the login keychain."
 echo "macOS may ask you to allow keychain access — click Allow."
+# -T /usr/bin/codesign alone grants codesign access without prompting each
+# build; -A would ALSO grant every application on the machine access to the
+# private key with no prompt at all, which is not what "let codesign use
+# this" needs.
 security import "$WORK/identity.p12" \
     -k "$HOME/Library/Keychains/login.keychain-db" \
-    -P "$P12PASS" -T /usr/bin/codesign -A
+    -P "$P12PASS" -T /usr/bin/codesign
 
 echo
 echo "Result:"
