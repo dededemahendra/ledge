@@ -33,6 +33,8 @@ bundle: build
 	rm -rf "$(APPDIR)"
 	mkdir -p "$(APPDIR)/Contents/MacOS" "$(APPDIR)/Contents/Resources"
 	cp "$(BUILDDIR)/$(APP)" "$(APPDIR)/Contents/MacOS/$(APP)"
+	cp -R Resources/mediaremote-adapter "$(APPDIR)/Contents/Resources/"
+	chmod +x "$(APPDIR)/Contents/Resources/mediaremote-adapter/MediaRemoteAdapterTestClient"
 	sed -e 's/@APP_NAME@/$(APP)/g' -e 's/@BUNDLE_ID@/$(BUNDLE)/g' \
 	    Info.plist.in > "$(APPDIR)/Contents/Info.plist"
 	printf 'APPL????' > "$(APPDIR)/Contents/PkgInfo"

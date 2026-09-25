@@ -1,0 +1,9 @@
+{"type":"data","diff":false,"payload":{"bundleIdentifier":"com.apple.Music","playing":true,"title":"First","artist":"A","album":"Album","duration":210.0,"elapsedTime":12.0,"timestamp":"2026-09-25T04:00:00Z","playbackRate":1.0}}
+{"type":"data","diff":true,"payload":{"elapsedTime":45.0}}
+{"type":"data","diff":true,"payload":{"artist":null}}
+{"type":"data","diff":true,"payload":{"playing":false}}
+{"type":"data","diff":true,"payload":{"title":"Second","artist":"B","elapsedTime":0.0}}
+{"type":"data","diff":false,"payload":{}}
+null
+not json at all
+{"type":"data","diff":true,"payload":{"duration":"nonsense"}}
