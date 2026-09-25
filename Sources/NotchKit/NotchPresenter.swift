@@ -236,8 +236,7 @@ public final class NotchPresenter {
             window.interactivePath = nil     // Review Focus 4
             return
         }
-        let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
-        window.setInteractiveShape(NotchShape(forgivingParameters()), in: canvas)
+        window.setInteractiveShape(NotchShape(forgivingParameters()), in: Self.canvas)
     }
 
     /// Claim/detect a little more than is actually drawn when collapsed or
@@ -275,6 +274,16 @@ public final class NotchPresenter {
     /// widened) region and updates `controller.isHovered` if that disagrees
     /// with the last known value. Returns whether it changed.
     ///
+    /// Tests the same `NotchShape` path `refreshInteractiveRegion` claims for
+    /// clicks (fix-wave item 2) — translated into global screen coordinates —
+    /// rather than a separately-computed `CGRect`. The two used to disagree
+    /// at exactly the corners that make this shape not a rectangle: the
+    /// rounded bottom corners are inside the old rect but outside the path
+    /// (a dead zone that read as hovered, suppressing TTL expiry, even
+    /// though a click there would have passed through), and the concave
+    /// outer fillets are outside the old rect but inside the path (a band
+    /// where clicks were claimed with no hover ever having been reported).
+    ///
     /// Deliberately does NOT call `syncWindowToVisibility()` itself: it is
     /// called FROM `syncWindowToVisibility()` (so geometry changes
     /// re-evaluate hover too — see that method's doc comment), and calling
@@ -283,20 +292,51 @@ public final class NotchPresenter {
     @discardableResult
     private func reevaluateHover() -> Bool {
         guard let screen = NSScreen.builtIn else { return false }
-        let mouse = NSEvent.mouseLocation
-        let parameters = forgivingParameters()
-
-        // Island hit region in global screen coordinates.
-        let region = CGRect(
-            x: screen.frame.midX - parameters.width / 2,
-            y: screen.frame.maxY - parameters.height,
-            width: parameters.width,
-            height: parameters.height
-        )
-
-        let hovered = region.contains(mouse)
+        let point = Self.localPoint(NSEvent.mouseLocation, on: screen.frame)
+        let hovered = Self.islandPath(for: forgivingParameters()).contains(point)
         guard hovered != controller.isHovered else { return false }
         controller.setHovered(hovered)
         return true
+    }
+}
+
+extension NotchPresenter {
+    /// The fixed canvas every claimed path (clicks in `refreshInteractiveRegion`,
+    /// hover in `reevaluateHover`) is built against — same size and origin
+    /// `NotchWindow` uses for its content view. `internal`, not `private`, so
+    /// `islandPath(for:)`/`localPoint(_:on:)` are directly testable via
+    /// `@testable import NotchKit` without faking `NSScreen`/`NSEvent`.
+    /// `nonisolated`: a pure constant with no access to actor state — without
+    /// this, `@MainActor` on the class would make even reading it implicitly
+    /// async from a synchronous test context, same reasoning as
+    /// `HUDService.composedAvailability`.
+    nonisolated static let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+
+    /// The island's claimed path for `parameters`, in the same canvas-local,
+    /// top-left-origin, y-down space `NotchShape.path(in:)` and
+    /// `NotchWindow.setInteractiveShape` both already use. The ONE
+    /// definition of "what counts as the island" both click hit-testing and
+    /// hover now derive from — see `reevaluateHover`'s doc comment.
+    /// `nonisolated`: pure function of its parameter, same reasoning as `canvas`.
+    nonisolated static func islandPath(for parameters: NotchShapeParameters) -> Path {
+        NotchShape(parameters).path(in: canvas)
+    }
+
+    /// Converts a point in AppKit global screen coordinates (e.g.
+    /// `NSEvent.mouseLocation`) into the local space `islandPath(for:)` is
+    /// defined in, given the screen the island's canvas is anchored to.
+    /// Mirrors `NotchWindow.reposition(for:)`'s placement — canvas centred
+    /// horizontally, top edge welded to the screen's top edge — and undoes
+    /// the flip `NotchWindow.setInteractiveShape` applies before AppKit hit
+    /// testing. `canvas`'s own width/height cancel out of this derivation
+    /// (`NotchShape.path(in:)` only ever reads `rect.midX`/`rect.minY`),
+    /// leaving just the offset from the screen's horizontal centre and the
+    /// vertical distance below its top edge. `nonisolated`: pure function of
+    /// its parameters, same reasoning as `canvas`.
+    nonisolated static func localPoint(_ globalPoint: CGPoint, on screenFrame: CGRect) -> CGPoint {
+        CGPoint(
+            x: globalPoint.x - screenFrame.midX + canvas.width / 2,
+            y: screenFrame.maxY - globalPoint.y
+        )
     }
 }
