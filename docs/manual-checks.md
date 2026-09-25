@@ -1,3 +1,17 @@
+> **Superseded — read this first.** A whole-branch review found the island
+> did not actually render: content sat at opacity 0 in every state but
+> `.expanded` (a progress-window mismatch), and separately rendered
+> 100–145pt below the island over the desktop (`.overlay`'s default
+> centre alignment against a `Shape` fill that occupies the whole canvas).
+> **Both defects were present for every check recorded below** — so Task
+> 8's "Revised expectation" (a visible dot + percentage at one-activity
+> size) and Task 6 check 6 were not true as shipped, regardless of how they
+> read. Both defects are now fixed; see **"Fix wave — corrected
+> predictions and new checks"** at the end of this file for the current,
+> accurate expectation and for what is still genuinely unverified. The
+> sections below are kept as a historical record of what each session
+> knew at the time, not as current guidance.
+
 # Task 6 manual checks — `NotchRootView` on screen
 
 Performed from an unattended CLI agent session: no interactive mouse/keyboard
@@ -293,3 +307,135 @@ power activity — not the full sentence, which still needs a second
 concurrent activity. That revised expectation is a traced, reasoned
 prediction plus 19/19 `PowerServiceTests` green, not a guess, but it is still
 not an eye-verified observation of pixels on a real screen.
+
+---
+
+# Fix wave — corrected predictions and new checks
+
+Same environment constraints as every session above: no interactive
+mouse/keyboard input, no screenshot capability, no Accessibility or Screen
+Recording grant. This session went further than that baseline, though —
+**it did not even run the launch smoke test** Task 6 and Task 8 did
+(`.build/debug/Ledge` directly, or `make dev`), because `make cert`'s
+keychain import needs an interactive "Allow" click this session has no
+standing to trigger unprompted, and nothing about this fix wave changes
+that constraint. So everything below is either (a) verified by an
+automated test that actually runs, and said which, or (b) reasoned from
+the diff, and said so — **nothing in this section is an eye-verified
+observation, and none of it claims to be**.
+
+## What was wrong, and what changed
+
+A whole-branch review found two defects in `NotchRootView.swift` that made
+island content invisible or misplaced in every state the six checks above
+exercise:
+
+1. **Content was opacity 0 outside `.expanded`.** The fade-in math compared
+   the wrong two quantities (a height normalised against the global
+   collapsed→expanded span, against a window defined over a transition's
+   own 0→1 progress). Fixed by driving the fade from `controller.isVisible`
+   and letting SwiftUI's `Animatable` interpolation supply the transition
+   progress.
+2. **Content rendered 100–145pt below the island**, over the desktop,
+   unbacked, in every state but the tallest. `.overlay {}`'s default
+   alignment is `.center`, applied to a `Shape` fill that occupies the
+   whole 640×320 canvas, not the island's own drawn extent. Fixed with
+   `.overlay(alignment: .top)`.
+3. A third, smaller defect the new test below caught while verifying the
+   first two: the detail row's height frame centred its content by
+   default, so two stacked activity rows could overflow upward into the
+   ear row/notch area instead of clipping safely below. Fixed by
+   top-aligning that frame.
+
+Full detail, including the exact arithmetic and the render test's
+before/after pixel counts, is in
+`.superpowers/sdd/2026-09-25-notch-shell-and-first-activity/final-fix-report.md`.
+
+## New automated evidence (not eye-verification)
+
+`Tests/NotchRenderTests` renders the real `NotchRootView` headlessly via
+`ImageRenderer` (no window, no screen) for the one-activity, two-activity,
+and expanded states, and checks the actual rendered pixels: at least one
+content pixel lands inside the island's drawn bounds, none lands inside the
+notch rect, and none lands outside the island's bounds. Confirmed this
+fails against the pre-fix code (for the reasons above) and passes against
+the fix, for all three states. This is real, automated, pixel-level
+evidence that content is geometrically correct — but it is a synthetic
+render, not a screenshot of the real app on real notched hardware, and it
+says nothing about animation feel, timing, or input handling. Checks 1, 2,
+and 6 below still need a human.
+
+## Corrected expectation for checks already in this file
+
+- **Task 8, checks 1–2** ("a human running check 1 or 2 today should expect
+  ... a short percentage in the trailing ear"): that prediction assumed
+  content was visible at one-activity size, which defect 1 made false for
+  the entire time it was true on paper. With defect 1 fixed, the
+  **original** fix-round-1 prediction is now actually deliverable: a lone
+  charging/unplug event should show the island at `oneActivity` size, the
+  leading-ear dot, and `"NN%"` in the trailing ear — not the full sentence.
+  Still not eye-verified; now backed by the render test above in addition
+  to the reasoning that was already there.
+- **Task 6, check 6** ("nothing is ever drawn inside the notch cutout"):
+  the previous supporting evidence only read the source structure, which
+  never actually proved the hole stayed clear once defect 2 shifted
+  everything downward (displaced content wouldn't have touched the hole
+  either way — which is exactly why defect 2 needed a pixel-level check,
+  not a source-level one, to be caught at all). The render test's second
+  assertion now checks this directly, pixel by pixel, for all three states.
+
+## New checks needed for this fix wave (none eye-verified)
+
+Interaction and lifecycle changes with no prior manual-check coverage at
+all, because the behaviour did not exist before this fix wave:
+
+1. **Tap the island when it is showing (peek/activity) → it expands.**
+   New: `NotchRootView` now has an `.onTapGesture` routed through
+   `NotchPresenter.toggle()`. Reasoned correct (mirrors the menu bar's
+   already-covered "Toggle Panel" path), not observed.
+2. **Click anywhere outside the island while expanded → it dismisses.**
+   New: a `.leftMouseDown` global monitor in `NotchPresenter`. Reasoned
+   correct from Apple's documented global-monitor semantics (see the
+   report), not observed.
+3. **Press Escape while expanded → it dismisses.** New: a *local* keyDown
+   monitor. Flagged plainly in the report as a real, unresolved tension:
+   `NotchWindow.canBecomeKey` is hardwired `false`, so this window can
+   never become key, and a local monitor structurally needs a key window
+   to see keyDown — this is unlikely to fire while some other app has
+   focus, which is the realistic case. A human should verify this
+   specifically, and may find it simply does not work while focus is
+   elsewhere; that would confirm the concern already on record rather than
+   be a new finding.
+4. **Turn Reduce Motion on/off in System Settings while Ledge is already
+   running → springs switch to the crossfade (and back) without
+   relaunching.** New: `NotchPresenter` now observes
+   `accessibilityDisplayOptionsDidChangeNotification`. Not observed.
+5. **Menu bar item's menu reads `power, app, ─, Quit Ledge` with Quit
+   last**, regardless of how many status rows or action items exist.
+   Previously read `power, app, ─, Quit Ledge, Toggle Panel` with Quit in
+   the middle. Reasoned correct by tracing the exact call sequence against
+   the new insertion logic (see the report); not observed.
+6. **On a Mac with no battery (e.g. a desktop Mac), the menu bar reads
+   `Power — unavailable — no internal battery`, not `Power — ready`.** New:
+   `PowerService.poll()` now filters for the internal battery specifically
+   and reports unavailability when none is found. Not observed on any
+   battery-less Mac; this development session has no such hardware.
+7. **Dismissing an open panel while an activity is live does not briefly
+   flash the notch cutout uncovered**, and hovering from peek onto a
+   one-activity island does not visibly dip before settling. Both are
+   spring-selection fixes (item 4 in the report) with no automated
+   coverage possible here — `NotchAnimationTests` still only pins the
+   spring constants themselves, not which one a given transition picks.
+   Needs a human watching the actual motion.
+
+## Bottom line
+
+Nothing in this fix wave has been eye-verified — this session did not even
+attempt the launch smoke test earlier sessions ran. What's new is a
+pixel-level automated test proving the two worst defects are actually
+fixed in the rendered output, not just in the reasoning about the code,
+plus seven new behaviours (above) that have no manual verification at all
+yet and did not exist before this pass. Before shipping, a human needs to:
+run `make cert` once (interactive), `make dev`, and go through Task 6's
+six checks, Task 8's six checks (with the corrected expectation above),
+and the seven new checks in this section.
