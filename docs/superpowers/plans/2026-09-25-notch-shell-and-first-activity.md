@@ -2761,6 +2761,18 @@ public enum PowerEvent: Sendable, Equatable {
             return "Low battery · \(percent)%"
         }
     }
+
+    /// Glanceable form for the trailing ear, which is the only place text can
+    /// appear while a single activity holds the island at notch height. The ear
+    /// is ~38pt wide, so this stays to a few characters.
+    public var compactText: String {
+        switch self {
+        case .pluggedIn(let percent, _): return "\(percent)%"
+        case .unplugged(let percent):    return "\(percent)%"
+        case .fullyCharged:              return "100%"
+        case .lowBattery(let percent):   return "\(percent)%"
+        }
+    }
 }
 
 /// Turns a stream of snapshots into the handful of moments worth showing.
@@ -3025,10 +3037,25 @@ In `Sources/NotchKit/NotchController.swift`, add:
         public let id: String
         public let title: String
         public let detail: String?
-        public init(id: String, title: String, detail: String? = nil) {
+        /// Very short glanceable form for the trailing ear — "87%", "50%".
+        ///
+        /// Required, not decorative: at one activity the island stays exactly
+        /// notch-height, so `detailRow` is gated off and `title` has nowhere to
+        /// render. Without this the common single-activity case shows a glyph and
+        /// no words at all. The ear is only ~38pt wide, so this must stay to a
+        /// few characters — the full `title` will not fit.
+        public let compactText: String?
+
+        public init(
+            id: String,
+            title: String,
+            detail: String? = nil,
+            compactText: String? = nil
+        ) {
             self.id = id
             self.title = title
             self.detail = detail
+            self.compactText = compactText
         }
     }
 ```
@@ -3054,6 +3081,15 @@ In `Sources/NotchKit/NotchRootView.swift`, replace `detailRow` and `trailingEar`
             Text("+\(controller.overflowCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
+        } else if let compact = controller.activities.first?.compactText {
+            // At one activity the island is notch-height and `detailRow` is gated
+            // off, so this ear is the ONLY place a value can appear. Without it the
+            // island widens, shows a glyph, and says nothing.
+            Text(compact)
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+                .lineLimit(1)
+                .transition(.blurReplace)
         }
     }
 
@@ -3106,7 +3142,9 @@ struct ContentFade: ViewModifier, Animatable {
     var progress: Double
     let metrics: NotchMetrics
 
-    var animatableData: Double {
+    // `nonisolated` is required: `ViewModifier` infers `@MainActor` isolation,
+    // which `Animatable`'s requirement does not accept.
+    nonisolated var animatableData: Double {
         get { progress }
         set { progress = newValue }
     }

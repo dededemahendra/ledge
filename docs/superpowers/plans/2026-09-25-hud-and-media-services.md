@@ -1270,6 +1270,15 @@ In `Sources/NotchKit/NotchController.swift`, replace the `ActivityDisplay` struc
         public let symbolName: String?
         /// `0...1` progress bar, or `nil` for activities without one.
         public let barFill: Double?
+        /// Short glanceable form for the trailing ear — "50%", "6%".
+        ///
+        /// **Required for every HUD event.** At one activity the island stays
+        /// exactly notch-height, so `detailRow` is gated off and `title` has
+        /// nowhere to render. A volume HUD without this shows a speaker glyph and
+        /// no number — which is the one thing a volume HUD exists to show. Use
+        /// `HUDEvent.compactText`, added in Task 1 of this plan:
+        /// `"\(Int((level * 100).rounded()))%"`, or `"Muted"` when muted.
+        public let compactText: String?
 
         public init(
             id: String,
