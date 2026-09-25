@@ -472,7 +472,30 @@ struct FakeScreen: ScreenDescribing {
 @Test func notchIsHorizontallyCentred() throws {
     let screen = FakeScreen.measured
     let rect = try #require(NotchGeometry.notchRect(for: screen))
-    #expect(abs(rect.midX - screen.frame.midX) < 0.01)
+    // Compared against half the screen's WIDTH, not `frame.midX`: the result is
+    // screen-relative, so `frame.midX` would only agree by accident on a screen
+    // that happens to sit at the desktop origin.
+    #expect(abs(rect.midX - screen.frame.width / 2) < 0.01)
+}
+
+/// The auxiliary areas arrive in global desktop coordinates, so a built-in panel
+/// that is not the primary display carries its desktop offset in them. The
+/// returned rect must not.
+@Test func notchXIsScreenRelativeEvenWhenTheScreenIsNotAtTheOrigin() throws {
+    // The same panel as `measured`, docked to the right of a 1920-wide external
+    // primary display: the frame and both auxiliary edges all shift by +1920.
+    let offset: CGFloat = 1920
+    let screen = FakeScreen(
+        frame: CGRect(x: offset, y: 0, width: 1470, height: 956),
+        safeAreaTopInset: 32,
+        auxiliaryTopLeftMaxX: 645.5 + offset,
+        auxiliaryTopRightMinX: 824.5 + offset
+    )
+    let rect = try #require(NotchGeometry.notchRect(for: screen))
+    #expect(rect.width == 179, "width is a difference, so position must not affect it")
+    #expect(rect.minX == 645.5, "x must be relative to the screen, not to the desktop")
+    #expect(rect.height == 32)
+    #expect(abs(rect.midX - screen.frame.width / 2) < 0.01)
 }
 
 // Review Focus 2: no notch must mean no island, never a guessed rect.
@@ -534,8 +557,13 @@ public protocol ScreenDescribing: Sendable {
     var frame: CGRect { get }
     var safeAreaTopInset: CGFloat { get }
     /// Right edge of the menu bar area to the left of the notch.
+    ///
+    /// Reported in **global desktop coordinates**, the same space as `frame` —
+    /// Apple documents `NSScreen.auxiliaryTopLeftArea` as "specified in global
+    /// screen coordinates". `NotchGeometry` subtracts `frame.minX` to convert.
     var auxiliaryTopLeftMaxX: CGFloat? { get }
     /// Left edge of the menu bar area to the right of the notch.
+    /// Also in global desktop coordinates — see above.
     var auxiliaryTopRightMinX: CGFloat? { get }
     var isBuiltIn: Bool { get }
 }
@@ -607,10 +635,16 @@ public enum NotchGeometry {
             let trailingEdge = screen.auxiliaryTopRightMinX
         else { return nil }
 
+        // Width is a difference of two global values, so the desktop offset
+        // cancels and it needs no adjustment.
         let width = trailingEdge - leadingEdge
         guard width > 0 else { return nil }
 
-        return CGRect(x: leadingEdge, y: 0, width: width, height: height)
+        // The auxiliary edges arrive in global desktop coordinates, so subtract
+        // the screen's own origin to land in the screen-relative space this
+        // function promises. A no-op on the primary display, where frame.minX is
+        // 0; not a no-op for a built-in panel docked beside an external primary.
+        return CGRect(x: leadingEdge - screen.frame.minX, y: 0, width: width, height: height)
     }
 }
 ```
