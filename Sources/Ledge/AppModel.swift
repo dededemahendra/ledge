@@ -203,7 +203,12 @@ final class AppModel {
     private func handle(_ payload: MediaPayload) {
         mediaPayload = payload
 
-        guard payload.hasMedia, let title = payload.title else {
+        // Music apps only (`MediaSourcePolicy`): a browser tab or a video
+        // call is not "now playing" for the island, however loudly
+        // MediaRemote reports it. Falls into the nothing-playing branch so
+        // the artwork, the panel and the position tick all go away too.
+        guard payload.hasMedia, let title = payload.title,
+              MediaSourcePolicy.isAllowed(bundleIdentifier: payload.bundleIdentifier) else {
             queue.remove(kind: .media)
             presenter.controller.setMedia(nil)
             stopPositionTicking()

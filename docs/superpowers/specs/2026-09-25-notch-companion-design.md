@@ -470,6 +470,13 @@ both HUDs appear, which is ugly but harmless.
 
 ### MediaService — no permission, medium risk
 
+**Source allow-list (2026-09-29, user's call):** only music players are shown
+and controlled — Apple Music, Spotify, TIDAL, Deezer, YouTube Music
+(`MediaSourcePolicy.allowedBundleIdentifiers`). MediaRemote reports whatever
+played most recently, browser tabs included, and those were landing in the
+island with their titles; a disallowed source is treated exactly as nothing
+playing. Extending the list is one line.
+
 Vendors [`mediaremote-adapter`](https://github.com/ungive/mediaremote-adapter)
 (BSD-3-Clause), which restores MediaRemote access broken by Apple in macOS 15.4.
 It loads `MediaRemoteAdapter.framework` inside `/usr/bin/perl`, which reports

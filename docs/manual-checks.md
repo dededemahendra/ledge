@@ -1125,3 +1125,11 @@ Clicking the card's artwork or title brings the playing app to the front
 (`NotchIntent.openSource` → `AppModel.openSourceApp`: LaunchServices
 `openApplication(at:)` by bundle id, pid `activate()` as fallback). The
 visualizer is not part of the button. Not verified live.
+
+# Music apps only (2026-09-29)
+
+`MediaSourcePolicy` allow-lists music players by bundle id;
+`AppModel.handle(_ payload:)` treats anything else as nothing playing (no
+artwork, no panel, no position tick). Tests cover the list, case-insensitivity,
+browsers, QuickTime, Zoom and a missing id. Live check: a browser video should
+no longer appear in the island; Music/Spotify still should.
