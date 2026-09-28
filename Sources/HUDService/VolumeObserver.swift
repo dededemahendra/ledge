@@ -47,6 +47,14 @@ public final class VolumeObserver {
     public private(set) var availability: ServiceAvailability = .available
 
     private let onChange: (VolumeReading) -> Void
+    /// Fired every time the listeners are re-pointed at a (possibly new)
+    /// default output device, BEFORE that device's current level is
+    /// emitted. `HUDService` uses it to drop the deriver's volume baseline,
+    /// so plugging in AirPods (which remember their own level) does not
+    /// fire a "Sound" HUD nobody asked for. This is the call the comment in
+    /// `rebind()` always promised existed at the call site — and did not,
+    /// until 2026-09-28.
+    public var onRebind: (() -> Void)?
     private var device = AudioDeviceID(kAudioObjectUnknown)
     private var strategy: VolumeStrategy = .unavailable
     private var installedDeviceListener: InstalledListener?
@@ -206,8 +214,10 @@ public final class VolumeObserver {
         }
 
         // Re-baseline: the new device's level is not a change the user made.
-        // (HUDEventDeriver.reset() is what actually suppresses this at the
-        // call site; this observer just reports what CoreAudio says now.)
+        // `onRebind` lets the call site drop its baseline first; this
+        // observer then just reports what CoreAudio says now, which the
+        // deriver records silently.
+        onRebind?()
         emit()
     }
 

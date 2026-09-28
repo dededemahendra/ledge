@@ -96,14 +96,17 @@ public final class OSDSuppressor {
 
         if suppressing {
             installAtexitHandler()
-            sweepTimer = Timer.scheduledTimer(
-                withTimeInterval: OSDSuppressionPolicy.sweepInterval, repeats: true
-            ) { _ in
+            // `.common` mode, not `Timer.scheduledTimer`'s `.default`-only
+            // schedule: a sweep that pauses while a menu is open is exactly
+            // the window the on-demand helper needs to launch and draw.
+            let sweep = Timer(timeInterval: OSDSuppressionPolicy.sweepInterval, repeats: true) { _ in
                 MainActor.assumeIsolated {
                     Self.apply(OSDSuppressionPolicy.actions(pids: Self.helperPIDs(), suppressing: true))
                 }
             }
-            sweepTimer?.tolerance = OSDSuppressionPolicy.sweepInterval / 2
+            sweep.tolerance = OSDSuppressionPolicy.sweepInterval / 2
+            RunLoop.main.add(sweep, forMode: .common)
+            sweepTimer = sweep
             Self.apply(OSDSuppressionPolicy.actions(pids: Self.helperPIDs(), suppressing: true))
         } else {
             sweepTimer?.invalidate()

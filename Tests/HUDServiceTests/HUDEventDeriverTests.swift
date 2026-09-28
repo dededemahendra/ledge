@@ -51,6 +51,22 @@ import Testing
 }
 
 // Review Focus 1: rebinding to a new device must not suppress the next real change.
+/// An output-device switch must re-baseline volume WITHOUT losing the
+/// brightness baseline: the display did not change, only the speakers did.
+@Test func resetVolumeRebaselinesVolumeOnlyAndKeepsBrightness() {
+    var d = HUDEventDeriver()
+    #expect(d.volumeChanged(level: 0.3, muted: false) == nil)
+    #expect(d.brightnessChanged(level: 0.5) == nil)
+
+    d.resetVolume()
+    #expect(d.volumeChanged(level: 0.8, muted: false) == nil,
+            "the new device's own level is a baseline, not a change — no HUD on AirPods connecting")
+    #expect(d.volumeChanged(level: 0.85, muted: false) == .volume(level: 0.85, muted: false),
+            "and the next real change fires against the new baseline")
+    #expect(d.brightnessChanged(level: 0.6) == .brightness(level: 0.6),
+            "brightness keeps its baseline across a volume-only reset")
+}
+
 @Test func resetForcesTheNextReadingToBeTreatedAsFresh() {
     var d = HUDEventDeriver()
     _ = d.volumeChanged(level: 0.4, muted: false)

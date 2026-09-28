@@ -144,12 +144,18 @@ public final class BrightnessObserver {
     }
 
     private func startPolling() {
-        timer = Timer.scheduledTimer(
-            withTimeInterval: Self.pollInterval, repeats: true
-        ) { [weak self] _ in
+        // `Timer(...)` + `RunLoop.main.add(_:forMode: .common)`, not
+        // `Timer.scheduledTimer`, which only schedules on `.default`: with a
+        // menu open or the scrubber mid-drag the main run loop sits in an
+        // event-tracking mode, and a `.default`-only poll silently stops —
+        // brightness keys pressed then never reach the island. Same fix as
+        // `AppModel.pruneTimer`/`positionTimer`.
+        let poll = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
-        timer?.tolerance = Self.pollInterval / 2   // let the OS coalesce wakeups
+        poll.tolerance = Self.pollInterval / 2   // let the OS coalesce wakeups
+        RunLoop.main.add(poll, forMode: .common)
+        timer = poll
         tick()
     }
 

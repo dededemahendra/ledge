@@ -89,6 +89,8 @@ public final class HUDService {
                 }
             }
 
+            volume.onRebind = { [weak self] in self?.deriver.resetVolume() }
+
             volume.start()
             brightness.start()
             self.volume = volume

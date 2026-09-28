@@ -22,6 +22,14 @@ public struct HUDEventDeriver: Sendable {
         lastBrightness = nil
     }
 
+    /// Volume-only variant for an output-device switch: the new device's
+    /// level is not a change the user made, but the display's brightness
+    /// baseline is still valid and must not be thrown away with it.
+    public mutating func resetVolume() {
+        lastVolume = nil
+        lastMuted = nil
+    }
+
     public mutating func volumeChanged(level: Double, muted: Bool) -> HUDEvent? {
         let clamped = min(1, max(0, level))
 
