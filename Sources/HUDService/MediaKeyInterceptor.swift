@@ -123,6 +123,11 @@ public final class MediaKeyInterceptor {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "media-keys")
 
     public private(set) var availability: ServiceAvailability = .unavailable(reason: "off")
+    /// The level this interceptor just wrote for a brightness key. While
+    /// the tap is active this is the ONLY source of brightness HUD events:
+    /// it is instant (no 100ms poll), and it is certain — the display's own
+    /// adjustments never come through here.
+    public var onBrightnessApplied: ((Double) -> Void)?
     /// Called on the main actor whenever `availability` changes, so the
     /// menu bar row can follow a grant made while the app is running.
     public var onAvailabilityChange: ((ServiceAvailability) -> Void)?
@@ -258,7 +263,9 @@ public final class MediaKeyInterceptor {
             let display = CGMainDisplayID()
             guard let bridge, let current = bridge.brightness(for: display) else { return false }
             let next = MediaKeyStepper.step(current, up: key == .brightnessUp, fine: fine)
-            return bridge.setBrightness(next, for: display)
+            guard bridge.setBrightness(next, for: display) else { return false }
+            onBrightnessApplied?(next)
+            return true
         }
     }
 }

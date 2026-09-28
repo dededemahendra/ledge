@@ -25,6 +25,16 @@ public final class HUDService {
     private let interceptor = MediaKeyInterceptor()
     private var continuation: AsyncStream<HUDEvent>.Continuation?
     private var wantsSuppression: Bool
+    private var pendingBrightness: Task<Void, Never>?
+    private var lastPowerSourceChange: Date?
+
+    /// How long after (or before) a power-source change a brightness change
+    /// is treated as the display's own doing, and how long an observed
+    /// change is held so a power change arriving just AFTER it can still
+    /// veto it. The two events race: the dimming can be seen before IOKit
+    /// reports the plug.
+    public static let powerChangeVeto: TimeInterval = 3
+    public static let brightnessHold: Duration = .milliseconds(300)
 
     public init(suppressStockOSD: Bool = true) {
         self.wantsSuppression = suppressStockOSD
@@ -83,13 +93,14 @@ public final class HUDService {
                 }
             }
             let brightness = BrightnessObserver { [weak self] level in
-                guard let self else { return }
-                if let event = self.deriver.brightnessChanged(level: level) {
-                    self.continuation?.yield(event)
-                }
+                self?.handleObservedBrightness(level)
             }
 
             volume.onRebind = { [weak self] in self?.deriver.resetVolume() }
+            interceptor.onBrightnessApplied = { [weak self] level in
+                guard let self, let event = self.deriver.brightnessChanged(level: level) else { return }
+                self.continuation?.yield(event)
+            }
 
             volume.start()
             brightness.start()
@@ -119,6 +130,45 @@ public final class HUDService {
         }
     }
 
+    /// `AppModel` calls this on every power event (plug, unplug, charged,
+    /// low). macOS dims the display slightly on battery and brightens it
+    /// back on AC; without this, each of those showed a "Display" HUD.
+    public func notePowerSourceChanged() {
+        lastPowerSourceChange = Date()
+        pendingBrightness?.cancel()
+        pendingBrightness = nil
+    }
+
+    private var powerChangedRecently: Bool {
+        guard let lastPowerSourceChange else { return false }
+        return Date().timeIntervalSince(lastPowerSourceChange) < Self.powerChangeVeto
+    }
+
+    /// A brightness reading from the 10Hz poll. Three cases:
+    /// - the media-key tap is active: keys report their own writes through
+    ///   `onBrightnessApplied`, so an observed change is by definition not
+    ///   the user's (the display's own adjustment, or Control Center's
+    ///   slider, for which macOS itself shows no HUD). Re-baseline silently
+    ///   so the next key press is measured from the true level.
+    /// - off the sixteenths grid: the display's own doing. Silent.
+    /// - on the grid: probably a key — but the return trip from battery
+    ///   dimming lands back on the grid too, so hold it briefly and let a
+    ///   power change just before or just after veto it.
+    private func handleObservedBrightness(_ level: Double) {
+        if interceptor.isActive {
+            _ = deriver.brightnessChanged(level: level)
+            return
+        }
+        guard let event = deriver.brightnessChanged(level: level) else { return }
+        guard HUDEventDeriver.isOnKeyGrid(level), !powerChangedRecently else { return }
+        pendingBrightness?.cancel()
+        pendingBrightness = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.brightnessHold)
+            guard let self, !Task.isCancelled, !self.powerChangedRecently else { return }
+            self.continuation?.yield(event)
+        }
+    }
+
     public func setSuppressStockOSD(_ suppress: Bool) {
         wantsSuppression = suppress
         let on = suppress && availability.isAvailable
@@ -127,6 +177,9 @@ public final class HUDService {
     }
 
     public func stop() {
+        pendingBrightness?.cancel()
+        pendingBrightness = nil
+        interceptor.onBrightnessApplied = nil
         interceptor.stop()
         suppressor.shutdown()
         volume?.stop()

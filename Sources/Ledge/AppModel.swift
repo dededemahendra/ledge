@@ -151,6 +151,9 @@ final class AppModel {
     }
 
     private func handle(_ event: PowerEvent) {
+        // The display dims on battery and brightens on AC by itself; the
+        // HUD service must not read that as a brightness key.
+        hud.notePowerSourceChanged()
         queue.insert(
             ActivityRecord(
                 id: ActivityKind.power.rawValue,

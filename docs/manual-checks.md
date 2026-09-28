@@ -1041,3 +1041,21 @@ label's weight, 10pt in, so its end lines up with the HUD's bar.
 ## Not verified
 
 - Live plug/unplug with music playing.
+
+# Brightness HUD on charger plug/unplug (2026-09-28)
+
+User report: the "Display" HUD fired when the charger went in or out. macOS
+dims the display slightly on battery and brightens it back on AC; the 10Hz
+value poll saw that as a change.
+
+Fix, two layers (`HUDService.handleObservedBrightness`):
+- tap active: brightness HUDs come only from `MediaKeyInterceptor`'s own
+  writes (`onBrightnessApplied`, instant); observed changes only re-baseline.
+  Control Center's slider therefore shows no HUD — as in macOS itself.
+- tap inactive: an observed change must land on the sixteenths key grid
+  (`HUDEventDeriver.isOnKeyGrid`) and is held 300 ms so a power event within
+  3 s before/after (`notePowerSourceChanged`, called from
+  `AppModel.handle(PowerEvent)`) vetoes it.
+
+Not verified live; auto-brightness drift that happens to land on the grid
+without the tap can still show a HUD.

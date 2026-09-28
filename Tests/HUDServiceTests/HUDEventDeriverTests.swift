@@ -162,3 +162,12 @@ import Testing
         #expect(HUDEvent.brightness(level: level).symbolName == "sun.max.fill")
     }
 }
+
+/// Brightness keys snap to sixteenths; the display's own adjustments do not.
+@Test func keyGridAcceptsSixteenthsAndRejectsTheDisplaysOwnDimming() {
+    for k in 0...16 { #expect(HUDEventDeriver.isOnKeyGrid(Double(k) / 16)) }
+    #expect(HUDEventDeriver.isOnKeyGrid(0.7501), "float jitter around a step is still a step")
+    #expect(!HUDEventDeriver.isOnKeyGrid(0.525), "0.75 dimmed by 30% on battery")
+    #expect(!HUDEventDeriver.isOnKeyGrid(0.71), "auto-brightness drift")
+    #expect(!HUDEventDeriver.isOnKeyGrid(0.03))
+}

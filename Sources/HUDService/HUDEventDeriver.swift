@@ -8,6 +8,18 @@ public struct HUDEventDeriver: Sendable {
     /// Below this, a change is imperceptible and almost certainly float jitter.
     public static let minimumDelta: Double = 0.005
 
+    /// Whether a brightness level is one the system's own keys would land
+    /// on: the keys step in sixteenths and snap to that grid, while the
+    /// display's own adjustments — dimming on battery, brightening back on
+    /// AC, auto-brightness following the room — land anywhere. Used to keep
+    /// those system-initiated changes from showing a "Display" HUD when the
+    /// media-key tap is not active to say for certain (2026-09-28: plugging
+    /// the charger in and out was popping the brightness HUD).
+    public static func isOnKeyGrid(_ level: Double, steps: Double = 16, tolerance: Double = 0.004) -> Bool {
+        let scaled = level * steps
+        return abs(scaled - scaled.rounded()) <= tolerance * steps
+    }
+
     private var lastVolume: Double?
     private var lastMuted: Bool?
     private var lastBrightness: Double?
