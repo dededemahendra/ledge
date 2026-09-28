@@ -915,3 +915,23 @@ on and did nothing: on this macOS the pill is `MenuBarAgent`'s, not
 - Fine steps (Shift+Option) and key auto-repeat on real hardware.
 - The system's "play feedback when volume is changed" pop is NOT reproduced
   when Ledge handles the key.
+
+# DeviceService (2026-09-28)
+
+## What was checked
+
+- `make test`: 211 tests pass; `DeviceServiceTests` pins baseline/duplicate
+  suppression, the built-in route being announced by name, glyph/battery
+  presentation, transport mapping, and battery name matching.
+- `make dev` launches and stays up. The first attempt, with `IOBluetooth`,
+  aborted under TCC ("attempted to access privacy-sensitive data without a
+  usage description … NSBluetoothAlwaysUsageDescription") — three crash
+  reports at 19:37–19:38; the Bluetooth observer was removed rather than
+  taking on the prompt.
+
+## Not verified
+
+- A real route change on this machine: only the built-in output was present
+  during the session, so no `outputChanged` event could be produced. Connect
+  AirPods and expect their name + battery in the island for 3 s, then their
+  glyph in the leading ear while the activity is live.

@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.setStatus(key: "hud", text: "HUD — \(model.hudStatus)")
             item.setStatus(key: "systemhud", text: "System HUD — \(model.systemHUDStatus)")
             item.setStatus(key: "media", text: "Media — \(model.mediaStatus)")
+            item.setStatus(key: "devices", text: "Devices — \(model.deviceStatus)")
         }
         refreshStatusRows()
         item.addItem(title: "Toggle Panel") { [weak presenter] in

@@ -5,6 +5,7 @@ import NotchKit
 import PowerService
 import HUDService
 import MediaService
+import DeviceService
 import OSLog
 
 /// Consumes service streams, maintains the queue, drives the controller.
@@ -17,6 +18,7 @@ final class AppModel {
     private let power = PowerService()
     private let hud = HUDService()
     private let media = MediaService()
+    private let device = DeviceService()
 
     private var queue = ActivityQueue()
     private var tasks: [Task<Void, Never>] = []
@@ -35,6 +37,7 @@ final class AppModel {
     var powerStatus: String { power.availability.statusText }
     var hudStatus: String { hud.availability.statusText }
     var mediaStatus: String { media.availability.statusText }
+    var deviceStatus: String { device.availability.statusText }
     var isSuppressingStockOSD: Bool { hud.isSuppressingStockOSD }
     var systemHUDStatus: String {
         switch hud.systemHUDReplacement {
@@ -81,6 +84,13 @@ final class AppModel {
             }
         })
 
+        let deviceStream = device.start()
+        tasks.append(Task { [weak self] in
+            for await event in deviceStream {
+                self?.handle(event)
+            }
+        })
+
         // The other direction: the panel's buttons/scrubber emit `NotchIntent`s
         // through the controller; this is the one place they get turned into
         // outbound `MediaCommand`s.
@@ -109,6 +119,26 @@ final class AppModel {
         hud.stop()
         power.stop()
         media.stop()
+        device.stop()
+    }
+
+    /// Devices ride the same `ActivityRecord` shape as power: a title for
+    /// the detail row, a glyph for the leading ear, an optional battery
+    /// percentage for the trailing ear. Same id for every device event, so
+    /// AirPods connecting right after a keyboard coalesces into one slot.
+    private func handle(_ event: DeviceEvent) {
+        queue.insert(
+            ActivityRecord(
+                id: ActivityKind.device.rawValue,
+                kind: .device,
+                insertedAt: Date(),
+                ttl: ActivityKind.device.defaultTTL,
+                title: event.activityTitle,
+                compactText: event.compactText,
+                symbolName: event.symbolName
+            )
+        )
+        publish()
     }
 
     private func handle(_ event: PowerEvent) {
@@ -271,6 +301,7 @@ final class AppModel {
     private func evictUnavailableServices() {
         if !power.availability.isAvailable { queue.remove(kind: .power) }
         if !hud.availability.isAvailable { queue.remove(kind: .hud) }
+        if !device.availability.isAvailable { queue.remove(kind: .device) }
         if !media.availability.isAvailable {
             queue.remove(kind: .media)
             // The activity is not the only thing a dead media service leaves

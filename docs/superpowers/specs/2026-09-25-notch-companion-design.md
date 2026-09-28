@@ -473,13 +473,25 @@ bundle id `com.apple.perl` and is therefore entitled. Its README lists macOS
 
 ### DeviceService — no permission
 
-- CoreAudio default-output-device listener → "AirPods Pro connected" style
-  activities on route change.
-- `IOBluetooth` device notifications → connect and disconnect events.
-- AirPods battery from `IORegistry` battery-percent keys, with
-  `system_profiler SPBluetoothDataType -json` as a slow fallback invoked only on
-  connect.
-- Output switching in the expanded panel via `AudioObjectSetPropertyData`.
+**Built 2026-09-28, narrower than planned.** `IOBluetooth` turned out to need
+the Bluetooth privacy prompt (the app aborts at launch without an
+`NSBluetoothAlwaysUsageDescription`), so the "no permission" promise won and
+the Bluetooth link observer was dropped:
+
+- CoreAudio default-output-device listener → an activity on every route
+  change, titled with the new device's NAME ("Dede's AirPods Pro", "MacBook Air
+  Speakers"), product glyph in the leading ear, battery in the trailing ear.
+  A move back to the built-in speakers is announced the same way: CoreAudio
+  cannot say whether the previous device disconnected or was merely switched
+  away from, so "disconnected" would be a guess.
+- Battery from the `IORegistry` (`AppleDeviceManagementHIDEventService`:
+  `Product` + `BatteryPercent`), name-matched loosely. No `system_profiler`
+  fallback — too slow for a 3 s activity.
+- Not covered: non-audio peripherals (keyboard, mouse) connecting or
+  disconnecting, and an audio device that connects without becoming the
+  default output. Both need `IOBluetooth` and its prompt.
+- Output switching in the expanded panel via `AudioObjectSetPropertyData` —
+  still to do.
 
 ### NotificationService — fragile, isolated, opt-in
 
