@@ -972,3 +972,30 @@ changed: a tap on a hover-opened panel no longer pins it
   the compact island. Whether the display-only card is worth keeping at all
   is a judgement to make there — the spec sequenced this last so it can be
   cut without touching anything else.
+
+## Lock-screen result (2026-09-28, later the same evening): not visible
+
+Checked with a detached diagnostic polling `CGWindowListCopyWindowInfo` at 2 Hz
+across four lock/unlock cycles, plus two throwaway apps showing labelled
+panels, and the user looking at the real lock screen:
+
+- The `com.apple.screenIsLocked` / `screenIsUnlocked` notifications fire;
+  Ledge's window went to layer 2147483629 on every lock and back to 26 on
+  unlock, and stayed `onscreen=true` throughout.
+- `loginwindow`'s lock UI is two windows at layers 2001 (30000×30000 backdrop)
+  and 2004 (1470×956 UI); `coreautha` at 1000. `CGShieldingWindowLevel()` is
+  2147483628 here.
+- During the lock transition every user window, Ledge's included, is scaled
+  by ~0.91 about the screen centre for ~0.5 s; the lock windows are not. The
+  lock screen is a separate composited layer, not a window level.
+- Test panels at levels 1000, 2005, 3000 and shield+1, opaque and labelled,
+  created BEFORE the lock: none visible on the lock screen (user report:
+  "no one"). A second variant creating them 1.5 s AFTER the lock notification
+  was armed but not run — the user parked the feature.
+- Screenshots are not evidence here: Ledge's window reports
+  `kCGWindowSharingState = 0` (excluded from capture) although nothing in
+  the code sets `sharingType`; presumably a side effect of the non-activating
+  panel configuration. Worth understanding before relying on screenshots for
+  anything else.
+
+Conclusion: parked. See spec §7.

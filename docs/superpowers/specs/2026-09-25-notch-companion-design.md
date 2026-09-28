@@ -535,6 +535,19 @@ enabled**.
 
 ### LockScreenService — fragile, built last
 
+**Does not render on macOS 27.0 — parked 2026-09-28.** The plumbing below is
+in and correct (the lock notification fires, the window rises to
+`CGShieldingWindowLevel() + 1` and is reported on-screen), but the lock screen
+is composited as a separate layer over every user window regardless of level:
+test panels at levels 1000, 2005, 3000 and shield+1 were all invisible on the
+lock screen, whether created before the lock or after it. `loginwindow`'s own
+lock windows sit at levels 2001/2004, and during the lock transition user
+windows (ours included) are scaled about the screen centre while those are
+not. Reaching the lock layer would need private SkyLight/CGS space APIs. The
+code stays because it is harmless (an invisible panel, collapsed again on
+unlock) and the observer is reusable; the feature is off the list until a
+public way exists. Details in `docs/manual-checks.md`.
+
 **Built 2026-09-28** as `LockScreenObserver` (NotchKit) + `NotchPresenter.setLocked`
 + `NotchController.isLocked`: with media playing, a locked screen shows the
 now-playing card in **display-only** form — artwork, title, artist, progress
