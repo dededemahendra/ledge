@@ -396,14 +396,14 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: symbol
                 )
-            if controller.isSoloHUD {
+            if controller.isHUDLeading {
                 // The reference HUD's ear: glyph, then a one-word label
                 // ("Sound"/"Display"), leading-aligned from the island's
                 // outer edge — not centred in the ear, which would drift
                 // the pair inward as the label's width changes. Only at
-                // `NotchMetrics.hud` size: the 38pt ear of every other
-                // one-activity island has no room for a word, and at two
-                // activities the title already renders in the detail row.
+                // `NotchMetrics.hud` size, which a leading HUD always
+                // gets: the 38pt ear of every other one-activity island
+                // has no room for a word.
                 //
                 // The glyph gets a fixed 18pt slot so the label's x is
                 // stable across symbols of different widths (the slashed
@@ -519,7 +519,12 @@ public struct NotchRootView: View {
     /// three digits at a glance, so volume/brightness now show glyph + bar;
     /// battery keeps glyph + `87%`, having no `barFill` to prefer.
     @ViewBuilder private var trailingEar: some View {
-        if controller.overflowCount > 0 {
+        if controller.isHUDLeading, let fill = controller.activities.first?.barFill {
+            // A live HUD owns both ears (see `NotchController.isHUDLeading`):
+            // the level bar beats the overflow pip, which would otherwise
+            // replace it the moment music was playing behind a volume press.
+            trailingBar(fill)
+        } else if controller.overflowCount > 0 {
             Text("+\(controller.overflowCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()

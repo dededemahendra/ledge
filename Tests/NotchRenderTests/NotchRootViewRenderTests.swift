@@ -352,24 +352,24 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 }
 
 /// The realistic concurrent case (spec's HUD priority 100 outranks
-/// power's 60): a HUD activity with both `symbolName` and `barFill` shares
-/// the two-activity size with another activity. Proves the full Task 5
-/// surface — leading-ear glyph AND detail-row bar — renders without
-/// leaking outside the island or into the notch, same shape as
-/// `twoActivitiesContentRendersInsideTheIslandAndClearOfTheNotch` above.
+/// power's 60): a leading HUD activity takes the HUD island ALONE — glyph +
+/// label in one ear, bar in the other, no detail row — with the other
+/// activity queued behind it. Pinned since 2026-09-28: it used to share the
+/// two-activity size, which with music playing made every volume press a
+/// tall island with the level drawn twice.
 @MainActor
 @Test func hudSymbolAndBarAlongsideAnotherActivityRenderInsideTheIslandAndClearOfTheNotch() {
     let controller = makeController()
     controller.setActivities(
         [
-            .init(id: "hud", title: "Volume 62%", compactText: "62%",
+            .init(id: "hud", title: "Sound", compactText: "62%",
                   symbolName: "speaker.wave.2.fill", barFill: 0.62),
             .init(id: "power", title: "Charging · 42%", compactText: "42%"),
         ],
         overflow: 0
     )
     #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.twoActivities)
+    #expect(controller.parameters == controller.metrics.hud)
 
     let result = renderAndClassify(controller)
     #expect(

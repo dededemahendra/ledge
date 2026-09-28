@@ -163,33 +163,30 @@ private func someMedia() -> MediaPresentation {
     #expect(c.parameters == c.metrics.expanded)
 }
 
-/// The wider HUD island is reserved for a volume/brightness activity that is
-/// ALONE: the same activity with company drops to the two-slot size (its title
-/// then lives in the detail row), and any other lone activity keeps the
-/// 255pt one-activity size.
+/// A LEADING volume/brightness HUD always gets the HUD island — alone, with a
+/// sticky media activity behind it (every volume press while music plays),
+/// or with overflow. Any other leading activity keeps the usual sizes.
 @MainActor
-@Test func aLoneHUDActivityGetsTheHUDSizeAndNothingElseDoes() {
+@Test func aLeadingHUDActivityGetsTheHUDSizeWhateverIsBehindIt() {
     let c = makeController()
-    c.setActivities([.init(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)], overflow: 0)
-    #expect(c.isSoloHUD)
+    let hud = NotchController.ActivityDisplay(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)
+    c.setActivities([hud], overflow: 0)
+    #expect(c.isHUDLeading)
     #expect(c.parameters == c.metrics.hud)
 
     c.setActivities([.init(id: "power", title: "Charging · 42%", compactText: "42%")], overflow: 0)
-    #expect(!c.isSoloHUD)
+    #expect(!c.isHUDLeading)
     #expect(c.parameters == c.metrics.oneActivity)
 
-    c.setActivities(
-        [
-            .init(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4),
-            .init(id: "power", title: "Charging · 42%", compactText: "42%"),
-        ],
-        overflow: 0
-    )
-    #expect(!c.isSoloHUD)
-    #expect(c.parameters == c.metrics.twoActivities)
+    c.setActivities([hud, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.isHUDLeading)
+    #expect(c.parameters == c.metrics.hud, "a volume press with music playing is still just the HUD")
 
-    c.setActivities([.init(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)], overflow: 1)
-    #expect(!c.isSoloHUD, "overflow is company too")
+    c.setActivities([hud], overflow: 1)
+    #expect(c.parameters == c.metrics.hud, "overflow does not demote a live HUD either")
+
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist"), .init(id: "power", title: "On AC", compactText: "95%")], overflow: 0)
+    #expect(!c.isHUDLeading)
     #expect(c.parameters == c.metrics.twoActivities)
 }
 

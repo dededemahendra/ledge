@@ -157,12 +157,18 @@ public final class NotchController {
     /// `NotchRootView.mediaActivityID` already relies on).
     public static let hudActivityID = "hud"
 
-    /// True while a volume/brightness HUD is the one and only live activity —
-    /// the case that gets the wider `NotchMetrics.hud` island and the
-    /// glyph + label ear layout. `activityCount`, not `activities.count`:
-    /// overflow counts as company too.
-    public var isSoloHUD: Bool {
-        activityCount == 1 && activities.first?.id == Self.hudActivityID
+    /// True while a volume/brightness HUD is the leading activity — the case
+    /// that gets the `NotchMetrics.hud` island and the glyph + label ear
+    /// layout, whatever else is queued behind it. A HUD is a 1.5s blip that
+    /// answers exactly one question (what, and how much); while it is live
+    /// the island says only that. It used to share the two-slot size with a
+    /// sticky media activity — which, with music playing, is EVERY volume
+    /// press — and that layout stranded the glyph top-left, put the level
+    /// in the ear AND the detail row, and grew the island for a word.
+    /// Whatever it pre-empted (the artwork, the battery) comes straight
+    /// back when it expires.
+    public var isHUDLeading: Bool {
+        activities.first?.id == Self.hudActivityID
     }
 
     public var parameters: NotchShapeParameters {
@@ -172,8 +178,8 @@ public final class NotchController {
         case .peek:
             return metrics.peek
         case .activity:
-            if activityCount >= 2 { return metrics.twoActivities }
-            return isSoloHUD ? metrics.hud : metrics.oneActivity
+            if isHUDLeading { return metrics.hud }
+            return activityCount >= 2 ? metrics.twoActivities : metrics.oneActivity
         case .expanded:
             return metrics.expanded
         }

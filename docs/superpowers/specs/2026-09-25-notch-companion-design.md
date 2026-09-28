@@ -320,18 +320,21 @@ growth itself becomes the signal that something happened.
 | Hidden | — | window ordered out |
 | Peek (hover) | 179 × 38 pt | **no content** — see below |
 | 1 activity | ~255 × 32 pt | leading ear: artwork 20 pt; trailing ear: waveform |
-| 1 activity, volume/brightness HUD | notch + 2 × 90 pt (~359) × 32 pt | leading ear: glyph + "Sound"/"Display"; trailing ear: 68 pt level bar |
+| Volume/brightness HUD live (whatever is behind it) | notch + 2 × 90 pt (~359) × 32 pt | leading ear: glyph + "Sound"/"Display"; trailing ear: 68 pt level bar |
 | 2 activities | ~342 × 62 pt | ears keep glanceable glyphs; detail row below the hole |
 | 3+ activities | ~342 × 62 pt | top two by priority, `+N` pip in trailing ear |
 | Expanded (hover with media, or pinned by click) | ~390 × 168 pt | full panel below the hole; ears keep glyphs |
 
 Ear width at one activity is ~38 pt per side; at two activities ~81 pt per side.
-A lone volume/brightness HUD is the exception: it gets a fixed 90 pt ear per side
+A live volume/brightness HUD is the exception: it takes the island alone for its
+1.5 s — even with the sticky media activity behind it, which with music playing is
+every volume press — and gets a fixed 90 pt ear per side
 (the island width follows from the notch, not the other way round), measured off
 the reference app's own HUD on 2026-09-25 — 360 pt around the same 179 pt notch,
 glyph then a one-word label leading-aligned on the left, a 5 pt-tall, 68 pt-long
-bar ending 10 pt short of the right edge. Any other lone activity, and a HUD with
-company, keep the sizes above.
+bar ending 10 pt short of the right edge. Whatever the HUD pre-empted (artwork,
+battery) comes back when it expires. Any other leading activity keeps the sizes
+above.
 
 **Peek carries no content, and cannot.** Peek is the notch's own width, so `earWidth`
 is exactly 0 and there is no ear to put a hint in. An earlier draft of the table above

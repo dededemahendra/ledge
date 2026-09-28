@@ -863,3 +863,22 @@ at activity size.
 
 - On-screen feel of the hover open/close on the real notch (no hover-intent
   delay was added; opening is immediate on entering the island's region).
+
+# HUD owns the island while live (2026-09-28)
+
+## What changed
+
+Screenshot from the user: with music playing, a volume press landed in the
+two-activity layout (HUD + sticky media) — a 342 × 62 island with the glyph
+stranded top-left, a 38 pt ear bar, "Sound" as a detail-row title and a second
+bar under it. `NotchController.isHUDLeading` (was `isSoloHUD`) now makes a
+LEADING HUD take `NotchMetrics.hud` regardless of what is queued behind it, and
+the trailing ear's bar beats the overflow pip. One row, one bar, same shape as
+the reference; the artwork returns when the HUD expires 1.5 s later.
+
+## Verified
+
+- `make test` passes; `aLeadingHUDActivityGetsTheHUDSizeWhateverIsBehindIt`
+  and the re-pinned `hudSymbolAndBarAlongsideAnotherActivity…` render test
+  cover HUD + media, HUD + overflow, and non-HUD pairs.
+- Headless snapshot of HUD + media at rest (temporary test, deleted after use).

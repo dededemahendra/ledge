@@ -65,8 +65,10 @@ public struct NotchMetrics: Sendable, Equatable {
     /// mode still gets the same ear.
     public static let hudEarWidth: CGFloat = 90
 
-    /// A lone volume/brightness HUD. Same height and corners as
-    /// `oneActivity` (notch-height, "ears first"), but wider: the reference
+    /// A live volume/brightness HUD — it takes the island alone for its
+    /// 1.5s, whatever is queued behind it (`NotchController.isHUDLeading`).
+    /// Same height and corners as `oneActivity` (notch-height, "ears
+    /// first"), but wider: the reference
     /// HUD says what it is in words ("Sound", "Display") next to the glyph,
     /// and gives the level a bar long enough to read at a glance. 255pt
     /// leaves 38pt ears — room for a glyph or a bar, never both plus a word.
