@@ -30,7 +30,11 @@ private func presentation(elapsed: Double, duration: Double?) -> MediaPresentati
     #expect(presentation(elapsed: 0, duration: 210).elapsedText == "0:00")
     #expect(presentation(elapsed: 9, duration: 210).elapsedText == "0:09")
     #expect(presentation(elapsed: 65, duration: 210).elapsedText == "1:05")
-    #expect(presentation(elapsed: 3661, duration: 7200).elapsedText == "61:01")
+    #expect(presentation(elapsed: 3661, duration: 7200).elapsedText == "1:01:01", "an hour reads as a clock, not as 61 minutes")
+    #expect(presentation(elapsed: 3599, duration: 7200).elapsedText == "59:59")
+    #expect(presentation(elapsed: 192, duration: 2304).elapsedText == "3:12")
+    #expect(presentation(elapsed: 192, duration: 2304).remainingText == "-35:12", "the 38-minute video from the report")
+    #expect(presentation(elapsed: 60, duration: 4320).remainingText == "-1:11:00")
 }
 
 @Test func remainingTimeIsNegativeAndAbsentWithoutDuration() {

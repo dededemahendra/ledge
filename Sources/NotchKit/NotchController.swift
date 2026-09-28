@@ -48,8 +48,14 @@ public struct MediaPresentation: Sendable, Equatable {
         return "-" + Self.clock(max(0, duration - min(elapsed, duration)))
     }
 
+    /// "m:ss" under an hour, "h:mm:ss" from an hour up — "61:01" for a
+    /// 1h01m position is not a clock anyone reads (2026-09-29; podcasts and
+    /// videos routinely run past an hour).
     private static func clock(_ seconds: Double) -> String {
         let total = Int(seconds.rounded(.down))
+        if total >= 3600 {
+            return String(format: "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
+        }
         return String(format: "%d:%02d", total / 60, total % 60)
     }
 }

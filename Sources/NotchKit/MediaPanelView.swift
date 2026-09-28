@@ -208,10 +208,14 @@ struct MediaPanelView: View {
         let dragging = dragFraction != nil
 
         return HStack(spacing: 8) {
-            // Fixed-width slots so the bar doesn't resize as digits tick
-            // over or the remaining count changes length.
+            // Natural width with a 34pt floor: monospaced digits keep the
+            // bar from twitching as seconds tick, and the width only ever
+            // changes at a 9:59 → 10:00 boundary. A FIXED 34pt slot used to
+            // truncate anything past ten minutes to "-35:…" (2026-09-29,
+            // seen on a 38-minute video); an hour-long one needs ~48pt.
             Text(media.elapsedText)
-                .frame(width: 34, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(minWidth: 34, alignment: .leading)
 
             GeometryReader { geometry in
                 let fraction = dragFraction.map(Double.init) ?? media.progress
@@ -251,7 +255,8 @@ struct MediaPanelView: View {
             .frame(height: 18)   // the whole strip is the hit target (~10pt slop rule)
 
             Text(media.remainingText ?? "")
-                .frame(width: 34, alignment: .trailing)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(minWidth: 34, alignment: .trailing)
         }
         .font(.system(size: 10, design: .rounded))
         .monospacedDigit()
