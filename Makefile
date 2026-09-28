@@ -15,12 +15,19 @@ APPDIR   := $(DIST)/$(APP).app
 TESTING_PLUGIN := $(shell d="$$(dirname "$$(dirname "$$(xcrun -f swift)")")/lib/swift/host/plugins/testing"; [ -d "$$d" ] && echo "$$d")
 TESTFLAGS := $(if $(TESTING_PLUGIN),-Xswiftc -plugin-path -Xswiftc $(TESTING_PLUGIN),)
 
-.PHONY: all dev release test build bundle sign install run stop cert clean
+.PHONY: all dev release test build bundle sign install run stop cert cert-allow clean
 
 all: release
 
 cert:
 	@bash scripts/make-cert.sh "$(IDENTITY)"
+
+# For an identity that already exists but prompts on every build: the
+# partition-list step from scripts/make-cert.sh on its own. Asks for the
+# login keychain password on the terminal.
+cert-allow:
+	security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+	    "$$HOME/Library/Keychains/login.keychain-db"
 
 # `make test` runs everything; `make test FILTER=SomeTests` narrows it.
 test:

@@ -58,4 +58,18 @@ security find-identity -p codesigning | grep "$IDENTITY" \
          echo "Fallback: Keychain Access → Certificate Assistant →" >&2
          echo "  Create a Certificate: name '$IDENTITY', type 'Code Signing', self-signed." >&2
          exit 1; }
-echo "Done. 'make dev' will now sign with '$IDENTITY'."
+
+# `-T /usr/bin/codesign` above is necessary but, since macOS 10.12, not
+# sufficient: Apple's tools also check the key's PARTITION LIST, and an
+# imported key has none — so codesign shows the "wants to sign using key"
+# dialog on EVERY build, and "Always Allow" does not stick (observed
+# 2026-09-28: six prompts in an afternoon, then a build left hanging for
+# ten minutes on the dialog). This one-time command fixes that. It asks
+# for the login keychain password itself, on the terminal — never pass it
+# on the command line.
+echo
+echo "Letting codesign use the key without a prompt on every build."
+echo "Enter your login (keychain) password when asked:"
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+    "$HOME/Library/Keychains/login.keychain-db"
+echo "Done. 'make dev' will now sign with '$IDENTITY' without prompting."
