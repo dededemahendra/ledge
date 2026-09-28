@@ -332,31 +332,33 @@ struct MediaPanelView: View {
         .accessibilityLabel("Output: \(current?.name ?? "unknown")")
     }
 
-    /// One chip per output, the current one filled. Horizontal and
-    /// scrollable without a bar, since a Mac with AirPlay speakers around
-    /// can list five or six. Picking one emits `selectOutput` and returns
-    /// to the controls; the route blip then confirms the switch in the
-    /// ears the same way a manual switch would.
+    /// One chip per output, the current one filled. A plain row that
+    /// shares the width between chips and truncates names — not a
+    /// `ScrollView`: every device stays reachable without scrolling, and
+    /// `ImageRenderer` cannot rasterize a scroll view (platform-backed),
+    /// which would leave this row unverifiable by `NotchRenderTests`.
+    /// Picking one emits `selectOutput` and returns to the controls; the
+    /// route blip then confirms the switch in the ears the same way a
+    /// manual switch would.
     private var outputsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(outputs) { output in
-                    outputChip(output)
-                }
-                Button {
-                    showsOutputs = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
-                        .opacity(0.6)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
-                .accessibilityLabel("Close output picker")
+        HStack(spacing: 6) {
+            ForEach(outputs) { output in
+                outputChip(output)
+                    .frame(maxWidth: .infinity)
             }
-            .frame(height: 30)
+            Button {
+                showsOutputs = false
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .opacity(0.6)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+            .accessibilityLabel("Close output picker")
         }
+        .frame(height: 30)
     }
 
     private func outputChip(_ output: OutputOption) -> some View {
