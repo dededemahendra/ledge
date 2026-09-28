@@ -208,6 +208,26 @@ public final class NotchController {
         state = .expanded
     }
 
+    /// A click on the island (as opposed to the menu bar's "Toggle Panel",
+    /// which is `click()`/`dismiss()` unconditionally):
+    /// - on a hover-opened panel: nothing. The cursor already holds it
+    ///   open; a click on its body is not a request, and turning it into a
+    ///   pin made the panel outlive the hover for no reason the user could
+    ///   see (the 2026-09-28 "click the notch, then…" report started here).
+    ///   The panel's own buttons still get their taps first.
+    /// - on a pinned panel: unpin. If the cursor is still there it stays
+    ///   hover-open, so nothing visibly changes — but leaving now closes it.
+    /// - otherwise: pin open, but only when there is something to show; a
+    ///   click on an empty peek must not open an empty slab.
+    public func tap() {
+        if state == .expanded {
+            if isPinnedOpen { dismiss() }
+            return
+        }
+        guard media != nil || activityCount > 0 else { return }
+        click()
+    }
+
     /// Unpins. If the cursor is still over the island and there is media
     /// to show, `recomputeState()` lands straight back on `.expanded` —
     /// hover-opened, no longer pinned — because under the hover model the

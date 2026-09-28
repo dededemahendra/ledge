@@ -935,3 +935,21 @@ on and did nothing: on this macOS the pill is `MenuBarAgent`'s, not
   during the session, so no `outputChanged` event could be produced. Connect
   AirPods and expect their name + battery in the island for 3 s, then their
   glyph in the leading ear while the activity is live.
+
+# Click-through fix (2026-09-28)
+
+User report: "click notch, after that can't click anything". Cause and fix in
+spec §5 (Hit testing, "Corrected 2026-09-28") and `NotchWindow.init`. Also
+changed: a tap on a hover-opened panel no longer pins it
+(`NotchController.tap()`).
+
+## Verified
+
+- `make test`: window default is mouse-transparent; `setAcceptsMouse` is
+  reversible; `shouldAcceptMouse` truth table; `tap()` semantics.
+
+## Not verified
+
+- On screen: with the panel open, clicking a Superset tab under the canvas
+  (screen x 415–1055, y 0–320) must land on Superset AND close a pinned panel.
+  Hover, then click a panel button, must still work.

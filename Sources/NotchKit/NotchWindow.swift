@@ -43,7 +43,19 @@ public final class NotchWindow: NSPanel {
         hidesOnDeactivate = false
         isFloatingPanel = true      // NB: also resets level to .floating as a side effect
         becomesKeyOnlyIfNeeded = true
-        ignoresMouseEvents = false      // hit testing decides, not a blanket flag
+        // Mouse-transparent until the cursor is actually on the island — see
+        // `setAcceptsMouse`. This used to be `false` ("hit testing decides"),
+        // and that was a bug (2026-09-28): a window that opts into mouse
+        // events RECEIVES every click inside its frame; `hitTest` returning
+        // nil merely discards the click, it does not hand it to the window
+        // underneath. So for as long as the island was visible, the whole
+        // 640×320 canvas — the menu bar around the notch and ~290pt of
+        // whatever sits below it — was dead to clicks, and a click there
+        // never reached the click-outside monitor either (global monitors
+        // don't see events delivered to our own windows), so a pinned panel
+        // could not be dismissed from there. Reported as "click the notch,
+        // then can't click anything".
+        ignoresMouseEvents = true
         level = Self.normalLevel      // must be set after isFloatingPanel, which clobbers it
         contentView = hostingView
 
@@ -90,4 +102,18 @@ public final class NotchWindow: NSPanel {
     public func setLocked(_ locked: Bool) {
         level = locked ? Self.lockedLevel : Self.normalLevel
     }
+
+    /// Whether the window takes mouse events at all. `NotchPresenter` turns
+    /// this on only while the cursor is inside the island's (forgiveness-
+    /// widened) path and off the moment it leaves, so a click anywhere else
+    /// on the canvas falls straight through to the window beneath, exactly
+    /// as if this window did not exist. `hitTest` stays as the second line
+    /// of defence for the band between the forgiving path and the exact
+    /// one. Two mechanisms, one truth: both derive from the same
+    /// `forgivingParameters()` path.
+    public func setAcceptsMouse(_ accepts: Bool) {
+        ignoresMouseEvents = !accepts
+    }
+
+    public var acceptsMouse: Bool { !ignoresMouseEvents }
 }

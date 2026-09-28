@@ -205,6 +205,19 @@ below.
 - Menu bar clicks beside the notch keep working.
 - This behaviour is integration-tested (§10) because it breaks silently.
 
+**Corrected 2026-09-28.** `hitTest` alone was not enough: the window was
+created with `ignoresMouseEvents = false`, and a window that opts into mouse
+events receives every click in its frame — a `hitTest` that returns `nil`
+discards the click rather than passing it to the window beneath. While the
+island was visible, everything under the canvas was dead, and a click there
+never reached the click-outside monitor either, so a pinned panel could not be
+dismissed from there ("click the notch, then can't click anything"). The
+window is now mouse-transparent by default and `NotchPresenter` turns
+`ignoresMouseEvents` off only while the cursor is inside the island's
+forgiving path (re-evaluated on every mouse move and on the 250 ms tick), and
+back on the moment it leaves. `hitTest` remains as the second line of defence
+inside the canvas.
+
 ### NotchController state machine
 
 One `@Observable` value, so SwiftUI derives every animation from a single source.

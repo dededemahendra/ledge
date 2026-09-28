@@ -110,6 +110,35 @@ private func someMedia() -> MediaPresentation {
     #expect(c.state == .hidden)
 }
 
+/// A tap on the island under the hover model: never pins what hover already
+/// holds open, unpins what a click pinned, and opens nothing when there is
+/// nothing to show.
+@MainActor
+@Test func tapNeverPinsAHoverOpenedPanelButPinsAndUnpinsOtherwise() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+
+    c.setHovered(true)
+    #expect(c.state == .expanded && !c.isPinnedOpen)
+    c.tap()
+    #expect(!c.isPinnedOpen, "a click on the body of a hover-opened panel is not a request to pin it")
+    c.setHovered(false)
+    #expect(c.state == .activity, "…so leaving still closes it")
+
+    c.tap()
+    #expect(c.state == .expanded && c.isPinnedOpen, "a click on the compact island pins the panel open")
+    c.tap()
+    #expect(!c.isPinnedOpen, "a second click unpins")
+    #expect(c.state == .activity)
+
+    let empty = makeController()
+    empty.setHovered(true)
+    #expect(empty.state == .peek)
+    empty.tap()
+    #expect(empty.state == .peek, "nothing to show — a click must not open an empty slab")
+}
+
 @MainActor
 @Test func activityShowsWithoutHoverAndRestsOnActivityState() {
     let c = makeController()

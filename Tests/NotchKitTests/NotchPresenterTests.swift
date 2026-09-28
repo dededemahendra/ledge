@@ -112,3 +112,14 @@ private func naiveRect(_ parameters: NotchShapeParameters) -> CGRect {
         "the concave fillet band must read as inside the real path, same as a click there would"
     )
 }
+
+/// The canvas may take mouse events only while there is an island AND the
+/// cursor is on it. A visible island the cursor is not on must stay
+/// transparent, or the 640x320 canvas kills every click beneath it — the
+/// 2026-09-28 "click the notch, then can't click anything" bug.
+@Test func theCanvasTakesMouseEventsOnlyWhileTheCursorIsOnAVisibleIsland() {
+    #expect(NotchPresenter.shouldAcceptMouse(visible: true, hovered: true))
+    #expect(!NotchPresenter.shouldAcceptMouse(visible: true, hovered: false))
+    #expect(!NotchPresenter.shouldAcceptMouse(visible: false, hovered: true), "no island, nothing to click")
+    #expect(!NotchPresenter.shouldAcceptMouse(visible: false, hovered: false))
+}

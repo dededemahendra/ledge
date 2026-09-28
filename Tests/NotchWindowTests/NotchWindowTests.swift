@@ -31,7 +31,24 @@ private func makeWindow() throws -> NotchWindow {
     #expect(w.isFloatingPanel)
     #expect(w.styleMask.contains(.borderless))
     #expect(w.styleMask.contains(.nonactivatingPanel))
-    #expect(w.ignoresMouseEvents == false, "hit testing decides what is claimed, not a blanket flag")
+    #expect(w.ignoresMouseEvents == true,
+            "mouse-transparent until the cursor is on the island — an opted-in window swallows every click in its frame")
+}
+
+/// The presenter flips this with hover. Pinned so nobody reverts the
+/// default to `false` "because hit testing decides" — it does not: a window
+/// that accepts mouse events discards, not forwards, the clicks its
+/// `hitTest` declines.
+@MainActor
+@Test func acceptingMouseIsExplicitAndReversible() throws {
+    let w = try makeWindow()
+    #expect(!w.acceptsMouse)
+    w.setAcceptsMouse(true)
+    #expect(w.acceptsMouse)
+    #expect(w.ignoresMouseEvents == false)
+    w.setAcceptsMouse(false)
+    #expect(!w.acceptsMouse)
+    #expect(w.ignoresMouseEvents == true)
 }
 
 @MainActor

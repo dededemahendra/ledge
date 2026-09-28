@@ -220,7 +220,7 @@ public final class NotchPresenter {
             let created = NotchWindow(
                 screen: screen,
                 content: AnyView(NotchRootView(controller: controller, onTap: { [weak self] in
-                    self?.toggle()
+                    self?.tapOnIsland()
                 }))
             )
             window = created
@@ -247,11 +247,33 @@ public final class NotchPresenter {
         reevaluateHover()
         refreshInteractiveRegion()
         guard let window else { return }
+        // The canvas takes mouse events only while the cursor is on the
+        // island — see `NotchWindow.setAcceptsMouse` for the bug this
+        // closes. Re-derived here, on the same choke point as everything
+        // else, so every path that can change hover or visibility (mouse
+        // moved, the 250ms tick, an activity arriving/expiring, a toggle,
+        // a screen change) keeps the flag honest.
+        window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: controller.isHovered))
         if controller.isVisible {
             window.orderFrontRegardless()
         } else {
             window.orderOut(nil)
         }
+    }
+
+    /// Pure, so it can be pinned by `NotchPresenterTests` without a window:
+    /// mouse events are wanted only when there is an island to click AND the
+    /// cursor is on it. Everything else must fall through.
+    nonisolated static func shouldAcceptMouse(visible: Bool, hovered: Bool) -> Bool {
+        visible && hovered
+    }
+
+    /// A tap on the island itself (`NotchRootView.onTap`). Routed through
+    /// `NotchController.tap()` for the decision and resynced here for the
+    /// same reason `toggle()` is.
+    private func tapOnIsland() {
+        controller.tap()
+        syncWindowToVisibility()
     }
 
     /// Keeps the claimed region in step with what is actually drawn.
