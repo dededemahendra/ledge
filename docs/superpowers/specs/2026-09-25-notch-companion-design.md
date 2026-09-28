@@ -407,7 +407,22 @@ observation proves unreliable in practice.
 
 Also handles keyboard-backlight changes and the no-audio-device state.
 
-**OSD suppression.** The stock HUD is drawn by the `OSDUIHelper` launchd agent.
+**Changed 2026-09-28 — system HUD replacement needs Accessibility after all.**
+On macOS 27 the stock volume/brightness pill is no longer `OSDUIHelper`'s: it is
+a popover owned by `MenuBarAgent`, the process that draws the whole menu bar, and
+it is triggered by the media-key HID event (a scripted `set volume` never shows
+it). Pausing `OSDUIHelper` therefore does nothing, and pausing `MenuBarAgent`
+would freeze the menu bar. The only working suppression is the one this section
+originally rejected: `MediaKeyInterceptor` takes the five keys with a filtering
+`CGEventTap` (Accessibility), applies them itself (CoreAudio virtual main volume /
+mute, `DisplayServicesSetBrightness`, sixteenths, sixty-fourths with Shift+Option,
+snapped to the grid like the system), and swallows them. The value observers
+above stay the source of every HUD event. Without the grant the keys still work
+through the system, the menu shows "System HUD — needs Accessibility", and the
+tap is retried every 2 s so a grant made in System Settings lands without a
+relaunch.
+
+**OSD suppression (legacy).** The stock HUD used to be drawn by the `OSDUIHelper` launchd agent.
 Ledge sends it `SIGSTOP` while its own HUD is enabled and `SIGCONT` when
 disabled. This is the least clean thing in the app, so restoration is
 belt-and-braces:

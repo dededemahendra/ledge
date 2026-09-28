@@ -103,7 +103,31 @@ further on a single-display machine, or by disassembling
 ## OSDUIHelper
 
 See `Sources/HUDService/OSDSuppressor.swift`. Bundle id `com.apple.OSDUIHelper`,
-a `gui/<uid>` LaunchAgent, **not resident** — launches on demand.
+a `gui/<uid>` LaunchAgent, **not resident** — launches on demand. **On macOS
+27.0 it does not draw the volume/brightness pill at all** (see next section);
+the suppressor is kept only because it is harmless.
+
+## MenuBarAgent (macOS 27.0) — the real owner of the volume/brightness pill
+
+Measured 2026-09-28 with a `CGWindowListCopyWindowInfo` diff taken while a
+volume key was pressed: the only new on-screen window was
+`owner=MenuBarAgent pid=678 layer=101 bounds=1128,33 352x152` — the pill under
+the Sound menu bar item. `MenuBarAgent` (`/System/Library/CoreServices/
+MenuBarAgent.app`, bundle id `com.apple.MenuBarAgent`, `KeepAlive` LaunchAgent,
+links `MenuBarClient`/`MenuBarClientCore`/`ControlCenter`) owns exactly one
+other window: the 1470×33 menu bar itself, at layer 24. So it cannot be
+SIGSTOPped the way `OSDUIHelper` is. Ice (#719) and BetterDisplay (#4726) both
+"lose" this pill as side effects — Ice by hiding the Sound status item the
+popover anchors to, BetterDisplay by consuming the volume keys with an event
+tap. Ledge uses the latter: `Sources/HUDService/MediaKeyInterceptor.swift`.
+
+Media-key event layout (unchanged for decades, still true here): `NSEvent`
+type `.systemDefined` (14), subtype 8, `data1 >> 16` = `NX_KEYTYPE_*` (0 sound
+up, 1 sound down, 2 brightness up, 3 brightness down, 7 mute), `(data1 & 0xFF00)
+>> 8` = `0x0A` down / `0x0B` up, `data1 & 1` = auto-repeat.
+
+`DisplayServicesSetBrightness(CGDirectDisplayID, float) -> int` resolves from the
+same private framework `DisplayServicesGetBrightness` does.
 
 ## MediaRemote
 

@@ -36,6 +36,19 @@ final class AppModel {
     var hudStatus: String { hud.availability.statusText }
     var mediaStatus: String { media.availability.statusText }
     var isSuppressingStockOSD: Bool { hud.isSuppressingStockOSD }
+    var systemHUDStatus: String {
+        switch hud.systemHUDReplacement {
+        case .available:                 return "replaced"
+        case .needsPermission(let what): return "needs \(what) — grant in System Settings › Privacy & Security"
+        case .unavailable:               return "off"
+        }
+    }
+    /// Fires on the main actor when `systemHUDStatus` changes (e.g. the
+    /// Accessibility grant lands while running). `AppDelegate` refreshes
+    /// its menu row from it.
+    var onSystemHUDStatusChange: (() -> Void)? {
+        didSet { hud.onSystemHUDReplacementChange = { [weak self] _ in self?.onSystemHUDStatusChange?() } }
+    }
 
     func toggleStockOSDSuppression() {
         hud.setSuppressStockOSD(!hud.isSuppressingStockOSD)

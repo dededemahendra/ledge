@@ -27,12 +27,19 @@ import OSLog
 public final class DisplayServicesBridge {
     private typealias GetBrightness =
         @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+    /// `DisplayServicesSetBrightness(CGDirectDisplayID, float) -> int`, the
+    /// same private call MonitorControl and BetterDisplay drive the built-in
+    /// panel with. Resolved lazily and optionally: reading must keep working
+    /// on a system that drops the setter.
+    private typealias SetBrightness =
+        @convention(c) (CGDirectDisplayID, Float) -> Int32
 
     private static let frameworkPath =
         "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices"
 
     private let handle: UnsafeMutableRawPointer
     private let getBrightness: GetBrightness
+    private let setBrightnessSymbol: SetBrightness?
     public let canRegisterForNotifications: Bool
 
     public init?() {
@@ -43,6 +50,8 @@ public final class DisplayServicesBridge {
         }
         self.handle = handle
         self.getBrightness = unsafeBitCast(symbol, to: GetBrightness.self)
+        self.setBrightnessSymbol = dlsym(handle, "DisplayServicesSetBrightness")
+            .map { unsafeBitCast($0, to: SetBrightness.self) }
         self.canRegisterForNotifications =
             dlsym(handle, "DisplayServicesRegisterForBrightnessChangeNotifications") != nil
     }
@@ -52,6 +61,15 @@ public final class DisplayServicesBridge {
         guard getBrightness(display, &value) == 0 else { return nil }
         guard value >= 0, value <= 1 else { return nil }
         return Double(value)
+    }
+
+    public var canSetBrightness: Bool { setBrightnessSymbol != nil }
+
+    /// `false` when the symbol is missing or the call is refused.
+    @discardableResult
+    public func setBrightness(_ value: Double, for display: CGDirectDisplayID) -> Bool {
+        guard let setBrightnessSymbol else { return false }
+        return setBrightnessSymbol(display, Float(min(1, max(0, value)))) == 0
     }
 
     deinit {

@@ -18,6 +18,11 @@ public final class HUDService {
     private var volume: VolumeObserver?
     private var brightness: BrightnessObserver?
     private let suppressor = OSDSuppressor()
+    /// The mechanism that actually keeps the stock overlay off screen on
+    /// this macOS — see its doc comment. `OSDSuppressor` above is kept for
+    /// the legacy helper, which older systems (and possibly other overlays)
+    /// still route through; it is harmless where the helper never runs.
+    private let interceptor = MediaKeyInterceptor()
     private var continuation: AsyncStream<HUDEvent>.Continuation?
     private var wantsSuppression: Bool
 
@@ -25,7 +30,19 @@ public final class HUDService {
         self.wantsSuppression = suppressStockOSD
     }
 
-    public var isSuppressingStockOSD: Bool { suppressor.isSuppressing }
+    public var isSuppressingStockOSD: Bool { suppressor.isSuppressing || interceptor.isActive }
+
+    /// `.available` while the media keys are intercepted (system overlay
+    /// replaced), `.needsPermission("Accessibility")` while waiting on the
+    /// grant, `.unavailable` when suppression is switched off.
+    public var systemHUDReplacement: ServiceAvailability { interceptor.availability }
+
+    /// Forwarded from the interceptor so the menu bar row can follow a
+    /// grant made while the app runs.
+    public var onSystemHUDReplacementChange: ((ServiceAvailability) -> Void)? {
+        get { interceptor.onAvailabilityChange }
+        set { interceptor.onAvailabilityChange = newValue }
+    }
 
     // `nonisolated`: a pure function of its parameters with no access to
     // actor state. Without this, `@MainActor` on the class would make it
@@ -84,6 +101,7 @@ public final class HUDService {
 
             if wantsSuppression, availability.isAvailable {
                 suppressor.setSuppressing(true)
+                interceptor.start(prompt: true)
             }
 
             continuation.onTermination = { [weak self] _ in
@@ -101,10 +119,13 @@ public final class HUDService {
 
     public func setSuppressStockOSD(_ suppress: Bool) {
         wantsSuppression = suppress
-        suppressor.setSuppressing(suppress && availability.isAvailable)
+        let on = suppress && availability.isAvailable
+        suppressor.setSuppressing(on)
+        if on { interceptor.start(prompt: true) } else { interceptor.stop() }
     }
 
     public func stop() {
+        interceptor.stop()
         suppressor.shutdown()
         volume?.stop()
         brightness?.stop()

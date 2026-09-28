@@ -882,3 +882,36 @@ the reference; the artwork returns when the HUD expires 1.5 s later.
   and the re-pinned `hudSymbolAndBarAlongsideAnotherActivity…` render test
   cover HUD + media, HUD + overflow, and non-HUD pairs.
 - Headless snapshot of HUD + media at rest (temporary test, deleted after use).
+
+# System HUD replacement via media-key interception (2026-09-28)
+
+## Why
+
+The user's screenshot showed the stock pill ("MacBook Air Speakers" slider under
+the Sound menu bar item) next to Ledge's own HUD. `OSDSuppressor` was already
+on and did nothing: on this macOS the pill is `MenuBarAgent`'s, not
+`OSDUIHelper`'s — see `docs/private-api-notes.md`.
+
+## What was checked
+
+- Window-list diff during a real volume key press identifies `MenuBarAgent` as
+  the pill's owner, and shows it also owns the menu bar window (so it is not a
+  SIGSTOP candidate).
+- A scripted `set volume` (osascript) opens no new window — the pill is
+  key-driven, so consuming the key is sufficient.
+- `make test`: 202 tests pass; `MediaKeysTests` pins the `data1` decoding for
+  all five keys (down/up/repeat), pass-through of other keys, sixteenth and
+  sixty-fourth steps, grid snapping and clamping.
+- `make dev` launches; on first launch without the grant the interceptor
+  prompts for Accessibility and the menu row reads "System HUD — needs
+  Accessibility …".
+
+## Not verified here
+
+- That the pill actually stays hidden once Accessibility is granted (needs the
+  grant, which only the user can give, then a real key press). If it still
+  shows, the next suspects are: the tap not being created (check the menu row),
+  or the pill also listening to a value-change path for keys in particular.
+- Fine steps (Shift+Option) and key auto-repeat on real hardware.
+- The system's "play feedback when volume is changed" pop is NOT reproduced
+  when Ledge handles the key.
