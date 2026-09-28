@@ -26,23 +26,6 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.expanded.outerFillet == 13)
 }
 
-/// The volume/brightness HUD is the one island whose width is DERIVED from the
-/// notch rather than fixed: it exists to give each ear exactly
-/// `hudEarWidth` of room for glyph + label / bar, whatever the hardware.
-@Test func hudSizeGivesEachEarTheMeasuredWidth() {
-    let metrics = NotchMetrics(notchRect: measuredNotch)
-    #expect(NotchMetrics.hudEarWidth == 90)
-    #expect(metrics.hud.width == 359)                    // 179 + 2 * 90
-    #expect(metrics.hud.height == 32, "still notch-height: ears first, never taller")
-    #expect(metrics.earWidth(forIslandWidth: metrics.hud.width) == 90)
-    #expect(metrics.hud.bottomRadius == metrics.oneActivity.bottomRadius)
-    #expect(metrics.hud.outerFillet == metrics.oneActivity.outerFillet)
-
-    let tall = NotchMetrics(notchRect: CGRect(x: 751, y: 0, width: 208, height: 37))
-    #expect(tall.earWidth(forIslandWidth: tall.hud.width) == 90, "the ear, not the island, is the constant")
-    #expect(tall.hud.height == 37)
-}
-
 @Test func earWidthLeavesRoomBesideTheHole() {
     let metrics = NotchMetrics(notchRect: measuredNotch)
     // Exercise the public function later tasks consume, not the arithmetic inline.

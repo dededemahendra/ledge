@@ -98,8 +98,8 @@ import Testing
 /// defect class (compactText silently missing) that Plan A shipped once already.
 @Test func compactTextIsAFewGlanceableCharacters() {
     #expect(HUDEvent.volume(level: 0.5, muted: false).compactText == "50%")
-    #expect(HUDEvent.volume(level: 0.5, muted: true).compactText == "Muted",
-            "muted must yield \"Muted\", not a percentage")
+    #expect(HUDEvent.volume(level: 0.5, muted: true).compactText == "0%",
+            "mute reads as zero beside the slashed glyph, like the system overlay's empty bar")
     #expect(HUDEvent.brightness(level: 0.25).compactText == "25%")
 }
 

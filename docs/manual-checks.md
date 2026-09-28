@@ -1065,3 +1065,11 @@ without the tap can still show a HUD.
 User: "remove the text". The power blip is back to the one-activity island
 with the new glyphs (bolt/plug/battery fill) left and the percentage right;
 the `label` plumbing added for it is removed again. HUD words stay.
+
+# HUD, second pass: glyph + percentage (2026-09-28)
+
+User: remove the text, replace the bar with a percentage. The volume/
+brightness HUD is now the one-activity island — glyph (waves/rays lit by
+level) left, "50%" right; mute is the slashed speaker + "0%". The wide HUD
+island (`NotchMetrics.hud`, `hudEarWidth`), the ear label and the bar are
+removed. HUD, power and device blips now share one ear vocabulary.

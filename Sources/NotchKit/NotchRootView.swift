@@ -430,33 +430,7 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: symbol
                 )
-            if controller.isHUDLeading {
-                // The reference HUD's ear: glyph, then a one-word label
-                // ("Sound"/"Display"), leading-aligned from the island's
-                // outer edge — not centred in the ear, which would drift
-                // the pair inward as the label's width changes. Only at
-                // `NotchMetrics.hud` size, which a leading HUD always
-                // gets: the 38pt ear of every other one-activity island
-                // has no room for a word.
-                //
-                // The glyph gets a fixed 18pt slot so the label's x is
-                // stable across symbols of different widths (the slashed
-                // speaker is narrower than the waved one) and across
-                // `variableValue` lighting more or fewer waves.
-                HStack(spacing: 6) {
-                    glyph.frame(width: 18)
-                    hudLabel(activity.title)
-                }
-                .padding(.leading, 9)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // Belt and braces: a label that ever outgrows the ear must
-                // clip at the ear's edge (into the hole, where there are no
-                // pixels anyway), never truncate with an ellipsis or shove
-                // the glyph.
-                .clipped()
-            } else {
-                glyph
-            }
+            glyph
         } else if controller.activities.first?.id == Self.mediaActivityID, let media = controller.media {
             // Task 8: media's artwork takes the leading ear once it is the
             // TOPMOST activity — guarded on `.first?.id`, not just
@@ -494,6 +468,28 @@ public struct NotchRootView: View {
         }
     }
 
+    /// The trailing ear's value — "95%", "50%", "+2". One helper for HUD,
+    /// power and device so the three read identically.
+    ///
+    /// `AppModel` gives every record of a kind the same `id` ("power",
+    /// "hud"), so `compact` changing (87% -> 86%) is an in-place update to
+    /// the SAME `Text`, not an insertion — `.transition` only ever plays on
+    /// insertion/removal, so it needs the value-keyed `.id` to register as
+    /// one, and its own animated transaction: the root's `.animation(value:
+    /// parameters)` never attaches for a value tick alone.
+    private func compactValue(_ compact: String) -> some View {
+        Text(compact)
+            .font(.system(size: 11, weight: .medium))
+            .monospacedDigit()
+            .lineLimit(1)
+            .id(compact)
+            .transition(.blurReplace)
+            .animation(
+                NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                value: compact
+            )
+    }
+
     /// A device's icon for an ear: the system's product render when there
     /// is one (24pt tall, own transparency, no sticker box), else its SF
     /// Symbol at the ear glyph size. Keyed on the title so one device
@@ -520,28 +516,6 @@ public struct NotchRootView: View {
             NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
             value: activity.title
         )
-    }
-
-    /// The HUD ear's word. 12pt semibold measured off the reference HUD
-    /// ("Sound" ≈ 35pt, "Display" ≈ 41pt wide), so glyph slot + label sit
-    /// inside the 90pt ear with room to spare. Keyed and animated like every
-    /// other in-place text swap in this file: `AppModel` gives every HUD
-    /// record the same id, so Sound -> Display is an update to the SAME
-    /// view and needs the value-keyed `.id` to register as an insertion for
-    /// `.blurReplace`, plus its own animated transaction. `fixedSize` keeps
-    /// SwiftUI from ever answering a tight proposal with an ellipsis — the
-    /// caller's `.clipped()` is the overflow policy.
-    private func hudLabel(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 12, weight: .semibold))
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .id(title)
-            .transition(.blurReplace)
-            .animation(
-                NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
-                value: title
-            )
     }
 
     /// `AppModel` inserts the sticky media activity with this id
@@ -586,44 +560,18 @@ public struct NotchRootView: View {
             // The device's icon in place of the visualizer bars
             // for the blip's lifetime — see `leadingEar`'s first branch.
             deviceIcon(activity)
-        } else if controller.isHUDLeading, let fill = controller.activities.first?.barFill {
+        } else if controller.isHUDLeading, let compact = controller.activities.first?.compactText {
             // A live HUD owns both ears (see `NotchController.isHUDLeading`):
-            // the level bar beats the overflow pip, which would otherwise
+            // its percentage beats the overflow pip, which would otherwise
             // replace it the moment music was playing behind a volume press.
-            trailingBar(fill)
+            compactValue(compact)
         } else if controller.overflowCount > 0 {
             Text("+\(controller.overflowCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
         } else if let activity = controller.activities.first {
-            if let fill = activity.barFill {
-                trailingBar(fill)
-            } else if let compact = activity.compactText {
-                Text(compact)
-                    .font(.system(size: 11, weight: .medium))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    // `AppModel` gives every power record the same `id`
-                    // ("power"), so `compact` changing (e.g. 87% -> 86%) is an
-                    // in-place update to the SAME `Text`, not an insertion —
-                    // `.transition` only ever plays on insertion/removal, so
-                    // without a value-keyed `.id` here it never ran. Re-keying
-                    // on the value itself is what makes each change register as
-                    // a fresh view for `.blurReplace` to animate.
-                    .id(compact)
-                    .transition(.blurReplace)
-                    // `.transition` needs an ANIMATED transaction to actually
-                    // play, not just the insertion/removal `.id` gives it above.
-                    // The only animation in scope, `.animation(value: parameters)`
-                    // on the root view, attaches only when `parameters` itself
-                    // changes — a percent tick (87% -> 86%) changes `compact`
-                    // but leaves `parameters` equal, so without this, nothing
-                    // attaches and the swap is instantaneous. Keyed on `compact`
-                    // specifically, so only an actual value change animates.
-                    .animation(
-                        NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
-                        value: compact
-                    )
+            if let compact = activity.compactText {
+                compactValue(compact)
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {
@@ -665,39 +613,6 @@ public struct NotchRootView: View {
                 Color.clear
             }
         }
-    }
-
-    /// `barFill`'s progress bar in the trailing ear — same visual language as
-    /// `detailBar` below, sized for the HUD ear (`NotchMetrics.hudEarWidth`).
-    /// Measured off the reference HUD at its 90pt ear: a 68pt track ending
-    /// 10pt short of the island's outer edge, so 12pt of lead-in from the
-    /// hole and 10pt of trailing inset. 5pt tall — a hair thicker than
-    /// `detailBar`'s 4pt, because this one IS the reading, not an
-    /// annotation under a title. The track's 22% white matches the
-    /// reference's measured ~23%.
-    /// The fill ANIMATES between values: volume/brightness keys step in
-    /// sixteenths, and an unanimated bar jumps those steps — a short
-    /// critically-damped spring turns them into one continuous slide, the
-    /// same "state change, not thrown object" tuning as the scrubber's
-    /// thickening. Local `.animation(value: fill)`, because the root's
-    /// `.animation(value: parameters)` never attaches for a fill change
-    /// alone (same reason every text swap above carries its own).
-    private func trailingBar(_ fill: Double) -> some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Capsule().fill(contentColor.opacity(0.22))
-                Capsule()
-                    .fill(contentColor)
-                    .frame(width: geometry.size.width * fill)
-                    .animation(
-                        controller.reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 1.0),
-                        value: fill
-                    )
-            }
-        }
-        .frame(height: 5)
-        .padding(.leading, 12)
-        .padding(.trailing, 10)
     }
 
     /// Budget below the hole is tight: at two (or three+, which shares the
@@ -820,7 +735,7 @@ public struct NotchRootView: View {
                 Capsule()
                     .fill(contentColor)
                     .frame(width: geometry.size.width * fill)
-                    // Same slide-not-jump tuning as `trailingBar` above.
+                    // Same slide-not-jump tuning as the panel's scrubber.
                     .animation(
                         controller.reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 1.0),
                         value: fill

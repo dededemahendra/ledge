@@ -334,7 +334,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
         overflow: 0
     )
     #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.hud)
+    #expect(controller.parameters == controller.metrics.oneActivity)
 
     let result = renderAndClassify(controller)
     #expect(
@@ -375,7 +375,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
         overflow: 0
     )
     #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.hud)
+    #expect(controller.parameters == controller.metrics.oneActivity)
 
     let result = renderAndClassify(controller)
     #expect(
@@ -484,7 +484,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 /// solo `barFill` activity renders a bar, not `compactText`) stays inside
 /// the island at exactly the size where `detailRow`'s own bar is gated off.
 @MainActor
-@Test func hudBarInTrailingEarRendersInsideTheIslandAndClearOfTheNotchAtOneActivitySize() {
+@Test func hudPercentInTrailingEarRendersInsideTheIslandAndClearOfTheNotchAtOneActivitySize() {
     let controller = makeController()
     controller.setActivities(
         [.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill", barFill: 0.62)],
@@ -494,7 +494,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
         MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200)
     )
     #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.hud)
+    #expect(controller.parameters == controller.metrics.oneActivity)
 
     let result = renderAndClassify(controller)
     #expect(

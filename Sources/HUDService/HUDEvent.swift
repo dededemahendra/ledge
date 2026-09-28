@@ -26,17 +26,9 @@ public enum HUDEvent: Sendable, Equatable {
         }
     }
 
-    /// No digits: this renders next to a bar that already shows the level,
-    /// and neither macOS's OSD nor Alcove numbers theirs. The word carries
-    /// the kind, the bar carries the value.
-    ///
-    /// "Sound"/"Display", not "Volume"/"Brightness": these are the words the
-    /// reference HUD uses, and they are also the ones that FIT — the label
-    /// shares a ~90pt ear with the glyph (`NotchMetrics.hudEarWidth`), and
-    /// "Brightness" at the label's 12pt semibold overruns it. Mute keeps the
-    /// same word: the slashed speaker and the empty bar already say muted,
-    /// and a label that swaps on every mute toggle would crossfade for no
-    /// new information.
+    /// The detail-row title (the expanded panel's activity list). Not shown
+    /// in the ears any more (2026-09-28): the compact island is glyph +
+    /// percentage. "Sound"/"Display" are the reference app's words.
     public var activityTitle: String {
         switch self {
         case .volume:     return "Sound"
@@ -44,12 +36,16 @@ public enum HUDEvent: Sendable, Equatable {
         }
     }
 
-    /// Glanceable form for the trailing ear, which is the only place text can appear
-    /// while a single activity holds the island at notch height. The ear is ~38pt
-    /// wide, so this stays to a few characters.
+    /// The trailing ear's text: glyph left, this right, nothing else (the
+    /// user's call, 2026-09-28 — a labelled "Sound …… bar" row was tried
+    /// and dropped). The ear is ~38pt wide, so this stays to a few characters.
     public var compactText: String {
         switch self {
-        case .volume(_, true):            return "Muted"
+        // "0%", not "Muted" (2026-09-28): the ear is glyph + percentage now,
+        // the slashed speaker already says muted, and the system's own
+        // overlay draws mute as an empty bar — i.e. zero. "Muted" at the
+        // ear's 11pt also measures ~33pt in a 38pt ear.
+        case .volume(_, true):            return "0%"
         case .volume(let level, false):   return "\(Int((level * 100).rounded()))%"
         case .brightness(let level):      return "\(Int((level * 100).rounded()))%"
         }

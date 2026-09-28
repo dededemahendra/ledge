@@ -163,16 +163,15 @@ public final class NotchController {
     /// `NotchRootView.mediaActivityID` already relies on).
     public static let hudActivityID = "hud"
 
-    /// True while a volume/brightness HUD is the leading activity — the case
-    /// that gets the `NotchMetrics.hud` island and the glyph + label ear
-    /// layout, whatever else is queued behind it. A HUD is a 1.5s blip that
-    /// answers exactly one question (what, and how much); while it is live
-    /// the island says only that. It used to share the two-slot size with a
-    /// sticky media activity — which, with music playing, is EVERY volume
-    /// press — and that layout stranded the glyph top-left, put the level
-    /// in the ear AND the detail row, and grew the island for a word.
-    /// Whatever it pre-empted (the artwork, the battery) comes straight
-    /// back when it expires.
+    /// True while a volume/brightness HUD is the leading activity: it owns
+    /// the one-activity island — glyph left, percentage right — whatever
+    /// else is queued behind it. A HUD is a 1.5s blip that answers exactly
+    /// one question (what, and how much); while it is live the island says
+    /// only that. It used to share the two-slot size with a sticky media
+    /// activity — which, with music playing, is EVERY volume press. A wider
+    /// labelled island ("Sound" + bar, matching the reference app) was
+    /// tried in between and dropped at the user's request for glyph +
+    /// percentage, the same shape as the power blip.
     public var isHUDLeading: Bool {
         activities.first?.id == Self.hudActivityID
     }
@@ -209,8 +208,7 @@ public final class NotchController {
         case .peek:
             return metrics.peek
         case .activity:
-            if isHUDLeading { return metrics.hud }
-            if isDeviceLeading || isPowerLeading { return metrics.oneActivity }
+            if isHUDLeading || isDeviceLeading || isPowerLeading { return metrics.oneActivity }
             return activityCount >= 2 ? metrics.twoActivities : metrics.oneActivity
         case .expanded:
             return metrics.expanded

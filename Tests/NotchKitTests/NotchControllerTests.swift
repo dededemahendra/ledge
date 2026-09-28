@@ -263,16 +263,16 @@ private func someMedia() -> MediaPresentation {
     #expect(c.parameters == c.metrics.expanded)
 }
 
-/// A LEADING volume/brightness HUD always gets the HUD island — alone, with a
-/// sticky media activity behind it (every volume press while music plays),
-/// or with overflow. Any other leading activity keeps the usual sizes.
+/// A LEADING volume/brightness HUD always keeps the one-activity island —
+/// alone, with a sticky media activity behind it (every volume press while
+/// music plays), or with overflow. Other pairs keep the two-slot size.
 @MainActor
-@Test func aLeadingHUDActivityGetsTheHUDSizeWhateverIsBehindIt() {
+@Test func aLeadingHUDActivityKeepsTheCompactIslandWhateverIsBehindIt() {
     let c = makeController()
     let hud = NotchController.ActivityDisplay(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)
     c.setActivities([hud], overflow: 0)
     #expect(c.isHUDLeading)
-    #expect(c.parameters == c.metrics.hud)
+    #expect(c.parameters == c.metrics.oneActivity)
 
     c.setActivities([.init(id: "notification", title: "Mail · 3 new", compactText: "3")], overflow: 0)
     #expect(!c.isHUDLeading)
@@ -280,10 +280,10 @@ private func someMedia() -> MediaPresentation {
 
     c.setActivities([hud, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
     #expect(c.isHUDLeading)
-    #expect(c.parameters == c.metrics.hud, "a volume press with music playing is still just the HUD")
+    #expect(c.parameters == c.metrics.oneActivity, "a volume press with music playing is still just the HUD")
 
     c.setActivities([hud], overflow: 1)
-    #expect(c.parameters == c.metrics.hud, "overflow does not demote a live HUD either")
+    #expect(c.parameters == c.metrics.oneActivity, "overflow does not demote a live HUD either")
 
     c.setActivities([.init(id: "media", title: "Song", detail: "Artist"), .init(id: "power", title: "On AC", compactText: "95%")], overflow: 0)
     #expect(!c.isHUDLeading)
