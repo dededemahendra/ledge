@@ -1118,3 +1118,10 @@ decoded but has no control since the output picker took its slot.
 Not verified live: only a browser was playing during the session, so the
 button was in its "unavailable" state here. Play something in Music, toggle
 shuffle there, and the dot should follow within a diff.
+
+# Media clickable (2026-09-29)
+
+Clicking the card's artwork or title brings the playing app to the front
+(`NotchIntent.openSource` → `AppModel.openSourceApp`: LaunchServices
+`openApplication(at:)` by bundle id, pid `activate()` as fallback). The
+visualizer is not part of the button. Not verified live.

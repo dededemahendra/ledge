@@ -92,6 +92,10 @@ public enum NotchIntent: Sendable, Equatable {
     /// Make this output (an `OutputOption.id`, CoreAudio's device UID) the
     /// default. `AppModel` hands it to `DeviceService`.
     case selectOutput(id: String)
+    /// Bring the app that is playing to the front (a click on the card's
+    /// artwork or title — the Dynamic Island's own gesture for "take me
+    /// there"). `AppModel` resolves which app from the live payload.
+    case openSource
 }
 
 /// One entry of the panel's output picker. A pure value like

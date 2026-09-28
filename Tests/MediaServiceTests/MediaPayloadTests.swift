@@ -131,3 +131,10 @@ import Foundation
     #expect(p.isShuffling == nil, "a wrong type is absent, never fatal")
     #expect(p.repeatSetting == .off, "an unknown number reads as off")
 }
+
+@Test func processIdentifierDecodesAsAnInt() {
+    #expect(MediaPayload.decode(["processIdentifier": 51979]).processIdentifier == 51979)
+    #expect(MediaPayload.decode(["processIdentifier": 51979.0]).processIdentifier == 51979)
+    #expect(MediaPayload.decode(["title": "Song"]).processIdentifier == nil)
+    #expect(MediaPayload.decode(["processIdentifier": "51979"]).processIdentifier == nil, "wrong type is absent, never fatal")
+}

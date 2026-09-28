@@ -186,6 +186,8 @@ private func someMedia() -> MediaPresentation {
     c.onIntent = { received = $0 }
     c.emit(.selectOutput(id: "bt-1"))
     #expect(received == .selectOutput(id: "bt-1"))
+    c.emit(.openSource)
+    #expect(received == .openSource)
 }
 
 // MARK: - Lock screen (spec §7)

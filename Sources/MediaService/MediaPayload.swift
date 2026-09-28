@@ -22,6 +22,9 @@ public struct MediaPayload: Sendable, Equatable {
     /// through by the adapter when the source app reports it (Music,
     /// Spotify; browsers never do): 1 off, 2 albums, 3 songs.
     public var shuffleMode: Int?
+    /// The playing app's pid, as the adapter reports it — the precise way
+    /// to bring THAT app forward when several instances share a bundle id.
+    public var processIdentifier: Int?
     /// `kMRMediaRemoteNowPlayingInfoRepeatMode`: 1 off, 2 one, 3 all
     /// (the adapter's own `repeat 3` comment calls 3 "playlist").
     public var repeatMode: Int?
@@ -73,6 +76,7 @@ public struct MediaPayload: Sendable, Equatable {
         p.playbackRate = number(json["playbackRate"])
         p.artworkMimeType = json["artworkMimeType"] as? String
         p.shuffleMode = number(json["shuffleMode"]).map { Int($0) }
+        p.processIdentifier = number(json["processIdentifier"]).map { Int($0) }
         p.repeatMode = number(json["repeatMode"]).map { Int($0) }
 
         if let encoded = json["artworkData"] as? String {

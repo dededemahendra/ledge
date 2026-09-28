@@ -234,11 +234,33 @@ final class AppModel {
         case .toggleShuffle:    media.send(.toggleShuffle)
         case .toggleRepeat:     media.send(.toggleRepeat)
         case .selectOutput(let id): device.setDefaultOutput(uid: id)
+        case .openSource:           openSourceApp()
         case .seek(let fraction):
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.
             guard let duration = mediaPayload.duration, duration > 0 else { return }
             media.send(.seek(seconds: duration * fraction))
+        }
+    }
+
+    /// Brings the app that is playing to the front. LaunchServices first
+    /// (`openApplication(at:)` with `activates`), keyed by bundle id: it
+    /// works from a background agent like this one, where macOS 14's
+    /// cooperative activation would refuse a bare
+    /// `NSRunningApplication.activate()` because Ledge is never the active
+    /// app itself. The pid path is the fallback for a running app that
+    /// LaunchServices cannot locate by bundle id (an unbundled binary).
+    private func openSourceApp() {
+        if let bundleID = mediaPayload.bundleIdentifier,
+           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+            return
+        }
+        if let pid = mediaPayload.processIdentifier,
+           let app = NSRunningApplication(processIdentifier: pid_t(pid)) {
+            app.activate()
         }
     }
 

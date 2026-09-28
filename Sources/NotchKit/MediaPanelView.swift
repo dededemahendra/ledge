@@ -124,39 +124,52 @@ struct MediaPanelView: View {
 
     private var headerRow: some View {
         HStack(alignment: .center, spacing: 10) {
-            artwork
-                .matchedGeometryEffect(id: NotchRootView.artworkGeometryID, in: artworkNamespace)
-                // Track-change crossfade, same keyed-`.id` + local-animation
-                // pattern as every other in-place swap in this codebase (the
-                // root's `.animation(value: parameters)` never attaches for a
-                // title change alone).
-                .id(media.title)
-                .transition(.blurReplace)
-                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: media.title)
-
-            VStack(alignment: .leading, spacing: 2) {
-                // Typography as a set: rounded family matching the system's
-                // own media surfaces; hierarchy from weight + size + opacity
-                // together. Tracking is size-specific — semibold rounded at
-                // 15pt reads slightly loose at 0.
-                Text(media.title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .tracking(-0.2)
-                    .lineLimit(1)
+            // Artwork + titles are one button: a click brings the playing
+            // app to the front (`NotchIntent.openSource`, 2026-09-29 — the
+            // Dynamic Island's own "take me there"). The visualizer stays
+            // outside it; it is a status glyph, not a control.
+            Button {
+                emit(.openSource)
+            } label: {
+                HStack(alignment: .center, spacing: 10) {
+                artwork
+                    .matchedGeometryEffect(id: NotchRootView.artworkGeometryID, in: artworkNamespace)
+                    // Track-change crossfade, same keyed-`.id` + local-animation
+                    // pattern as every other in-place swap in this codebase (the
+                    // root's `.animation(value: parameters)` never attaches for a
+                    // title change alone).
                     .id(media.title)
                     .transition(.blurReplace)
                     .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: media.title)
 
-                if let artist = media.artist {
-                    Text(artist)
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
-                        .foregroundStyle(contentColor.opacity(0.62))
+                VStack(alignment: .leading, spacing: 2) {
+                    // Typography as a set: rounded family matching the system's
+                    // own media surfaces; hierarchy from weight + size + opacity
+                    // together. Tracking is size-specific — semibold rounded at
+                    // 15pt reads slightly loose at 0.
+                    Text(media.title)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .tracking(-0.2)
                         .lineLimit(1)
-                        .id(artist)
+                        .id(media.title)
                         .transition(.blurReplace)
-                        .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: artist)
+                        .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: media.title)
+
+                    if let artist = media.artist {
+                        Text(artist)
+                            .font(.system(size: 13, weight: .regular, design: .rounded))
+                            .foregroundStyle(contentColor.opacity(0.62))
+                            .lineLimit(1)
+                            .id(artist)
+                            .transition(.blurReplace)
+                            .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: artist)
+                    }
                 }
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+            .accessibilityLabel("Open in the playing app")
 
             Spacer(minLength: 8)
 
