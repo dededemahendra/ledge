@@ -63,6 +63,11 @@ public final class MediaService {
                 return
             }
 
+            // Before anything of ours is running: clear what a previous
+            // instance left behind. Done here, not in `launch()`, which also
+            // runs on every restart — by then our own stream would match.
+            MediaRemoteSource.reapOrphans(locator: locator)
+
             // A fresh policy per `start()`: `RestartPolicy.fatal` is a latch
             // by design (the README's "do not reinvoke"), but it must not
             // outlive the process it judged — a second `start()` launches a

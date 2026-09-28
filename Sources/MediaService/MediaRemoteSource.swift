@@ -99,10 +99,33 @@ final class MediaRemoteSource {
     }
 
     /// The adapter streams until it receives SIGTERM, per its README.
+    /// Escalates to SIGKILL if it is still running two seconds later —
+    /// two adapters were found orphaned (parent pid 1) after app relaunches
+    /// on 2026-09-28, so "SIGTERM is enough" is not something to rely on.
     func terminate() {
-        process?.terminationHandler = nil
-        process?.terminate()
-        process = nil
+        guard let process else { return }
+        process.terminationHandler = nil
+        process.terminate()
+        self.process = nil
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        }
+    }
+
+    /// Kills any adapter stream left behind by a previous instance of THIS
+    /// bundle — matched on the script's absolute path, so another app's
+    /// copy of the same adapter is never touched. A previous Ledge that was
+    /// SIGKILLed, crashed, or whose SIGTERM the adapter ignored leaves a
+    /// perl process streaming to nobody; each one holds a MediaRemote
+    /// subscription and they accumulate across relaunches.
+    static func reapOrphans(locator: AdapterLocator) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        process.arguments = ["-f", "^/usr/bin/perl \(locator.scriptPath.path) .* stream$"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()   // pkill returns immediately; nothing to await
     }
 
     /// One-shot invocation for `send` / `seek`. Fire-and-forget: a lost
