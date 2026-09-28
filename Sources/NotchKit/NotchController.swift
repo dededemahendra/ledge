@@ -151,6 +151,20 @@ public final class NotchController {
 
     public var isVisible: Bool { state != .hidden }
 
+    /// `AppModel` inserts every volume/brightness record with this id
+    /// (`ActivityKind.hud.rawValue` — a string, not the enum, since `NotchKit`
+    /// has no dependency on `ActivityKit`; the same cross-module convention
+    /// `NotchRootView.mediaActivityID` already relies on).
+    public static let hudActivityID = "hud"
+
+    /// True while a volume/brightness HUD is the one and only live activity —
+    /// the case that gets the wider `NotchMetrics.hud` island and the
+    /// glyph + label ear layout. `activityCount`, not `activities.count`:
+    /// overflow counts as company too.
+    public var isSoloHUD: Bool {
+        activityCount == 1 && activities.first?.id == Self.hudActivityID
+    }
+
     public var parameters: NotchShapeParameters {
         switch state {
         case .hidden:
@@ -158,7 +172,8 @@ public final class NotchController {
         case .peek:
             return metrics.peek
         case .activity:
-            return activityCount >= 2 ? metrics.twoActivities : metrics.oneActivity
+            if activityCount >= 2 { return metrics.twoActivities }
+            return isSoloHUD ? metrics.hud : metrics.oneActivity
         case .expanded:
             return metrics.expanded
         }

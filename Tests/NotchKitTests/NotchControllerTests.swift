@@ -101,6 +101,36 @@ private func makeController(reduceMotion: Bool = false) -> NotchController {
     #expect(c.parameters == c.metrics.expanded)
 }
 
+/// The wider HUD island is reserved for a volume/brightness activity that is
+/// ALONE: the same activity with company drops to the two-slot size (its title
+/// then lives in the detail row), and any other lone activity keeps the
+/// 255pt one-activity size.
+@MainActor
+@Test func aLoneHUDActivityGetsTheHUDSizeAndNothingElseDoes() {
+    let c = makeController()
+    c.setActivities([.init(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)], overflow: 0)
+    #expect(c.isSoloHUD)
+    #expect(c.parameters == c.metrics.hud)
+
+    c.setActivities([.init(id: "power", title: "Charging · 42%", compactText: "42%")], overflow: 0)
+    #expect(!c.isSoloHUD)
+    #expect(c.parameters == c.metrics.oneActivity)
+
+    c.setActivities(
+        [
+            .init(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4),
+            .init(id: "power", title: "Charging · 42%", compactText: "42%"),
+        ],
+        overflow: 0
+    )
+    #expect(!c.isSoloHUD)
+    #expect(c.parameters == c.metrics.twoActivities)
+
+    c.setActivities([.init(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)], overflow: 1)
+    #expect(!c.isSoloHUD, "overflow is company too")
+    #expect(c.parameters == c.metrics.twoActivities)
+}
+
 // Review Focus 1: geometry can change under a live island.
 @MainActor
 @Test func changingMetricsUpdatesParametersImmediately() {

@@ -55,6 +55,30 @@ public struct NotchMetrics: Sendable, Equatable {
         )
     }
 
+    /// Ear width the volume/brightness HUD is laid out for. Measured off the
+    /// reference app's own HUD (2026-09-25 screen recording, 2x): its pill is
+    /// 360pt wide around the same 179pt notch, i.e. ~90pt of ear per side —
+    /// enough for glyph + a one-word label on the left and a 68pt bar on
+    /// the right. Defined as an EAR width, not an island width, because the
+    /// ear layout is what needs the room; the island width follows from the
+    /// hardware notch (`hud` below), so a wider notch under another scaling
+    /// mode still gets the same ear.
+    public static let hudEarWidth: CGFloat = 90
+
+    /// A lone volume/brightness HUD. Same height and corners as
+    /// `oneActivity` (notch-height, "ears first"), but wider: the reference
+    /// HUD says what it is in words ("Sound", "Display") next to the glyph,
+    /// and gives the level a bar long enough to read at a glance. 255pt
+    /// leaves 38pt ears — room for a glyph or a bar, never both plus a word.
+    public var hud: NotchShapeParameters {
+        NotchShapeParameters(
+            width: notchRect.width + 2 * Self.hudEarWidth,
+            height: notchRect.height,
+            bottomRadius: 12,
+            outerFillet: 6
+        )
+    }
+
     public var twoActivities: NotchShapeParameters {
         NotchShapeParameters(
             width: 342,

@@ -795,3 +795,47 @@ adapter genuinely absent) proving graceful degradation on both sides of
 that boundary. What is not verified is on-screen appearance/interaction —
 the same category every task in this file has deferred to a human or a
 screenshot-capable agent, for the same reason each time.
+
+# HUD polish — reference-style volume/brightness island
+
+**Date:** 2026-09-28. Branch `code-check` on top of `notch-shell-and-services`.
+
+## What changed
+
+A lone volume/brightness activity now gets its own island size
+(`NotchMetrics.hud`: notch width + 2 × 90 pt, still notch-height) and its own
+ear layout: glyph + "Sound"/"Display" label leading-aligned on the left, a 5 pt
+× 68 pt bar with a 10 pt trailing inset on the right. Content also blurs in/out
+with the fade (`ContentFade.blurRadius`, 0 at rest). Every other one-activity
+island keeps 255 pt; a HUD with company keeps the two-slot size.
+
+## Where the numbers came from
+
+A 20 s, 1060 × 192 px screen recording of the reference app's HUD (2× scale,
+so 2 px per point), frames extracted at 2 fps and scanned pixel by pixel:
+
+| Measured | Reference | Ledge (rendered at 2×) |
+| --- | --- | --- |
+| Pill width | 720 px | 718 px |
+| Glyph, from pill's left edge | 21–45 px | 18–46 px |
+| "Sound" label | 68–137 px | 67–138 px |
+| "Display" label | 68–149 px | 68–151 px |
+| Bar starts | 564 px | 562 px |
+| Track length / right inset | 136 px / 20 px | 136 px / 20 px |
+| Bar height | ~9.4 px | 10 px |
+| Track brightness | ~23 % white | 22 % white |
+
+## Verified
+
+- `make test`: 193 tests across 7 targets pass, including new
+  `hudSizeGivesEachEarTheMeasuredWidth`,
+  `aLoneHUDActivityGetsTheHUDSizeAndNothingElseDoes`, and the two render tests
+  re-pinned to `metrics.hud`.
+- Headless `ImageRenderer` snapshots of Sound 40 %, Sound 90 %, Display 70 %,
+  muted, and a lone power activity, measured against the reference frames as
+  above (temporary test, deleted after use).
+
+## Not verified
+
+- The live morph on the real notch — the spring and the blur-in were not
+  watched on screen; only the resting frame was compared.

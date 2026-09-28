@@ -61,8 +61,20 @@ struct ContentFade: ViewModifier, Animatable {
         set { progress = newValue }
     }
 
+    /// Blur at the fully-faded end of the window. Content resolves out of a
+    /// soft haze as it fades in (and dissolves back into one on the way
+    /// out) instead of a bare opacity ramp — the reference HUD's glyph,
+    /// label and bar arrive this way, and it hides the frame where text is
+    /// legible but the ear is not yet wide enough to hold it. Exactly 0 at
+    /// rest, so a resting render is pixel-identical to an unblurred one
+    /// (`NotchRenderTests` classify resting frames only).
+    static let blurRadius: CGFloat = 6
+
     func body(content: Content) -> some View {
-        content.opacity(metrics.contentOpacity(progress: progress))
+        let opacity = metrics.contentOpacity(progress: progress)
+        content
+            .opacity(opacity)
+            .blur(radius: (1 - opacity) * Self.blurRadius)
     }
 }
 
@@ -373,7 +385,7 @@ public struct NotchRootView: View {
             // actually-animated transaction (the root view's `.animation(value:
             // parameters)` does not attach for a symbol change alone, since
             // `parameters` — state/activityCount/metrics — stays equal).
-            Image(systemName: symbol, variableValue: activity.barFill)
+            let glyph = Image(systemName: symbol, variableValue: activity.barFill)
                 .font(.system(size: 13, weight: .medium))
                 .id(symbol)
                 .transition(.blurReplace)
@@ -381,6 +393,33 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: symbol
                 )
+            if controller.isSoloHUD {
+                // The reference HUD's ear: glyph, then a one-word label
+                // ("Sound"/"Display"), leading-aligned from the island's
+                // outer edge — not centred in the ear, which would drift
+                // the pair inward as the label's width changes. Only at
+                // `NotchMetrics.hud` size: the 38pt ear of every other
+                // one-activity island has no room for a word, and at two
+                // activities the title already renders in the detail row.
+                //
+                // The glyph gets a fixed 18pt slot so the label's x is
+                // stable across symbols of different widths (the slashed
+                // speaker is narrower than the waved one) and across
+                // `variableValue` lighting more or fewer waves.
+                HStack(spacing: 6) {
+                    glyph.frame(width: 18)
+                    hudLabel(activity.title)
+                }
+                .padding(.leading, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // Belt and braces: a label that ever outgrows the ear must
+                // clip at the ear's edge (into the hole, where there are no
+                // pixels anyway), never truncate with an ellipsis or shove
+                // the glyph.
+                .clipped()
+            } else {
+                glyph
+            }
         } else if controller.activities.first?.id == Self.mediaActivityID, let media = controller.media {
             // Task 8: media's artwork takes the leading ear once it is the
             // TOPMOST activity — guarded on `.first?.id`, not just
@@ -416,6 +455,28 @@ public struct NotchRootView: View {
         } else if controller.activityCount > 0 {
             Circle().fill(contentColor.opacity(0.28)).padding(6)
         }
+    }
+
+    /// The HUD ear's word. 12pt semibold measured off the reference HUD
+    /// ("Sound" ≈ 35pt, "Display" ≈ 41pt wide), so glyph slot + label sit
+    /// inside the 90pt ear with room to spare. Keyed and animated like every
+    /// other in-place text swap in this file: `AppModel` gives every HUD
+    /// record the same id, so Sound -> Display is an update to the SAME
+    /// view and needs the value-keyed `.id` to register as an insertion for
+    /// `.blurReplace`, plus its own animated transaction. `fixedSize` keeps
+    /// SwiftUI from ever answering a tight proposal with an ellipsis — the
+    /// caller's `.clipped()` is the overflow policy.
+    private func hudLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .id(title)
+            .transition(.blurReplace)
+            .animation(
+                NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                value: title
+            )
     }
 
     /// `AppModel` inserts the sticky media activity with this id
@@ -529,8 +590,13 @@ public struct NotchRootView: View {
     }
 
     /// `barFill`'s progress bar in the trailing ear — same visual language as
-    /// `detailBar` below, just narrower (the ear is ~38pt wide at
-    /// one-activity size, versus the full island width `detailBar` gets).
+    /// `detailBar` below, sized for the HUD ear (`NotchMetrics.hudEarWidth`).
+    /// Measured off the reference HUD at its 90pt ear: a 68pt track ending
+    /// 10pt short of the island's outer edge, so 12pt of lead-in from the
+    /// hole and 10pt of trailing inset. 5pt tall — a hair thicker than
+    /// `detailBar`'s 4pt, because this one IS the reading, not an
+    /// annotation under a title. The track's 22% white matches the
+    /// reference's measured ~23%.
     /// The fill ANIMATES between values: volume/brightness keys step in
     /// sixteenths, and an unanimated bar jumps those steps — a short
     /// critically-damped spring turns them into one continuous slide, the
@@ -551,8 +617,9 @@ public struct NotchRootView: View {
                     )
             }
         }
-        .frame(height: 4)
-        .padding(.horizontal, 4)
+        .frame(height: 5)
+        .padding(.leading, 12)
+        .padding(.trailing, 10)
     }
 
     /// See the `trailingEar` media branch for why this exists and why it is

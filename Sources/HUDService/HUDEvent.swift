@@ -29,11 +29,18 @@ public enum HUDEvent: Sendable, Equatable {
     /// No digits: this renders next to a bar that already shows the level,
     /// and neither macOS's OSD nor Alcove numbers theirs. The word carries
     /// the kind, the bar carries the value.
+    ///
+    /// "Sound"/"Display", not "Volume"/"Brightness": these are the words the
+    /// reference HUD uses, and they are also the ones that FIT — the label
+    /// shares a ~90pt ear with the glyph (`NotchMetrics.hudEarWidth`), and
+    /// "Brightness" at the label's 12pt semibold overruns it. Mute keeps the
+    /// same word: the slashed speaker and the empty bar already say muted,
+    /// and a label that swaps on every mute toggle would crossfade for no
+    /// new information.
     public var activityTitle: String {
         switch self {
-        case .volume(_, true):  return "Muted"
-        case .volume(_, false): return "Volume"
-        case .brightness:       return "Brightness"
+        case .volume:     return "Sound"
+        case .brightness: return "Display"
         }
     }
 

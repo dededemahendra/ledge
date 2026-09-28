@@ -67,10 +67,11 @@ import Testing
     #expect(HUDEvent.volume(level: 0.5, muted: true).symbolName == "speaker.slash.fill")
     #expect(HUDEvent.brightness(level: 0.25).barFill == 0.25)
     #expect(HUDEvent.brightness(level: 0.25).symbolName == "sun.max.fill")
-    #expect(HUDEvent.volume(level: 0.5, muted: false).activityTitle == "Volume",
+    #expect(HUDEvent.volume(level: 0.5, muted: false).activityTitle == "Sound",
             "no digits — the bar beside the title carries the value")
-    #expect(HUDEvent.volume(level: 0.5, muted: true).activityTitle == "Muted")
-    #expect(HUDEvent.brightness(level: 0.06).activityTitle == "Brightness")
+    #expect(HUDEvent.volume(level: 0.5, muted: true).activityTitle == "Sound",
+            "mute is told by the slashed glyph and the empty bar, not by swapping the word")
+    #expect(HUDEvent.brightness(level: 0.06).activityTitle == "Display")
 }
 
 /// `compactText` is the ONLY place a value can appear while a single activity holds

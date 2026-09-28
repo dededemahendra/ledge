@@ -324,11 +324,11 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 @Test func hudSymbolInLeadingEarRendersInsideTheIslandAndClearOfTheNotch() {
     let controller = makeController()
     controller.setActivities(
-        [.init(id: "hud", title: "Volume 62%", compactText: "62%", symbolName: "speaker.wave.2.fill")],
+        [.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")],
         overflow: 0
     )
     #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.oneActivity)
+    #expect(controller.parameters == controller.metrics.hud)
 
     let result = renderAndClassify(controller)
     #expect(
@@ -481,14 +481,14 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 @Test func hudBarInTrailingEarRendersInsideTheIslandAndClearOfTheNotchAtOneActivitySize() {
     let controller = makeController()
     controller.setActivities(
-        [.init(id: "hud", title: "Volume 62%", compactText: "62%", symbolName: "speaker.wave.2.fill", barFill: 0.62)],
+        [.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill", barFill: 0.62)],
         overflow: 0
     )
     controller.setMedia(
         MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200)
     )
     #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.oneActivity)
+    #expect(controller.parameters == controller.metrics.hud)
 
     let result = renderAndClassify(controller)
     #expect(
