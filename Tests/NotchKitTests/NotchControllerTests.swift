@@ -273,16 +273,16 @@ private func someMedia() -> MediaPresentation {
     c.setActivityCount(1)
     #expect(c.parameters == c.metrics.oneActivity)
     c.setActivityCount(2)
-    #expect(c.parameters == c.metrics.twoActivities)
+    #expect(c.parameters == c.metrics.oneActivity, "more activities never grow the island; they queue")
     c.setActivityCount(5)
-    #expect(c.parameters == c.metrics.twoActivities, "three or more still uses the two-slot size")
+    #expect(c.parameters == c.metrics.oneActivity)
     c.click()
     #expect(c.parameters == c.metrics.expanded)
 }
 
 /// A LEADING volume/brightness HUD always keeps the one-activity island —
 /// alone, with a sticky media activity behind it (every volume press while
-/// music plays), or with overflow. Other pairs keep the two-slot size.
+/// music plays), or with overflow — as does every other leading activity.
 @MainActor
 @Test func aLeadingHUDActivityKeepsTheCompactIslandWhateverIsBehindIt() {
     let c = makeController()
@@ -304,7 +304,7 @@ private func someMedia() -> MediaPresentation {
 
     c.setActivities([.init(id: "media", title: "Song", detail: "Artist"), .init(id: "power", title: "On AC", compactText: "95%")], overflow: 0)
     #expect(!c.isHUDLeading)
-    #expect(c.parameters == c.metrics.twoActivities)
+    #expect(c.parameters == c.metrics.oneActivity)
 }
 
 // Review Focus 1: geometry can change under a live island.

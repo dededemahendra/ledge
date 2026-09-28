@@ -33,9 +33,6 @@ struct MediaPanelView: View {
     /// threaded through from `NotchRootView.contentColor` so exactly one
     /// place decides it.
     let contentColor: Color
-    /// Artwork-derived (`ArtworkAccent`), kept for the compact ear's paused
-    /// visualizer bars. The card itself is white-on-black like Alcove's.
-    let accent: Color
     /// Pairs the compact ear's 20pt artwork with the 56pt one below into a
     /// single morphing element across expand/collapse. The pair is exclusive
     /// — `NotchRootView.leadingEar` hides its copy at `.expanded` — which is
@@ -80,7 +77,6 @@ struct MediaPanelView: View {
         media: MediaPresentation,
         reduceMotion: Bool,
         contentColor: Color,
-        accent: Color,
         artworkNamespace: Namespace.ID,
         emit: @escaping (NotchIntent) -> Void,
         displayOnly: Bool = false,
@@ -92,7 +88,6 @@ struct MediaPanelView: View {
         self.media = media
         self.reduceMotion = reduceMotion
         self.contentColor = contentColor
-        self.accent = accent
         self.artworkNamespace = artworkNamespace
         self.emit = emit
         self.displayOnly = displayOnly
@@ -222,8 +217,7 @@ struct MediaPanelView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(contentColor.opacity(0.22))
                     Capsule()
-                        // White fill, like Alcove's — the accent stays in the
-                        // compact ear where it carries the track's identity.
+                        // White fill, like Alcove's.
                         .fill(contentColor)
                         .frame(width: max(0, geometry.size.width * fraction))
                         // Smooths the 1Hz position tick into a continuous

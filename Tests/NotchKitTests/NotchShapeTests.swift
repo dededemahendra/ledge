@@ -18,8 +18,6 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.peek.height == 38)                  // notch + 6
     #expect(metrics.oneActivity.width == 255)
     #expect(metrics.oneActivity.height == 32)
-    #expect(metrics.twoActivities.width == 342)
-    #expect(metrics.twoActivities.height == 62)
     #expect(metrics.expanded.width == 390)
     #expect(metrics.expanded.height == 168)   // 118 -> 140 -> 168, matching Alcove's card proportions
     #expect(metrics.expanded.bottomRadius == 26)
@@ -30,7 +28,6 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     let metrics = NotchMetrics(notchRect: measuredNotch)
     // Exercise the public function later tasks consume, not the arithmetic inline.
     #expect(metrics.earWidth(forIslandWidth: metrics.oneActivity.width) == 38)
-    #expect(metrics.earWidth(forIslandWidth: metrics.twoActivities.width) == 81.5)
     #expect(metrics.earWidth(forIslandWidth: 100) == 0, "narrower than the notch leaves no ear")
 }
 
@@ -47,7 +44,6 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     let chain = [
         tall.collapsed.height,
         tall.oneActivity.height,
-        tall.twoActivities.height,
         tall.expanded.height,
     ]
     for height in chain {

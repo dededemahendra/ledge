@@ -55,15 +55,6 @@ public struct NotchMetrics: Sendable, Equatable {
         )
     }
 
-    public var twoActivities: NotchShapeParameters {
-        NotchShapeParameters(
-            width: 342,
-            height: atLeastNotchHeight(62),
-            bottomRadius: 20,
-            outerFillet: 10
-        )
-    }
-
     public var expanded: NotchShapeParameters {
         NotchShapeParameters(
             width: 390,

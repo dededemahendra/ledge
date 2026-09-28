@@ -334,8 +334,7 @@ growth itself becomes the signal that something happened.
 | Peek (hover) | 179 × 38 pt | **no content** — see below |
 | 1 activity | ~255 × 32 pt | leading ear: artwork 20 pt; trailing ear: waveform |
 | Volume/brightness HUD, power or device blip live (whatever is behind it) | ~255 × 32 pt | leading ear: glyph (or product render); trailing ear: percentage (device over music: artwork left, icon right) |
-| 2 activities | ~342 × 62 pt | ears keep glanceable glyphs; detail row below the hole |
-| 3+ activities | ~342 × 62 pt | top two by priority, `+N` pip in trailing ear |
+| 2+ activities | ~255 × 32 pt | **retired 2026-09-29**: the leading activity owns the island alone; the rest wait in the queue (`+N` pip in the trailing ear when more than two are live) |
 | Expanded (hover with media, or pinned by click) | ~390 × 168 pt | full panel below the hole; ears keep glyphs |
 
 Ear width at one activity is ~38 pt per side; at two activities ~81 pt per side.

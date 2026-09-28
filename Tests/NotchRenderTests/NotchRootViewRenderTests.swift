@@ -168,7 +168,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     )
 }
 
-// MARK: - The three resting states named in the review
+// MARK: - The resting states named in the review
 
 @MainActor
 @Test func oneActivityContentRendersInsideTheIslandAndClearOfTheNotch() {
@@ -180,42 +180,6 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     )
     #expect(controller.state == .activity)
     #expect(controller.parameters == controller.metrics.oneActivity)
-
-    let result = renderAndClassify(controller)
-    #expect(
-        result.hasContentInsideIsland,
-        """
-        no content pixel found inside the island bounds \(result.islandBounds) \
-        — this is defect 1 (opacity stuck at 0 outside .expanded)
-        """
-    )
-    #expect(
-        result.contentInsideNotchCount == 0,
-        "\(result.contentInsideNotchCount) content pixel(s) drawn inside the notch rect \(result.holeRect)"
-    )
-    #expect(
-        result.contentOutsideIslandCount == 0,
-        """
-        \(result.contentOutsideIslandCount) content pixel(s) drawn outside the island bounds \
-        \(result.islandBounds) — this is defect 2 (.overlay defaulting to centre alignment)
-        """
-    )
-}
-
-@MainActor
-@Test func twoActivitiesContentRendersInsideTheIslandAndClearOfTheNotch() {
-    let controller = makeController()
-    controller.setActivities(
-        [
-            // Neither hud, power nor device leads here — each of those has
-            // its own island now; the two-slot layout serves the rest.
-            .init(id: "notification", title: "Mail · 3 new", detail: "From Alice", compactText: "3"),
-            .init(id: "media", title: "Song", detail: "Artist"),
-        ],
-        overflow: 0
-    )
-    #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.twoActivities)
 
     let result = renderAndClassify(controller)
     #expect(
@@ -270,56 +234,6 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     )
 }
 
-// MARK: - Detail row budget
-
-/// Pins the fix for the two-activity detail row overflowing its budget.
-/// `twoActivities.height - notchRect.height` gives `detailRow` a 30pt
-/// budget below the hole; showing every activity's title (let alone title
-/// + detail) measures 38-51pt, which was silently clipped away downward by
-/// `.clipShape` — invisible to a pixel check against the parent view (the
-/// three tests above), since a clipped pixel is simply an absent pixel, not
-/// a failure. Measuring `detailRow`'s own ideal (UNCLIPPED) size directly,
-/// via the `detailRowForTesting` seam, is what actually catches content
-/// that grows past its budget.
-@MainActor
-@Test func twoActivityDetailRowIdealHeightFitsItsBudget() {
-    let controller = makeController()
-    controller.setActivities(
-        [
-            // Neither hud, power nor device leads here — each of those has
-            // its own island now; the two-slot layout serves the rest.
-            .init(id: "notification", title: "Mail · 3 new", detail: "From Alice", compactText: "3"),
-            .init(id: "media", title: "Song", detail: "Artist"),
-        ],
-        overflow: 0
-    )
-    #expect(controller.state == .activity)
-    #expect(controller.parameters == controller.metrics.twoActivities)
-
-    let budget = controller.metrics.twoActivities.height - controller.metrics.notchRect.height
-
-    let renderer = ImageRenderer(content: NotchRootView(controller: controller).detailRowForTesting)
-    renderer.scale = 2
-    // Height left unconstrained (`nil`): the point is the subtree's own
-    // IDEAL height, not whatever a fixed proposed height would force it
-    // into. Width is fixed to match what `islandContent` actually gives it
-    // in production (see `detailRowForTesting`'s doc comment).
-    renderer.proposedSize = ProposedViewSize(width: controller.parameters.width, height: nil)
-    guard let cgImage = renderer.cgImage else {
-        fatalError("ImageRenderer produced no image for detailRowForTesting")
-    }
-    let idealHeight = CGFloat(cgImage.height) / renderer.scale
-
-    #expect(
-        idealHeight <= budget,
-        """
-        detailRow's ideal height \(idealHeight)pt exceeds its \(budget)pt budget at two-activity \
-        size — content that doesn't fit is silently clipped downward by `.clipShape`, invisible \
-        to a pixel-level check against the full island
-        """
-    )
-}
-
 // MARK: - HUD symbol and bar (Task 5)
 
 /// A lone HUD activity: `detailRow` is gated off at one-activity size (it
@@ -358,11 +272,9 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 }
 
 /// The realistic concurrent case (spec's HUD priority 100 outranks
-/// power's 60): a leading HUD activity takes the HUD island ALONE — glyph +
-/// label in one ear, bar in the other, no detail row — with the other
-/// activity queued behind it. Pinned since 2026-09-28: it used to share the
-/// two-activity size, which with music playing made every volume press a
-/// tall island with the level drawn twice.
+/// power's 60): a leading HUD activity takes the island ALONE — glyph in
+/// one ear, percentage in the other, no detail row — with the other
+/// activity queued behind it.
 @MainActor
 @Test func hudSymbolAndBarAlongsideAnotherActivityRenderInsideTheIslandAndClearOfTheNotch() {
     let controller = makeController()
@@ -391,54 +303,6 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
         """
         \(result.contentOutsideIslandCount) content pixel(s) drawn outside the island bounds \
         \(result.islandBounds)
-        """
-    )
-}
-
-/// `twoActivityDetailRowIdealHeightFitsItsBudget` above pins the budget with
-/// fixtures that carry no `barFill`, so it cannot tell a rendered bar from a
-/// silently-missing one — both measure the same. This pins the bar
-/// POSITIVELY, by comparing the same detail row with and without `barFill`:
-/// the version with a bar must measure measurably taller (proving the bar
-/// actually drew something), while both must still fit the budget.
-@MainActor
-@Test func detailBarAddsMeasurableHeightAndStillFitsTheTwoActivityBudget() {
-    func idealHeight(barFill: Double?) -> CGFloat {
-        let controller = makeController()
-        controller.setActivities(
-            [
-                .init(id: "hud", title: "Volume 62%", compactText: "62%", barFill: barFill),
-                .init(id: "power", title: "Charging · 42%", compactText: "42%"),
-            ],
-            overflow: 0
-        )
-        let renderer = ImageRenderer(content: NotchRootView(controller: controller).detailRowForTesting)
-        renderer.scale = 2
-        renderer.proposedSize = ProposedViewSize(width: controller.parameters.width, height: nil)
-        guard let cgImage = renderer.cgImage else {
-            fatalError("ImageRenderer produced no image for detailRowForTesting")
-        }
-        return CGFloat(cgImage.height) / renderer.scale
-    }
-
-    let withoutBar = idealHeight(barFill: nil)
-    let withBar = idealHeight(barFill: 0.62)
-
-    #expect(
-        withBar > withoutBar,
-        """
-        a barFill activity's detail row (\(withBar)pt) should measurably exceed the same row \
-        with no bar (\(withoutBar)pt) — otherwise the bar silently isn't rendering
-        """
-    )
-
-    let controller = makeController()
-    let budget = controller.metrics.twoActivities.height - controller.metrics.notchRect.height
-    #expect(
-        withBar <= budget,
-        """
-        detailRow's ideal height \(withBar)pt with a barFill activity exceeds its \(budget)pt \
-        budget at two-activity size
         """
     )
 }
@@ -545,9 +409,8 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     )
 }
 
-/// Pins the media panel to its budget exactly like
-/// `twoActivityDetailRowIdealHeightFitsItsBudget` pins the two-activity
-/// case: a rendered/clipped pixel check against the full island (the test
+/// Pins the media panel to its budget: a rendered/clipped pixel check
+/// against the full island (the test
 /// above) cannot see content silently truncated by `.clipShape` — measuring
 /// `detailRow`'s own ideal (UNCLIPPED) height directly, via the same
 /// `detailRowForTesting` seam, is what actually catches a panel that has
@@ -768,7 +631,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 
     func idealHeight(pickerOpen: Bool) -> CGFloat {
         let panel = MediaPanelView(
-            media: media, reduceMotion: true, contentColor: .red, accent: .red,
+            media: media, reduceMotion: true, contentColor: .red,
             artworkNamespace: namespace, emit: { _ in }, outputs: outputs, showsOutputsInitially: pickerOpen
         )
         let renderer = ImageRenderer(content: panel.frame(width: metrics.expanded.width))

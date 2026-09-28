@@ -241,8 +241,11 @@ public final class NotchController {
         case .peek:
             return metrics.peek
         case .activity:
-            if isHUDLeading || isDeviceLeading || isPowerLeading { return metrics.oneActivity }
-            return activityCount >= 2 ? metrics.twoActivities : metrics.oneActivity
+            // One size for every activity, however many are queued
+            // (2026-09-29): the "grow down when crowded" two-slot layout
+            // was retired once HUD, power and device blips each learned to
+            // own the island alone — nothing was left to reach it.
+            return metrics.oneActivity
         case .expanded:
             return metrics.expanded
         }

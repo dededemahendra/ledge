@@ -156,27 +156,6 @@ public struct NotchRootView: View {
     private var _artworkNamespace: Namespace = Namespace()
     private var artworkNamespace: Namespace.ID { _artworkNamespace.wrappedValue }
 
-    /// Accent derived from the current artwork (`ArtworkAccent`), cached here
-    /// so both surfaces would agree, and recomputed only when the artwork
-    /// actually changes (see the `.onChange` in `body`) — never per frame.
-    /// As of 2026-09-28 nothing draws with it any more (the compact ear's
-    /// bars went white at the user's request); kept wired, cheap, in case
-    /// a tint comes back.
-    private var _accent: State<Color> = State(initialValue: ArtworkAccent.fallback)
-    private var accent: Color {
-        get { _accent.wrappedValue }
-        nonmutating set { _accent.wrappedValue = newValue }
-    }
-
-    /// Under `NotchRenderTests` the accent collapses to `contentColor`, so
-    /// pixel classification there stays strictly two-colour.
-    private var effectiveAccent: Color {
-        #if DEBUG
-        if NotchRenderTestHook.contentColor != nil { return contentColor }
-        #endif
-        return accent
-    }
-
     /// The purely-visual expanded-card effects (hairline border, drop
     /// shadow) are suppressed while the render-test hook is active: a
     /// half-outside stroke or a soft shadow ring would pollute the
@@ -287,14 +266,6 @@ public struct NotchRootView: View {
             // transition comes next.
             previousHeight = newValue.height
             previousWidth = newValue.width
-        }
-        // Accent recomputes only when the artwork itself changes — a 1×1
-        // draw, once per track, never per frame. See `ArtworkAccent`.
-        .onChange(of: controller.media?.artwork) { _, artwork in
-            accent = ArtworkAccent.accent(from: artwork)
-        }
-        .onAppear {
-            accent = ArtworkAccent.accent(from: controller.media?.artwork)
         }
     }
 
@@ -615,22 +586,11 @@ public struct NotchRootView: View {
         }
     }
 
-    /// Budget below the hole is tight: at two (or three+, which shares the
-    /// same `twoActivities` size) activities it is `twoActivities.height -
-    /// notch.height` = 30pt. Measured ideal height of every activity's
-    /// title+detail stacked: 51pt; even titles-only (no detail lines): 38pt.
-    /// Both blow the budget — growing the island to fit was rejected (62pt
-    /// is the spec value; "ears first, grow down only when crowded" was
-    /// chosen over "grow to fit text"), and so was accepting truncation
-    /// (silently clipping the state spec §6 says shows the top two is not a
-    /// defensible resting state). So only the highest-priority activity's
-    /// TITLE (no detail) renders here — both activities stay represented
-    /// regardless, each via its own ear (`leadingEar`/`trailingEar`).
-    /// `.expanded` has far more room (86pt) and shows every activity in
-    /// full. Pinned by `NotchRenderTests`'
-    /// `twoActivityDetailRowIdealHeightFitsItsBudget`, which measures this
-    /// subtree's own ideal (unclipped) height directly — a rendered/clipped
-    /// pixel check can't see content silently truncated by `.clipShape`.
+    /// Reachable only at `.expanded` (2026-09-29): the two-slot "grow down
+    /// when crowded" layout is gone — every activity kind owns the
+    /// notch-height island alone while it is live, and whatever is queued
+    /// behind it waits (or shows as the `+N` pip). Below the hole there is
+    /// now exactly one thing: the panel.
     /// Task 8: `.expanded` shows the rich media panel instead of the generic
     /// per-activity list whenever media exists — deliberately unconditional
     /// on which activity currently leads (unlike the ears above): a click
@@ -657,7 +617,6 @@ public struct NotchRootView: View {
                 media: media,
                 reduceMotion: controller.reduceMotion,
                 contentColor: contentColor,
-                accent: effectiveAccent,
                 artworkNamespace: artworkNamespace,
                 emit: { controller.emit($0) },
                 displayOnly: controller.isLocked,
@@ -673,23 +632,16 @@ public struct NotchRootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: 2) {
-                if controller.state == .expanded {
-                    ForEach(controller.activities) { activity in
-                        detailTitle(activity.title)
-                        if let fill = activity.barFill {
-                            detailBar(fill)
-                        }
-                        if let detail = activity.detail {
-                            Text(detail)
-                                .font(.system(size: 9))
-                                .foregroundStyle(contentColor.opacity(0.6))
-                                .lineLimit(1)
-                        }
-                    }
-                } else if let activity = controller.activities.first {
+                ForEach(controller.activities) { activity in
                     detailTitle(activity.title)
                     if let fill = activity.barFill {
                         detailBar(fill)
+                    }
+                    if let detail = activity.detail {
+                        Text(detail)
+                            .font(.system(size: 9))
+                            .foregroundStyle(contentColor.opacity(0.6))
+                            .lineLimit(1)
                     }
                 }
             }
@@ -726,9 +678,7 @@ public struct NotchRootView: View {
     /// Fixed at 4pt tall via the outer `.frame(height:)` regardless of what
     /// `GeometryReader` itself would report as an ideal size — that is what
     /// makes this a small, KNOWN addition to `detailRow`'s ideal-height
-    /// measurement in `NotchRenderTests`
-    /// (`twoActivityDetailRowIdealHeightFitsItsBudget`), rather than an
-    /// unbounded one.
+    /// measurement in `NotchRenderTests`, rather than an unbounded one.
     private func detailBar(_ fill: Double) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {

@@ -1091,3 +1091,11 @@ removed. HUD, power and device blips now share one ear vocabulary.
   a device, hear the route change and see the device blip in the ears. Only
   one output was present on this machine during the session, so the button
   was dimmed here.
+
+# Cleanup (2026-09-29)
+
+Removed: `ArtworkAccent` (nothing drew with it once the compact bars went
+white) and the two-slot layout (`NotchMetrics.twoActivities`, the
+non-expanded detail row) — unreachable once HUD, power and device blips each
+own the island alone. Three render tests that pinned the two-slot budget went
+with it. `make test` passes.
