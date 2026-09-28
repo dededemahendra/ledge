@@ -99,6 +99,10 @@ public final class NotchController {
         /// `0...1` progress bar shown in the detail row, or `nil` for
         /// activities without one (e.g. a plain status line).
         public let barFill: Double?
+        /// Encoded image for the leading ear — a device activity's product
+        /// render (AirPods, from the system's own assets). Wins over
+        /// `symbolName`, which stays as the fallback when decoding fails.
+        public let artwork: Data?
 
         public init(
             id: String,
@@ -106,7 +110,8 @@ public final class NotchController {
             detail: String? = nil,
             compactText: String? = nil,
             symbolName: String? = nil,
-            barFill: Double? = nil
+            barFill: Double? = nil,
+            artwork: Data? = nil
         ) {
             self.id = id
             self.title = title
@@ -114,6 +119,7 @@ public final class NotchController {
             self.compactText = compactText
             self.symbolName = symbolName
             self.barFill = barFill.map { min(1, max(0, $0)) }
+            self.artwork = artwork
         }
     }
 

@@ -484,6 +484,13 @@ the Bluetooth link observer was dropped:
   A move back to the built-in speakers is announced the same way: CoreAudio
   cannot say whether the previous device disconnected or was merely switched
   away from, so "disconnected" would be a guess.
+- **Product renders, not just glyphs (2026-09-28, at the user's request):**
+  for AirPods the leading ear shows Apple's own photo-real render, read at
+  runtime from `HeadphoneAssets.framework` on the running system
+  (`DeviceArtwork`) — never copied into the bundle. Missing file → SF Symbol.
+  Real-time 3D (SceneKit/USDZ) was considered and rejected: no AirPods models
+  ship with macOS, third-party ones carry licences, and a 24pt ear cannot show
+  depth a still render does not already give.
 - Battery from the `IORegistry` (`AppleDeviceManagementHIDEventService`:
   `Product` + `BatteryPercent`), name-matched loosely. No `system_profiler`
   fallback — too slow for a 3 s activity.

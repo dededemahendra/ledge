@@ -17,6 +17,10 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// `0...1` progress bar, or `nil` for activities without one — see
     /// `NotchController.ActivityDisplay.barFill`.
     public let barFill: Double?
+    /// Encoded image for the leading ear (a product render for a device
+    /// activity); wins over `symbolName` when present — see
+    /// `NotchController.ActivityDisplay.artwork`.
+    public let artwork: Data?
 
     public init(
         id: String,
@@ -27,7 +31,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         detail: String? = nil,
         compactText: String? = nil,
         symbolName: String? = nil,
-        barFill: Double? = nil
+        barFill: Double? = nil,
+        artwork: Data? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -38,6 +43,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.compactText = compactText
         self.symbolName = symbolName
         self.barFill = barFill.map { min(1, max(0, $0)) }
+        self.artwork = artwork
     }
 
     public var isSticky: Bool { ttl == nil }

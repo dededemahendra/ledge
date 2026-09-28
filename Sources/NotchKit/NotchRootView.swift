@@ -372,7 +372,26 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if let activity = controller.activities.first, let symbol = activity.symbolName {
+        if let activity = controller.activities.first,
+           let data = activity.artwork, let image = NSImage(data: data) {
+            // A product render (AirPods et al.) in place of the glyph. 24pt
+            // tall in a 32pt ear, width from the render's own aspect (the
+            // system's are ~1.4:1, so ~34pt — inside the 38pt ear of the
+            // one-activity island with a little air). No clip shape: the
+            // renders carry their own transparency, and a rounded box
+            // around a pair of earbuds would look like a sticker.
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(height: 24)
+                .id(activity.title)
+                .transition(.blurReplace)
+                .animation(
+                    NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                    value: activity.title
+                )
+        } else if let activity = controller.activities.first, let symbol = activity.symbolName {
             // `variableValue` lights the symbol's own level layers (speaker
             // waves, sun rays) from `barFill` — the macOS-OSD way to show a
             // level in a glyph. Non-HUD symbols carry no `barFill` (nil) and

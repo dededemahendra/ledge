@@ -133,3 +133,21 @@ same private framework `DisplayServicesGetBrightness` does.
 
 Not touched directly. Reached only through the vendored `mediaremote-adapter`,
 which loads it inside `/usr/bin/perl` (bundle id `com.apple.perl`).
+
+## HeadphoneAssets.framework — AirPods product renders (macOS 27.0)
+
+`/System/Library/PrivateFrameworks/HeadphoneAssets.framework/Versions/A/Resources/`
+holds the photo-real renders System Settings' headphone panes use, as plain
+996×702 transparent PNGs inside `*.ca` bundles (Core Animation archives):
+
+| Model code | Product | File |
+| --- | --- | --- |
+| B788 | AirPods Pro 3 | `B788_Translate.ca/assets/AirPodsPro1-3_translate.png` |
+| B698 | AirPods Pro 2 | `B698_Translate.ca/assets/AirPodsPro1-2_translator_996x702.png` |
+| B768 | AirPods 4 | `B768_Translate.ca/assets/AirPods1-4_translator_996x702.png` |
+| B868 | AirPods 3 | `B868_Translate.ca/assets/Airpods3-7_CL-0_Translate.png` |
+| B515d | AirPods Max | `B515d-Translate-CL{18..22}.ca/assets/AirPodsMax1-2_CL-{n}_Translate_v14.png` (CL-18 black, CL-20 blue, CL-22 purple) |
+
+Also `IOBluetoothUI.framework/Resources/AirPods.png` (64px, the old menu icon).
+No Beats render was found. `DeviceArtwork` reads these by path; the test
+`theRendersExistOnThisSystem` fails loudly when an OS update moves them.

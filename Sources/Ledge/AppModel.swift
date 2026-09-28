@@ -127,6 +127,14 @@ final class AppModel {
     /// percentage for the trailing ear. Same id for every device event, so
     /// AirPods connecting right after a keyboard coalesces into one slot.
     private func handle(_ event: DeviceEvent) {
+        // The system's own product render for AirPods (`DeviceArtwork`),
+        // read from disk here — one small file, once per route change —
+        // rather than on the service's CoreAudio callback. Only Bluetooth
+        // routes can be AirPods; everything else keeps the glyph.
+        var artwork: Data?
+        if case .outputChanged(let name, .bluetooth, _) = event {
+            artwork = DeviceArtwork.load(forDeviceNamed: name)
+        }
         queue.insert(
             ActivityRecord(
                 id: ActivityKind.device.rawValue,
@@ -135,7 +143,8 @@ final class AppModel {
                 ttl: ActivityKind.device.defaultTTL,
                 title: event.activityTitle,
                 compactText: event.compactText,
-                symbolName: event.symbolName
+                symbolName: event.symbolName,
+                artwork: artwork
             )
         )
         publish()
@@ -324,7 +333,8 @@ final class AppModel {
                 detail: record.detail,
                 compactText: record.compactText,
                 symbolName: record.symbolName,
-                barFill: record.barFill
+                barFill: record.barFill,
+                artwork: record.artwork
             )
         }
         // `setActivities` sets the count itself — do not also call

@@ -623,3 +623,41 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(abs(renderedBounds.minY - expected.minY) < tolerance, "\(renderedBounds) vs \(expected)")
     #expect(abs(renderedBounds.maxY - expected.maxY) < tolerance, "\(renderedBounds) vs \(expected)")
 }
+
+// MARK: - Device artwork (2026-09-28)
+
+/// A device activity carrying a product render: the image (painted in the
+/// content test colour so the classifier can see it) must land in the
+/// leading ear — inside the island, clear of the notch — at one-activity
+/// size, where the ear is only 38pt wide and the render is scaled to 24pt
+/// tall. Pins the `artwork`-over-`symbolName` branch of `leadingEar`.
+@MainActor
+@Test func deviceArtworkInLeadingEarRendersInsideTheIslandAndClearOfTheNotch() throws {
+    // A 140x100 solid-red PNG — the same ~1.4:1 aspect as the system's
+    // AirPods renders.
+    let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: 140, pixelsHigh: 100, bitsPerSample: 8,
+        samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+    )!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    NSColor(red: 1, green: 0, blue: 0, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: 140, height: 100).fill()
+    NSGraphicsContext.restoreGraphicsState()
+    let png = try #require(rep.representation(using: .png, properties: [:]))
+
+    let controller = makeController()
+    controller.setActivities(
+        [.init(id: "device", title: "AirPods Pro", compactText: "87%", symbolName: "airpods.pro", artwork: png)],
+        overflow: 0
+    )
+    #expect(controller.parameters == controller.metrics.oneActivity)
+
+    let result = renderAndClassify(controller)
+    #expect(result.hasContentInsideIsland, "the render did not draw")
+    #expect(result.contentInsideNotchCount == 0,
+            "\(result.contentInsideNotchCount) render pixel(s) inside the notch rect \(result.holeRect)")
+    #expect(result.contentOutsideIslandCount == 0,
+            "\(result.contentOutsideIslandCount) render pixel(s) outside the island bounds \(result.islandBounds)")
+}
