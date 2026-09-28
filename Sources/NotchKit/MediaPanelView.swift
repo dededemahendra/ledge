@@ -292,7 +292,7 @@ struct MediaPanelView: View {
     /// transport inside, play in the middle.
     private var controlsRow: some View {
         HStack(spacing: 0) {
-            controlButton("shuffle", label: "Shuffle", size: 13, opacity: 0.6, .toggleShuffle)
+            shuffleButton
                 .frame(maxWidth: .infinity)
             controlButton("backward.fill", label: "Previous", size: 17, opacity: 0.9, .previous)
                 .frame(maxWidth: .infinity)
@@ -381,6 +381,36 @@ struct MediaPanelView: View {
         .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
         .accessibilityLabel(output.name)
         .accessibilityAddTraits(output.isCurrent ? .isSelected : [])
+    }
+
+    /// Shuffle with its state (2026-09-29): full-strength glyph plus a dot
+    /// beneath when on — the Music app's own indicator language — dim when
+    /// off, and dimmer still and disabled when the source does not report
+    /// shuffle at all (`isShuffling == nil`: browsers), so the button never
+    /// claims a state it cannot know or a power it does not have.
+    private var shuffleButton: some View {
+        let state = media.isShuffling
+        let on = state == true
+        return Button {
+            emit(.toggleShuffle)
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: "shuffle")
+                    .font(.system(size: 13, weight: .semibold))
+                Circle()
+                    .fill(contentColor)
+                    .frame(width: 3, height: 3)
+                    .opacity(on ? 1 : 0)
+            }
+            .opacity(state == nil ? 0.25 : (on ? 1 : 0.6))
+            .frame(width: 30, height: 30)
+            .contentShape(Rectangle())
+            .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: on)
+        }
+        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+        .disabled(state == nil)
+        .accessibilityLabel("Shuffle")
+        .accessibilityValue(state == nil ? "unavailable" : (on ? "on" : "off"))
     }
 
     private var playPauseButton: some View {

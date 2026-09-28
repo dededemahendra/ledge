@@ -18,8 +18,37 @@ public struct MediaPayload: Sendable, Equatable {
     public var playbackRate: Double?
     public var artworkData: Data?
     public var artworkMimeType: String?
+    /// MediaRemote's `kMRMediaRemoteNowPlayingInfoShuffleMode`, passed
+    /// through by the adapter when the source app reports it (Music,
+    /// Spotify; browsers never do): 1 off, 2 albums, 3 songs.
+    public var shuffleMode: Int?
+    /// `kMRMediaRemoteNowPlayingInfoRepeatMode`: 1 off, 2 one, 3 all
+    /// (the adapter's own `repeat 3` comment calls 3 "playlist").
+    public var repeatMode: Int?
 
     public init() {}
+
+    /// `nil` when the source does not report shuffle at all — the panel
+    /// disables the button then, rather than showing a state it cannot
+    /// know. Any mode above "off" counts as on.
+    public var isShuffling: Bool? {
+        shuffleMode.map { $0 >= 2 }
+    }
+
+    public enum RepeatMode: Sendable, Equatable {
+        case off, one, all
+    }
+
+    /// `nil` when unreported; an out-of-range value reads as off rather
+    /// than crashing on an adapter surprise.
+    public var repeatSetting: RepeatMode? {
+        guard let repeatMode else { return nil }
+        switch repeatMode {
+        case 2:  return .one
+        case 3:  return .all
+        default: return .off
+        }
+    }
 
     /// The adapter guarantees these three are non-null when media exists;
     /// a payload missing any of them is not usable now-playing state.
@@ -43,6 +72,8 @@ public struct MediaPayload: Sendable, Equatable {
         p.elapsedTime = number(json["elapsedTime"])
         p.playbackRate = number(json["playbackRate"])
         p.artworkMimeType = json["artworkMimeType"] as? String
+        p.shuffleMode = number(json["shuffleMode"]).map { Int($0) }
+        p.repeatMode = number(json["repeatMode"]).map { Int($0) }
 
         if let encoded = json["artworkData"] as? String {
             p.artworkData = Data(base64Encoded: encoded)

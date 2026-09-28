@@ -71,3 +71,12 @@ private func presentation(elapsed: Double, duration: Double?) -> MediaPresentati
     controller.emit(.seek(fraction: 0.25))
     #expect(received == [.togglePlayPause, .seek(fraction: 0.25)])
 }
+
+@Test func shuffleAndRepeatDefaultToUnknown() {
+    let unknown = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 100)
+    #expect(unknown.isShuffling == nil)
+    #expect(unknown.repeatMode == nil)
+    let known = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 100, isShuffling: true, repeatMode: .all)
+    #expect(known.isShuffling == true)
+    #expect(known.repeatMode == .all)
+}

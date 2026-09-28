@@ -1106,3 +1106,15 @@ See spec §5 "Motion polish". Verified: `make test` (resting layouts unchanged;
 `springDirectionIsDecidedByArea` pins the new rule). Not verifiable headlessly:
 the live morph — ears travelling with the shape, blip-to-blip crossfades, the
 card's fade on collapse. Judge on the notch.
+
+# Shuffle state (2026-09-29)
+
+`MediaPayload` now decodes the adapter's `shuffleMode`/`repeatMode` (MediaRemote
+now-playing info keys the framework passes through when the source reports
+them — Music/Spotify do, browsers do not). The panel's shuffle button shows
+on (full glyph + dot), off (dim) or unavailable (dimmer, disabled). Repeat is
+decoded but has no control since the output picker took its slot.
+
+Not verified live: only a browser was playing during the session, so the
+button was in its "unavailable" state here. Play something in Music, toggle
+shuffle there, and the dot should follow within a diff.

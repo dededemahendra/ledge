@@ -283,7 +283,15 @@ final class AppModel {
                 artwork: mediaPayload.artworkData,
                 isPlaying: mediaPayload.isPlaying,
                 elapsed: elapsed,
-                duration: mediaPayload.duration
+                duration: mediaPayload.duration,
+                isShuffling: mediaPayload.isShuffling,
+                repeatMode: mediaPayload.repeatSetting.map {
+                    switch $0 {
+                    case .off: .off
+                    case .one: .one
+                    case .all: .all
+                    }
+                }
             )
         )
     }

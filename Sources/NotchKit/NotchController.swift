@@ -20,10 +20,21 @@ public struct MediaPresentation: Sendable, Equatable {
     public let isPlaying: Bool
     public let elapsed: Double
     public let duration: Double?
+    /// `nil`: the source does not report shuffle (browsers), and the
+    /// panel's shuffle button is disabled. Otherwise the button shows it.
+    public let isShuffling: Bool?
+    /// Decoded alongside shuffle for the day a repeat control has a slot
+    /// again (the output picker took repeat's on 2026-09-28); not drawn.
+    public let repeatMode: RepeatMode?
+
+    public enum RepeatMode: Sendable, Equatable {
+        case off, one, all
+    }
 
     public init(
         title: String, artist: String?, artwork: Data?,
-        isPlaying: Bool, elapsed: Double, duration: Double?
+        isPlaying: Bool, elapsed: Double, duration: Double?,
+        isShuffling: Bool? = nil, repeatMode: RepeatMode? = nil
     ) {
         self.title = title
         self.artist = artist
@@ -31,6 +42,8 @@ public struct MediaPresentation: Sendable, Equatable {
         self.isPlaying = isPlaying
         self.elapsed = elapsed
         self.duration = duration
+        self.isShuffling = isShuffling
+        self.repeatMode = repeatMode
     }
 
     /// `0...1`, or exactly `0` when duration is unknown or zero — a live

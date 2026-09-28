@@ -107,3 +107,27 @@ import Foundation
     }
     #expect(parsedCount > 0, "the real capture must yield at least one usable line")
 }
+
+/// Shuffle/repeat modes ride the same tolerant decode as everything else:
+/// ints or doubles accepted, absent means unknown, junk means off.
+@Test func shuffleAndRepeatModesDecodeToStatesAndUnknownStaysUnknown() {
+    var p = MediaPayload.decode(["shuffleMode": 3, "repeatMode": 2])
+    #expect(p.shuffleMode == 3 && p.isShuffling == true)
+    #expect(p.repeatSetting == .one)
+
+    p = MediaPayload.decode(["shuffleMode": 1.0, "repeatMode": 3.0])
+    #expect(p.isShuffling == false, "1 is off")
+    #expect(p.repeatSetting == .all)
+
+    p = MediaPayload.decode(["shuffleMode": 2, "repeatMode": 1])
+    #expect(p.isShuffling == true, "albums counts as on")
+    #expect(p.repeatSetting == .off)
+
+    p = MediaPayload.decode(["title": "Song"])
+    #expect(p.isShuffling == nil, "a browser reports neither — unknown, not off")
+    #expect(p.repeatSetting == nil)
+
+    p = MediaPayload.decode(["shuffleMode": "songs", "repeatMode": 99])
+    #expect(p.isShuffling == nil, "a wrong type is absent, never fatal")
+    #expect(p.repeatSetting == .off, "an unknown number reads as off")
+}
