@@ -96,11 +96,13 @@ enum NotchRenderTestHook {
 public struct NotchRootView: View {
     private let controller: NotchController
 
-    /// Spec §5/§14: click-to-expand is the interaction model. Defaults to a
-    /// no-op so every existing call site (including `NotchRenderTests`, which
-    /// constructs this view directly with no presenter around) keeps
-    /// compiling unchanged; `NotchPresenter` supplies its own `toggle()` so
-    /// the window resyncs — mutating the controller alone would leave the
+    /// Spec §5/§14: hover opens the panel; a tap PINS it open (or unpins
+    /// it) so it survives the cursor leaving — see
+    /// `NotchController.isPinnedOpen`. Defaults to a no-op so every
+    /// existing call site (including `NotchRenderTests`, which constructs
+    /// this view directly with no presenter around) keeps compiling
+    /// unchanged; `NotchPresenter` supplies its own `toggle()` so the
+    /// window resyncs — mutating the controller alone would leave the
     /// window ordered out, the same bug `toggle()` was written to fix for
     /// the menu bar's "Toggle Panel".
     private let onTap: () -> Void
@@ -262,8 +264,9 @@ public struct NotchRootView: View {
             height: NotchMetrics.canvasSize.height,
             alignment: .top
         )
-        // Spec §5: `peek ──click──▶ expanded`, and `.leftMouseDown`/Escape
-        // dismissal (both in `NotchPresenter`) close it again. AppKit's own
+        // Spec §5: `hover ──▶ expanded`; a tap pins/unpins, and
+        // `.leftMouseDown`-outside/Escape (both in `NotchPresenter`) unpin.
+        // AppKit's own
         // hit-testing (`NotchHostingView.hitTest`, driven by
         // `interactivePath`) already restricts which points ever reach this
         // view, so no extra region check is needed here.

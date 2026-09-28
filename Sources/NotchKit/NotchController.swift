@@ -192,14 +192,32 @@ public final class NotchController {
     /// Toggle Panel is pressed again.
     public func click() {
         guard metrics.notchRect.width > 0 else { return }
+        isPinnedOpen = true
         state = .expanded
     }
 
+    /// Unpins. If the cursor is still over the island and there is media
+    /// to show, `recomputeState()` lands straight back on `.expanded` —
+    /// hover-opened, no longer pinned — because under the hover model the
+    /// cursor being there IS the request to see the panel. Escape/click-
+    /// outside/Toggle Panel therefore only visibly close a panel the
+    /// cursor has already left, or one with nothing to hover open.
     public func dismiss() {
         guard state == .expanded else { return }
+        isPinnedOpen = false
         state = .hidden          // recomputeState restores peek/activity if warranted
         recomputeState()
     }
+
+    /// True while the panel was opened by `click()` (a tap on the island,
+    /// or the menu bar's "Toggle Panel") and not yet `dismiss()`ed. A
+    /// pinned panel stays open whatever the cursor does; a hover-opened one
+    /// is derived from `isHovered` every time and closes when the cursor
+    /// leaves. Two distinct things, kept distinct: without this flag,
+    /// `recomputeState()` could not tell "expanded because hovered" from
+    /// "expanded because asked", and would either close a pinned panel on
+    /// unhover or never close a hovered one.
+    public private(set) var isPinnedOpen = false
 
     public func setActivityCount(_ count: Int) {
         activityCount = max(0, count)
@@ -219,6 +237,10 @@ public final class NotchController {
     /// (artwork, elapsed/duration) that activity's plain title/detail can't.
     public func setMedia(_ media: MediaPresentation?) {
         self.media = media
+        // Media is what hover opens (see `recomputeState`), so media
+        // arriving under a cursor already parked on the island must open
+        // the panel, and media going away must close a hover-opened one.
+        recomputeState()
     }
 
     /// Forwards a panel-originated command out to `onIntent`. Public so the
@@ -228,11 +250,26 @@ public final class NotchController {
         onIntent?(intent)
     }
 
-    /// An open panel outranks everything; otherwise activities outrank hover,
-    /// and hover outranks nothing at all.
+    /// A pinned panel outranks everything. Otherwise hover opens the panel
+    /// whenever there is media to put in it — the now-playing card is the
+    /// one expanded surface with controls, so it is the one worth opening
+    /// for; a lone HUD or battery blip already says everything in its ears,
+    /// and hovering it must not balloon it into a 168pt slab. Below that,
+    /// activities outrank hover, and hover with nothing to show is the
+    /// small peek.
+    ///
+    /// Hover-driven expansion is DERIVED here on every call, never latched:
+    /// that is what makes the cursor leaving close it (`setHovered(false)`
+    /// lands here) and media stopping close it (`setMedia(nil)` lands here).
+    /// No flicker risk at the boundary: every hover transition only ever
+    /// grows the island (peek/activity -> expanded), so a cursor that was
+    /// inside the small shape is still inside the big one.
     private func recomputeState() {
-        if state == .expanded { return }
-        if activityCount > 0 {
+        if isPinnedOpen {
+            state = .expanded
+        } else if isHovered, media != nil {
+            state = .expanded
+        } else if activityCount > 0 {
             state = .activity
         } else if isHovered {
             state = .peek

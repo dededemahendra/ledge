@@ -49,6 +49,68 @@ private func makeController(reduceMotion: Bool = false) -> NotchController {
 }
 
 @MainActor
+private func someMedia() -> MediaPresentation {
+    MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200)
+}
+
+// MARK: - Hover opens the panel (2026-09-28: hover, not click)
+
+@MainActor
+@Test func hoverOpensThePanelWhenThereIsMediaAndLeavingClosesIt() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.state == .activity)
+    c.setHovered(true)
+    #expect(c.state == .expanded)
+    #expect(!c.isPinnedOpen, "hover-opened, not pinned")
+    c.setHovered(false)
+    #expect(c.state == .activity, "the cursor leaving closes a hover-opened panel")
+}
+
+@MainActor
+@Test func hoverWithoutMediaOnlyPeeksOrKeepsTheActivity() {
+    let c = makeController()
+    c.setHovered(true)
+    #expect(c.state == .peek, "nothing to open a panel for")
+    c.setActivities([.init(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)], overflow: 0)
+    #expect(c.state == .activity, "a lone HUD says everything in its ears; hover must not balloon it")
+}
+
+@MainActor
+@Test func mediaArrivingOrLeavingUnderAParkedCursorOpensAndClosesThePanel() {
+    let c = makeController()
+    c.setHovered(true)
+    #expect(c.state == .peek)
+    c.setMedia(someMedia())
+    #expect(c.state == .expanded, "media appearing under the cursor opens the panel")
+    c.setMedia(nil)
+    #expect(c.state == .peek, "media going away closes a hover-opened panel")
+}
+
+@MainActor
+@Test func aPinnedPanelIgnoresHoverAndAHoverOpenedOneDoesNot() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setHovered(true)
+    c.click()
+    #expect(c.isPinnedOpen)
+    c.setHovered(false)
+    #expect(c.state == .expanded, "pinned by click: survives the cursor leaving")
+    c.dismiss()
+    #expect(!c.isPinnedOpen)
+    #expect(c.state == .hidden)
+
+    c.setHovered(true)
+    #expect(c.state == .expanded)
+    c.dismiss()
+    #expect(c.state == .expanded, "dismiss unpins, but the cursor still being there re-opens it")
+    #expect(!c.isPinnedOpen)
+    c.setHovered(false)
+    #expect(c.state == .hidden)
+}
+
+@MainActor
 @Test func activityShowsWithoutHoverAndRestsOnActivityState() {
     let c = makeController()
     c.setActivityCount(1)

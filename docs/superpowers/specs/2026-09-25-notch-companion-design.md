@@ -210,21 +210,30 @@ below.
 One `@Observable` value, so SwiftUI derives every animation from a single source.
 
 ```
-  hidden ──hover──▶ peek ──click──▶ expanded
-    ▲                │                  │
-    │                └──unhover─────────┤ esc / click-outside
-    │                                   │
-    └────── activity(a) ◀───────────────┘
+  hidden ──hover──▶ peek ──hover, media playing──▶ expanded
+    ▲                │                                │
+    │                └──unhover──────────────────────┤ unhover (hover-opened)
+    │                                                │ esc / click-outside (pinned)
+    └────── activity(a) ◀────────────────────────────┘
             auto-collapses after a.ttl
 ```
+
+**Changed 2026-09-28: hover opens the panel, not click.** Hovering the island
+while there is media to show expands it; the cursor leaving collapses it. Hover
+with nothing playing is still the small peek, and hovering a lone HUD/battery
+activity leaves it at activity size — the panel is opened for the now-playing
+card, the one expanded surface with controls in it. A click on the island (or
+the menu bar's "Toggle Panel") **pins** the panel open so it survives the cursor
+leaving; Escape, click-outside and a second click unpin it. Unpinning while the
+cursor is still over the island lands straight back on the hover-opened panel.
 
 - Auto-collapse timers are **cancelled while hovered** — never yank the island out
   from under the cursor.
 - `peek` is the notch height + 6 pt with glanceable hints.
-- Click-outside dismissal uses
+- Click-outside dismissal (of a *pinned* panel) uses
   `NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown)`, which requires no
   permission for mouse events.
-- Escape dismisses when expanded.
+- Escape unpins when expanded.
 
 ### NotchShape
 
@@ -314,7 +323,7 @@ growth itself becomes the signal that something happened.
 | 1 activity, volume/brightness HUD | notch + 2 × 90 pt (~359) × 32 pt | leading ear: glyph + "Sound"/"Display"; trailing ear: 68 pt level bar |
 | 2 activities | ~342 × 62 pt | ears keep glanceable glyphs; detail row below the hole |
 | 3+ activities | ~342 × 62 pt | top two by priority, `+N` pip in trailing ear |
-| Expanded (click) | ~390 × 168 pt | full panel below the hole; ears keep glyphs |
+| Expanded (hover with media, or pinned by click) | ~390 × 168 pt | full panel below the hole; ears keep glyphs |
 
 Ear width at one activity is ~38 pt per side; at two activities ~81 pt per side.
 A lone volume/brightness HUD is the exception: it gets a fixed 90 pt ear per side
@@ -644,7 +653,7 @@ unworkable.
 | What to build | Free equivalent of Alcove | Camera mirror, iPhone Mirroring, AirPlay control |
 | Audience | Personal daily driver | Public release, learning project, portfolio piece |
 | v1 features | All four: media+HUD, battery/device, notifications, lock screen | — |
-| Interaction | Dynamic Island: invisible idle, events morph out, click to expand | Always-on island, event-only, hover-to-expand |
+| Interaction | Dynamic Island: invisible idle, events morph out, **hover to expand** (changed 2026-09-28 from click; click now pins) | Always-on island, event-only, click-to-expand |
 | Approach | Own shell, vendor plumbing | Everything from scratch; fork Boring Notch |
 | Build | SwiftPM + Makefile | Xcode project; hybrid |
 | Shape | Flush with inverted corners | Floating card; notch-hugging capsule |

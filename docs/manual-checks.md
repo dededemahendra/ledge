@@ -839,3 +839,27 @@ so 2 px per point), frames extracted at 2 fps and scanned pixel by pixel:
 
 - The live morph on the real notch — the spring and the blur-in were not
   watched on screen; only the resting frame was compared.
+
+# Hover-to-expand (2026-09-28)
+
+## What changed
+
+`NotchController.recomputeState()` now derives `.expanded` from hover: cursor
+over the island + `media != nil` opens the panel, cursor leaving closes it,
+`setMedia` re-derives so media arriving/leaving under a parked cursor
+opens/closes it too. `click()` (tap, or "Toggle Panel") now sets
+`isPinnedOpen`, which hover cannot close; `dismiss()` clears it. Hover with
+nothing playing is still peek; hover over a lone HUD/battery activity stays
+at activity size.
+
+## Verified
+
+- `make test`: all targets pass, including four new `NotchControllerTests`
+  covering open-on-hover/close-on-leave, no-media hover, media arriving under a
+  parked cursor, and pinned-vs-hover-opened.
+- Launched via `make dev`.
+
+## Not verified
+
+- On-screen feel of the hover open/close on the real notch (no hover-intent
+  delay was added; opening is immediate on entering the island's region).
