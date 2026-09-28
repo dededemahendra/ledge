@@ -307,6 +307,18 @@ Collapse is deliberately duller — closing should not draw attention.
 `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion` is true, replace the
 entire spring system with a 0.15 s crossfade and an instant size change.
 
+**Motion polish, 2026-09-29.** Three things the island's content used to do
+badly while the shape sprang: (1) it was laid out for the *target* size from
+the first frame, so the ears jumped to their final x and were then revealed by
+the moving clip mask — now an `Animatable` modifier publishes the spring's
+interpolated parameters through the environment and the ears row lays out from
+that, so they travel with the shape; (2) one blip replacing another at the same
+size swapped the ears instantly because nothing else animated — the ear
+containers are now keyed on the leading activity's identity and crossfade with
+`.blurReplace`; (3) the expanded card was sliced by the shrinking mask on
+collapse — it now fades and blurs in and out over the spring. The spring
+direction is decided by area, not height (peek → activity is growth).
+
 ### Content presentation
 
 - `clipShape`'d to the same `NotchShape` so nothing bleeds out mid-morph.

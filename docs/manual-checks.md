@@ -1099,3 +1099,10 @@ white) and the two-slot layout (`NotchMetrics.twoActivities`, the
 non-expanded detail row) — unreachable once HUD, power and device blips each
 own the island alone. Three render tests that pinned the two-slot budget went
 with it. `make test` passes.
+
+# Motion polish (2026-09-29)
+
+See spec §5 "Motion polish". Verified: `make test` (resting layouts unchanged;
+`springDirectionIsDecidedByArea` pins the new rule). Not verifiable headlessly:
+the live morph — ears travelling with the shape, blip-to-blip crossfades, the
+card's fade on collapse. Judge on the notch.

@@ -39,6 +39,104 @@ public enum NotchAnimation {
     public static func textAnimation(reduceMotion: Bool) -> Animation {
         reduceMotion ? reduced : textCrossfade
     }
+
+    /// Which spring a transition gets: the confident one when the island
+    /// GROWS, the dull one when it shrinks. By area, not height: height
+    /// alone called peek (179×38) -> activity (255×32) a collapse because
+    /// it is 6pt shorter, and could not tell hidden -> activity (equal
+    /// height) from a no-op at all. Area is monotone in what the eye sees
+    /// — more island or less — for every pair of resting states.
+    nonisolated public static func isExpanding(from: CGSize, to: CGSize) -> Bool {
+        to.width * to.height > from.width * from.height
+    }
+}
+
+/// The island's LIVE size — the spring's interpolated value, not the
+/// target — published to the content subtree by `AnimatedIslandParameters`
+/// so the ears are laid out where the shape actually is on each frame.
+/// `nil` outside the island (tests that render subtrees on their own).
+private struct LiveIslandParametersKey: EnvironmentKey {
+    static let defaultValue: NotchShapeParameters? = nil
+}
+
+extension EnvironmentValues {
+    var liveIslandParameters: NotchShapeParameters? {
+        get { self[LiveIslandParametersKey.self] }
+        set { self[LiveIslandParametersKey.self] = newValue }
+    }
+}
+
+/// Same trick as `ContentFade`: a modifier whose `animatableData` IS the
+/// island's parameters, so SwiftUI hands its `body` the interpolated value
+/// on every frame of the morph, and the environment carries it down to
+/// `IslandEarsRow`. A view body reading `controller.parameters` only ever
+/// sees the target — which is why, before this (2026-09-29), the ears
+/// jumped to their final x on the first frame of every expand/collapse and
+/// were then revealed by the moving clip mask rather than travelling with
+/// the shape.
+struct AnimatedIslandParameters: ViewModifier, Animatable {
+    var parameters: NotchShapeParameters
+
+    nonisolated var animatableData: NotchShapeParameters.AnimatableData {
+        get { parameters.animatableData }
+        set { parameters.animatableData = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.environment(\.liveIslandParameters, parameters)
+    }
+}
+
+/// The ears row, laid out from the LIVE island width (see
+/// `AnimatedIslandParameters`), with both ears keyed on the identity of
+/// what they show: when one blip replaces another at the same island size
+/// (volume expiring back to the artwork, headphones appearing beside it),
+/// the shape does not change, so nothing else would animate — the ears
+/// used to swap instantly. Keying the containers on `key` turns every such
+/// swap into a `.blurReplace` crossfade, and `.animation(value: key)`
+/// supplies the transaction the transition needs.
+private struct IslandEarsRow<Leading: View, Trailing: View>: View {
+    // Spelled-out `Environment`, like every `State` in this file (no macro
+    // plugin on this toolchain).
+    private var _live: Environment<NotchShapeParameters?> = Environment(\.liveIslandParameters)
+    private var live: NotchShapeParameters? { _live.wrappedValue }
+
+    let target: NotchShapeParameters
+    let notch: CGRect
+    let key: String
+    let animation: Animation
+    let leading: Leading
+    let trailing: Trailing
+
+    init(
+        target: NotchShapeParameters, notch: CGRect, key: String, animation: Animation,
+        @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.target = target
+        self.notch = notch
+        self.key = key
+        self.animation = animation
+        self.leading = leading()
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        let width = live?.width ?? target.width
+        let ear = max(0, (width - notch.width) / 2)
+        HStack(spacing: 0) {
+            ZStack { leading }
+                .id(key)
+                .transition(.blurReplace)
+                .frame(width: ear, height: notch.height)
+            Color.clear.frame(width: notch.width, height: notch.height)   // the hole
+            ZStack { trailing }
+                .id(key)
+                .transition(.blurReplace)
+                .frame(width: ear, height: notch.height)
+        }
+        .animation(animation, value: key)
+        .frame(width: width, height: notch.height)
+    }
 }
 
 /// Fades island content in as the shape grows, so text never appears before there
@@ -179,9 +277,10 @@ public struct NotchRootView: View {
     public var body: some View {
         let parameters = controller.parameters
         let shape = NotchShape(parameters)
-        let expanding = parameters.height == previousHeight
-            ? parameters.width > previousWidth
-            : parameters.height > previousHeight
+        let expanding = NotchAnimation.isExpanding(
+            from: CGSize(width: previousWidth, height: previousHeight),
+            to: CGSize(width: parameters.width, height: parameters.height)
+        )
 
         let expanded = controller.state == .expanded
         let showEffects = expanded && !visualEffectsSuppressed
@@ -203,6 +302,10 @@ public struct NotchRootView: View {
                 // the island actually is.
                 .overlay(alignment: .top) {
                     islandContent(parameters: parameters)
+                        // Interpolated size for the ears — see
+                        // `AnimatedIslandParameters`. Driven by the same
+                        // `.animation(value: parameters)` below as the shape.
+                        .modifier(AnimatedIslandParameters(parameters: parameters))
                         .modifier(ContentFade(
                             // `ContentFade` is `Animatable`: handing it a
                             // plain 0/1 target lets SwiftUI interpolate this
@@ -281,26 +384,49 @@ public struct NotchRootView: View {
         #endif
 
         VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                leadingEar.frame(width: ear, height: notch.height)
-                Color.clear.frame(width: notch.width, height: notch.height)   // the hole
-                trailingEar.frame(width: ear, height: notch.height)
-            }
+            IslandEarsRow(
+                target: parameters,
+                notch: notch,
+                key: earContentKey,
+                animation: NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                leading: { leadingEar },
+                trailing: { trailingEar }
+            )
+            // Gated on the TARGET height, so the card is inserted on the
+            // first frame of an expand and removed on the first frame of a
+            // collapse — and `.transition(.blurReplace)` then fades and
+            // sharpens it over the spring (the root's `.animation(value:
+            // parameters)` is the transaction). Before this the card was
+            // simply sliced by the moving clip mask on the way out.
             if parameters.height > notch.height + 8 {
                 detailRow
                     .frame(maxWidth: .infinity)
-                    // `alignment: .top`, not the default `.center`: if the
-                    // detail row's content is ever taller than its budget
-                    // (e.g. two priority-2 activities each with a title),
-                    // the excess must overflow DOWNWARD, where the
-                    // `.clipShape` below trims it invisibly — never upward,
-                    // which would paint over the ear row and the notch
-                    // rect itself. Caught by `NotchRenderTests`.
+                    // `alignment: .top`, not the default `.center`: content
+                    // taller than its budget must overflow DOWNWARD, where
+                    // the `.clipShape` below trims it invisibly — never
+                    // upward into the ear row and the notch rect. Caught by
+                    // `NotchRenderTests`.
                     .frame(height: parameters.height - notch.height, alignment: .top)
+                    // Target width, not live: the card's text must not
+                    // reflow mid-morph.
+                    .frame(width: parameters.width)
+                    .transition(.blurReplace)
             }
         }
-        .frame(width: parameters.width, alignment: .top)
         .foregroundStyle(contentColor)
+    }
+
+    /// What the ears are currently ABOUT — the leading activity and whether
+    /// media sits behind it — not what they show pixel for pixel (a value
+    /// ticking 87% -> 86% keeps its own inner `.id`). Changing this is what
+    /// crossfades both ears; see `IslandEarsRow`. Deliberately excludes
+    /// `state == .expanded`: the artwork's hand-off to the panel at expand
+    /// is a `matchedGeometryEffect` hero, and re-keying the ear container
+    /// at that moment would fade a ghost of the artwork in place beside the
+    /// flying copy.
+    private var earContentKey: String {
+        let first = controller.activities.first
+        return "\(first?.id ?? "-")|\(controller.media == nil ? 0 : 1)"
     }
 
     /// Spec §6/§10: content must stay inside the island's own rect and clear
