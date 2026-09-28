@@ -139,6 +139,23 @@ private func someMedia() -> MediaPresentation {
     #expect(empty.state == .peek, "nothing to show — a click must not open an empty slab")
 }
 
+/// A device blip never grows the island: alone it is the one-activity
+/// island; over music it is STILL the one-activity island (artwork left,
+/// device icon right), never the two-slot layout.
+@MainActor
+@Test func aLeadingDeviceActivityKeepsTheCompactIslandEvenOverMusic() {
+    let c = makeController()
+    let device = NotchController.ActivityDisplay(id: "device", title: "External Headphones", symbolName: "headphones")
+    c.setActivities([device], overflow: 0)
+    #expect(c.isDeviceLeading)
+    #expect(c.parameters == c.metrics.oneActivity)
+
+    c.setMedia(someMedia())
+    c.setActivities([device, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.isDeviceLeading)
+    #expect(c.parameters == c.metrics.oneActivity, "headphones plugged in while music plays is an ear swap, not a slab")
+}
+
 // MARK: - Lock screen (spec §7)
 
 @MainActor

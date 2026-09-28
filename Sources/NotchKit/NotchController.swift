@@ -177,6 +177,19 @@ public final class NotchController {
         activities.first?.id == Self.hudActivityID
     }
 
+    /// `AppModel` inserts every device (output-route) record with this id.
+    public static let deviceActivityID = "device"
+
+    /// A device blip leads. It never grows the island (user's call,
+    /// 2026-09-28, after "External Headphones" landed in the two-slot
+    /// layout over music): the island stays at one-activity size, and with
+    /// music playing the artwork keeps the leading ear while the device's
+    /// icon takes the trailing one for the blip's 3s — "what just
+    /// connected" reads as a swap in the ear, not a slab with a caption.
+    public var isDeviceLeading: Bool {
+        activities.first?.id == Self.deviceActivityID
+    }
+
     public var parameters: NotchShapeParameters {
         switch state {
         case .hidden:
@@ -185,6 +198,7 @@ public final class NotchController {
             return metrics.peek
         case .activity:
             if isHUDLeading { return metrics.hud }
+            if isDeviceLeading { return metrics.oneActivity }
             return activityCount >= 2 ? metrics.twoActivities : metrics.oneActivity
         case .expanded:
             return metrics.expanded

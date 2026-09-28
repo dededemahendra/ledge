@@ -999,3 +999,22 @@ panels, and the user looking at the real lock screen:
   anything else.
 
 Conclusion: parked. See spec §7.
+
+# Device blip over music (2026-09-28)
+
+User screenshot: "External Headphones" plugged in with music playing landed
+in the two-slot layout (laptop glyph top-left, name under the hole, empty
+slab). Now: `NotchController.isDeviceLeading` keeps the one-activity island;
+with media present the artwork stays left and the device icon replaces the
+visualizer/progress sliver on the right (`NotchRootView.deviceIcon`). The
+jack's "External Headphones" gets the headphones glyph (name beats transport).
+
+## Verified
+
+- `make test`: controller size rule, glyph mapping, render test for the
+  over-music case, headless snapshot of both ears.
+
+## Not verified
+
+- Live: plug/unplug headphones while playing — expect the right ear to swap
+  to the headphones glyph for 3 s and back to the visualizer.

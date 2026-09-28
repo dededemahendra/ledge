@@ -696,3 +696,25 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(lockedHeight < interactiveHeight,
             "display-only \(lockedHeight)pt should be shorter than interactive \(interactiveHeight)pt: the control row must be gone")
 }
+
+/// Device blip over music, the user's screenshot case: the island stays at
+/// one-activity size with the artwork in the leading ear and the device's
+/// glyph in the trailing one — both inside the island, clear of the notch.
+@MainActor
+@Test func deviceGlyphOverMusicRendersInTheTrailingEarInsideTheIsland() {
+    let controller = makeController()
+    controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    controller.setActivities(
+        [.init(id: "device", title: "External Headphones", symbolName: "headphones"),
+         .init(id: "media", title: "Song", detail: "Artist")],
+        overflow: 0
+    )
+    #expect(controller.parameters == controller.metrics.oneActivity)
+
+    let result = renderAndClassify(controller)
+    #expect(result.hasContentInsideIsland, "neither the artwork placeholder nor the glyph rendered")
+    #expect(result.contentInsideNotchCount == 0,
+            "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect \(result.holeRect)")
+    #expect(result.contentOutsideIslandCount == 0,
+            "\(result.contentOutsideIslandCount) content pixel(s) outside the island bounds \(result.islandBounds)")
+}

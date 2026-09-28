@@ -372,7 +372,20 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if let activity = controller.activities.first,
+        if controller.isDeviceLeading, let media = controller.media, controller.state != .expanded {
+            // Device blip over music: the artwork stays put and the device
+            // goes to the trailing ear (see `NotchController.isDeviceLeading`
+            // and `deviceIcon` below). Not at `.expanded`, where the panel
+            // owns the artwork and this slot must yield it (same hero-pair
+            // rule as the media branch further down).
+            mediaArtwork(media)
+                .id(media.title)
+                .transition(.blurReplace)
+                .animation(
+                    NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                    value: media.title
+                )
+        } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
             // tall in a 32pt ear, width from the render's own aspect (the
@@ -479,6 +492,34 @@ public struct NotchRootView: View {
         }
     }
 
+    /// A device's icon for an ear: the system's product render when there
+    /// is one (24pt tall, own transparency, no sticker box), else its SF
+    /// Symbol at the ear glyph size. Keyed on the title so one device
+    /// replacing another inside the 3s window crossfades.
+    @ViewBuilder
+    private func deviceIcon(_ activity: NotchController.ActivityDisplay) -> some View {
+        Group {
+            if let data = activity.artwork, let image = NSImage(data: data) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(height: 24)
+            } else if let symbol = activity.symbolName {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .medium))
+            } else {
+                Color.clear
+            }
+        }
+        .id(activity.title)
+        .transition(.blurReplace)
+        .animation(
+            NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+            value: activity.title
+        )
+    }
+
     /// The HUD ear's word. 12pt semibold measured off the reference HUD
     /// ("Sound" ≈ 35pt, "Display" ≈ 41pt wide), so glyph slot + label sit
     /// inside the 90pt ear with room to spare. Keyed and animated like every
@@ -538,7 +579,12 @@ public struct NotchRootView: View {
     /// three digits at a glance, so volume/brightness now show glyph + bar;
     /// battery keeps glyph + `87%`, having no `barFill` to prefer.
     @ViewBuilder private var trailingEar: some View {
-        if controller.isHUDLeading, let fill = controller.activities.first?.barFill {
+        if controller.isDeviceLeading, controller.media != nil, controller.state != .expanded,
+           let activity = controller.activities.first {
+            // The device's icon in place of the visualizer/progress sliver
+            // for the blip's lifetime — see `leadingEar`'s first branch.
+            deviceIcon(activity)
+        } else if controller.isHUDLeading, let fill = controller.activities.first?.barFill {
             // A live HUD owns both ears (see `NotchController.isHUDLeading`):
             // the level bar beats the overflow pip, which would otherwise
             // replace it the moment music was playing behind a volume press.

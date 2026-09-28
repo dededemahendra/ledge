@@ -40,6 +40,8 @@ import CoreAudio
     #expect(DeviceEvent.outputChanged(name: "Living Room", transport: .airPlay, batteryPercent: nil).symbolName == "airplay.audio")
     #expect(DeviceEvent.outputChanged(name: "Studio Display", transport: .usb, batteryPercent: nil).symbolName == "speaker.wave.2")
     #expect(DeviceEvent.outputChanged(name: "MacBook Air Speakers", transport: .builtIn, batteryPercent: nil).symbolName == "laptopcomputer")
+    #expect(DeviceEvent.outputChanged(name: "External Headphones", transport: .builtIn, batteryPercent: nil).symbolName == "headphones",
+            "the headphone jack is the built-in device renamed — the name wins over the transport")
 }
 
 @Test func transportMappingCoversTheCommonTypesAndDefaultsToOther() {

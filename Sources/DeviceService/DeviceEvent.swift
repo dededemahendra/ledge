@@ -45,6 +45,10 @@ public enum DeviceEvent: Sendable, Equatable {
             if lower.contains("airpods pro") { return "airpods.pro" }
             if lower.contains("airpods")     { return "airpods" }
             if lower.contains("beats")       { return "beats.headphones" }
+            // The headphone jack is the BUILT-IN device renamed ("External
+            // Headphones"), so the name has to win over the transport here
+            // or wired headphones get the laptop glyph.
+            if lower.contains("headphone")   { return "headphones" }
             switch transport {
             case .bluetooth:                       return "headphones"
             case .airPlay:                         return "airplay.audio"

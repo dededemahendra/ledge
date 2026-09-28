@@ -504,6 +504,10 @@ the Bluetooth link observer was dropped:
   Real-time 3D (SceneKit/USDZ) was considered and rejected: no AirPods models
   ship with macOS, third-party ones carry licences, and a 24pt ear cannot show
   depth a still render does not already give.
+- **Never grows the island (2026-09-28, user's call):** a device blip is the
+  one-activity island even with music behind it — artwork stays in the
+  leading ear, the device's render/glyph takes the trailing ear for 3 s. The
+  device NAME is not shown while music plays; the icon is the message.
 - Battery from the `IORegistry` (`AppleDeviceManagementHIDEventService`:
   `Product` + `BatteryPercent`), name-matched loosely. No `system_profiler`
   fallback — too slow for a 3 s activity.
