@@ -139,6 +139,45 @@ private func someMedia() -> MediaPresentation {
     #expect(empty.state == .peek, "nothing to show — a click must not open an empty slab")
 }
 
+// MARK: - Lock screen (spec §7)
+
+@MainActor
+@Test func lockingShowsTheNowPlayingPanelAndUnlockingRestoresTheCompactIsland() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.state == .activity)
+
+    c.setLocked(true)
+    #expect(c.isLocked)
+    #expect(c.state == .expanded, "on the lock screen the now-playing card is the whole point")
+    #expect(!c.isPinnedOpen, "a lock is not a pin: unlocking must close it")
+
+    c.setLocked(false)
+    #expect(c.state == .activity)
+}
+
+@MainActor
+@Test func lockingWithNothingPlayingShowsNothingExtra() {
+    let c = makeController()
+    c.setLocked(true)
+    #expect(c.state == .hidden, "no media, no activity — an empty slab on the lock screen would be noise")
+
+    c.setActivities([.init(id: "power", title: "Charging · 42%", compactText: "42%")], overflow: 0)
+    #expect(c.state == .activity, "charging state still shows in the ears while locked, at activity size")
+    #expect(c.parameters == c.metrics.oneActivity)
+}
+
+@MainActor
+@Test func aPinnedPanelSurvivesLockAndUnlock() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.click()
+    c.setLocked(true)
+    c.setLocked(false)
+    #expect(c.state == .expanded && c.isPinnedOpen)
+}
+
 @MainActor
 @Test func activityShowsWithoutHoverAndRestsOnActivityState() {
     let c = makeController()

@@ -953,3 +953,22 @@ changed: a tap on a hover-opened panel no longer pins it
 - On screen: with the panel open, clicking a Superset tab under the canvas
   (screen x 415–1055, y 0–320) must land on Superset AND close a pinned panel.
   Hover, then click a panel button, must still work.
+
+# Lock-screen presence (2026-09-28)
+
+## Verified
+
+- `make test`: lock → expanded with media (not pinned), unlock → back; lock
+  with nothing playing → hidden, with a power activity → activity size; a
+  pinned panel survives lock/unlock; the observer maps exactly the two
+  `loginwindow` notifications; the display-only card renders inside the
+  island and clear of the notch.
+
+## Not verified
+
+- On the real lock screen (⌃⌘Q with music playing): the card should appear
+  hanging from the notch above the lock UI, without the five control
+  buttons, with the scrubber still ticking; unlocking should collapse it to
+  the compact island. Whether the display-only card is worth keeping at all
+  is a judgement to make there — the spec sequenced this last so it can be
+  cut without touching anything else.

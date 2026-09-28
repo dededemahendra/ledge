@@ -661,3 +661,38 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(result.contentOutsideIslandCount == 0,
             "\(result.contentOutsideIslandCount) render pixel(s) outside the island bounds \(result.islandBounds)")
 }
+
+// MARK: - Lock screen (2026-09-28)
+
+/// The display-only card (`MediaPanelView.displayOnly`, driven by
+/// `NotchController.isLocked`) must render inside the island and clear of
+/// the notch exactly like the interactive one — and, being one row
+/// shorter, must measure strictly less ideal height than it, which is the
+/// only cheap proof that the control row really is gone rather than
+/// merely disabled.
+@MainActor
+@Test func lockedMediaPanelRendersInsideTheIslandWithoutItsControlRow() {
+    func controller(locked: Bool) -> NotchController {
+        let c = makeController()
+        c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+        c.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 30, duration: 200))
+        if locked { c.setLocked(true) } else { c.click() }
+        return c
+    }
+
+    let locked = controller(locked: true)
+    #expect(locked.state == .expanded)
+    #expect(!locked.isPinnedOpen)
+
+    let result = renderAndClassify(locked)
+    #expect(result.hasContentInsideIsland, "the display-only card did not render")
+    #expect(result.contentInsideNotchCount == 0,
+            "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect \(result.holeRect)")
+    #expect(result.contentOutsideIslandCount == 0,
+            "\(result.contentOutsideIslandCount) content pixel(s) outside the island bounds \(result.islandBounds)")
+
+    let lockedHeight = NSHostingView(rootView: NotchRootView(controller: locked).detailRowForTesting).fittingSize.height
+    let interactiveHeight = NSHostingView(rootView: NotchRootView(controller: controller(locked: false)).detailRowForTesting).fittingSize.height
+    #expect(lockedHeight < interactiveHeight,
+            "display-only \(lockedHeight)pt should be shorter than interactive \(interactiveHeight)pt: the control row must be gone")
+}

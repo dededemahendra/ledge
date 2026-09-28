@@ -18,6 +18,7 @@ public final class NotchPresenter {
     /// center cannot be removed via the other, so this is tracked and torn
     /// down separately.
     private var reduceMotionObserver: NSObjectProtocol?
+    private var lockObserver: LockScreenObserver?
 
     public init() {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -51,6 +52,16 @@ public final class NotchPresenter {
                 self?.controller.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
             }
         }
+
+        // Lock screen, spec §7: raise the window above the lock shield and
+        // switch the controller to display-only while `loginwindow` owns
+        // the screen. Built last, as the spec sequenced it; nothing else
+        // depends on it and it can be removed without touching anything.
+        let lock = LockScreenObserver { [weak self] locked in
+            self?.setLocked(locked)
+        }
+        lock.start()
+        lockObserver = lock
 
         // Mouse tracking: the window is click-through, so hover is observed globally
         // and filtered against the island rect. Mouse-moved monitors need no permission.
@@ -117,8 +128,21 @@ public final class NotchPresenter {
         clickOutsideMonitor = nil
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
         escapeMonitor = nil
+        lockObserver?.stop()
+        lockObserver = nil
         window?.orderOut(nil)
         window = nil
+    }
+
+    /// Screen locked/unlocked (`LockScreenObserver`). The window's level
+    /// and the controller's mode change together, then the usual resync —
+    /// which also orders the window in at its new level if there is
+    /// something to show. `NotchWindow.setLocked` existed from the start
+    /// but had no caller until 2026-09-28.
+    public func setLocked(_ locked: Bool) {
+        window?.setLocked(locked)
+        controller.setLocked(locked)
+        syncWindowToVisibility()
     }
 
     /// Opens or collapses the panel on demand (e.g. the menu bar's "Toggle

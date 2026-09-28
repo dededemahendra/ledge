@@ -196,6 +196,19 @@ public final class NotchController {
         recomputeState()
     }
 
+    /// The screen is locked (`loginwindow` owns it). Spec §7: lock-screen
+    /// mode is display-only — with media playing the panel shows the
+    /// now-playing card without its controls (`NotchRootView` reads this
+    /// flag to strip them), since a panel above the lock shield can render
+    /// but cannot reliably take clicks. Charging/HUD/device activities keep
+    /// appearing in the ears exactly as when unlocked.
+    public private(set) var isLocked = false
+
+    public func setLocked(_ locked: Bool) {
+        isLocked = locked
+        recomputeState()
+    }
+
     /// A no-op with no island to expand (zero-width notch rect — no notch on
     /// this Mac, or a display-hot-plug gap). Without this guard, "Toggle
     /// Panel" latches `.expanded` with no window ever created to show it,
@@ -298,6 +311,11 @@ public final class NotchController {
     /// inside the small shape is still inside the big one.
     private func recomputeState() {
         if isPinnedOpen {
+            state = .expanded
+        } else if isLocked, media != nil {
+            // Lock screen: now-playing stays up, display-only (see
+            // `setLocked`). Above `isHovered` only for clarity — with the
+            // cursor also there the outcome is the same.
             state = .expanded
         } else if isHovered, media != nil {
             state = .expanded

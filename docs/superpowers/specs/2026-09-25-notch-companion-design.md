@@ -535,6 +535,13 @@ enabled**.
 
 ### LockScreenService — fragile, built last
 
+**Built 2026-09-28** as `LockScreenObserver` (NotchKit) + `NotchPresenter.setLocked`
++ `NotchController.isLocked`: with media playing, a locked screen shows the
+now-playing card in **display-only** form — artwork, title, artist, progress
+and times, no control row, no drag on the scrubber. Nothing playing: nothing
+extra; charging/HUD/device activities keep appearing in the ears at their
+usual size, above the shield. A pinned panel survives lock/unlock.
+
 - Detect lock and unlock via the `com.apple.screenIsLocked` and
   `com.apple.screenIsUnlocked` distributed notifications.
 - Raise the panel to `CGShieldingWindowLevel() + 1` while locked.

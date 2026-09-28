@@ -39,6 +39,12 @@ struct MediaPanelView: View {
     /// valid here at all; see the call-site comment there.
     let artworkNamespace: Namespace.ID
     let emit: (NotchIntent) -> Void
+    /// Lock-screen mode (spec §7): metadata and progress only. The control
+    /// row is dropped rather than shown inert — a button that cannot be
+    /// pressed is a lie — and the scrubber keeps ticking but does not take
+    /// a drag. Clicks cannot reliably reach a panel above the lock shield
+    /// anyway, so the visible surface should promise nothing it can't do.
+    let displayOnly: Bool
 
     /// In-progress scrub position, `nil` when not dragging. While non-nil the
     /// filled bar renders from THIS, 1:1 with the pointer — feedback must be
@@ -62,7 +68,8 @@ struct MediaPanelView: View {
         contentColor: Color,
         accent: Color,
         artworkNamespace: Namespace.ID,
-        emit: @escaping (NotchIntent) -> Void
+        emit: @escaping (NotchIntent) -> Void,
+        displayOnly: Bool = false
     ) {
         self.media = media
         self.reduceMotion = reduceMotion
@@ -70,13 +77,16 @@ struct MediaPanelView: View {
         self.accent = accent
         self.artworkNamespace = artworkNamespace
         self.emit = emit
+        self.displayOnly = displayOnly
     }
 
     var body: some View {
         VStack(spacing: 7) {
             headerRow
             scrubRow
-            controlsRow
+            if !displayOnly {
+                controlsRow
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -200,7 +210,12 @@ struct MediaPanelView: View {
                     value: dragging
                 )
                 .contentShape(Rectangle())
-                .highPriorityGesture(scrubGesture(width: geometry.size.width))
+                // `.subviews` masks out the added gesture only — the
+                // display-only card keeps its bar but takes no drag.
+                .highPriorityGesture(
+                    scrubGesture(width: geometry.size.width),
+                    including: displayOnly ? .subviews : .all
+                )
             }
             .frame(height: 18)   // the whole strip is the hit target (~10pt slop rule)
 
