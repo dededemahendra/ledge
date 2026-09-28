@@ -157,9 +157,11 @@ public struct NotchRootView: View {
     private var artworkNamespace: Namespace.ID { _artworkNamespace.wrappedValue }
 
     /// Accent derived from the current artwork (`ArtworkAccent`), cached here
-    /// so the compact ear's visualizer bars and the expanded card always
-    /// agree, and recomputed only when the artwork actually changes (see the
-    /// `.onChange` in `body`) — never per frame.
+    /// so both surfaces would agree, and recomputed only when the artwork
+    /// actually changes (see the `.onChange` in `body`) — never per frame.
+    /// As of 2026-09-28 nothing draws with it any more (the compact ear's
+    /// bars went white at the user's request); kept wired, cheap, in case
+    /// a tint comes back.
     private var _accent: State<Color> = State(initialValue: ArtworkAccent.fallback)
     private var accent: Color {
         get { _accent.wrappedValue }
@@ -636,8 +638,13 @@ public struct NotchRootView: View {
                 // brief's notch-edge progress ring stays impossible: it
                 // would draw across the cutout. At `.expanded` the panel
                 // takes over and this yields to the fallback below.
+                // White, like the card's own bars — not the artwork accent
+                // (user's call, 2026-09-28): the island is a flat black
+                // slab with white content everywhere else, and a coloured
+                // ear read as a different object. Same 0.85/paused-dim
+                // pair the card uses.
                 AudioVisualizerBars(
-                    color: effectiveAccent.opacity(media.isPlaying ? 1 : 0.4),
+                    color: contentColor.opacity(media.isPlaying ? 0.85 : 0.3),
                     isAnimating: media.isPlaying && !controller.reduceMotion
                 )
             } else {
