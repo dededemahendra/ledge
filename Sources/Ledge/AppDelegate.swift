@@ -20,24 +20,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.model = model
 
         let item = StatusItemController()
-        item.setStatus(key: "app", text: "Ledge — running")
-        item.setStatus(key: "power", text: "Power — \(model.powerStatus)")
-        item.setStatus(key: "hud", text: "HUD — \(model.hudStatus)")
-        item.setStatus(key: "systemhud", text: "System HUD — \(model.systemHUDStatus)")
-        item.setStatus(key: "media", text: "Media — \(model.mediaStatus)")
+        // Rows are (re)written by `refreshStatusRows` — at launch, after a
+        // toggle, and whenever a service reports a change — so a service
+        // dying or recovering mid-session never leaves launch-time text
+        // behind. `setStatus` updates in place by key.
+        func refreshStatusRows() {
+            item.setStatus(key: "app", text: "Ledge — running")
+            item.setStatus(key: "power", text: "Power — \(model.powerStatus)")
+            item.setStatus(key: "hud", text: "HUD — \(model.hudStatus)")
+            item.setStatus(key: "systemhud", text: "System HUD — \(model.systemHUDStatus)")
+            item.setStatus(key: "media", text: "Media — \(model.mediaStatus)")
+        }
+        refreshStatusRows()
         item.addItem(title: "Toggle Panel") { [weak presenter] in
             presenter?.toggle()
         }
-        item.addItem(title: "Toggle System HUD Replacement") { [weak model, weak item] in
+        item.addItem(title: "Toggle System HUD Replacement") { [weak model] in
             model?.toggleStockOSDSuppression()
-            if let model { item?.setStatus(key: "systemhud", text: "System HUD — \(model.systemHUDStatus)") }
+            refreshStatusRows()
         }
-        // The Accessibility grant usually lands AFTER launch (the user
-        // flips the switch in System Settings); keep the row honest.
-        model.onSystemHUDStatusChange = { [weak model, weak item] in
-            guard let model else { return }
-            item?.setStatus(key: "systemhud", text: "System HUD — \(model.systemHUDStatus)")
-        }
+        model.onStatusChange = { refreshStatusRows() }
         statusItem = item
 
         Self.log.info("launched; notch \(String(describing: presenter.controller.metrics.notchRect))")

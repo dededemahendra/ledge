@@ -43,11 +43,16 @@ final class AppModel {
         case .unavailable:               return "off"
         }
     }
-    /// Fires on the main actor when `systemHUDStatus` changes (e.g. the
-    /// Accessibility grant lands while running). `AppDelegate` refreshes
-    /// its menu row from it.
-    var onSystemHUDStatusChange: (() -> Void)? {
-        didSet { hud.onSystemHUDReplacementChange = { [weak self] _ in self?.onSystemHUDStatusChange?() } }
+    /// Fires on the main actor whenever any status row's text may have
+    /// changed: the Accessibility grant landing, media giving up or
+    /// recovering. `AppDelegate` refreshes every row from it — cheaper to
+    /// reason about than one hook per service, and the rows are four
+    /// strings.
+    var onStatusChange: (() -> Void)? {
+        didSet {
+            hud.onSystemHUDReplacementChange = { [weak self] _ in self?.onStatusChange?() }
+            media.onAvailabilityChange = { [weak self] _ in self?.onStatusChange?() }
+        }
     }
 
     func toggleStockOSDSuppression() {
@@ -266,7 +271,18 @@ final class AppModel {
     private func evictUnavailableServices() {
         if !power.availability.isAvailable { queue.remove(kind: .power) }
         if !hud.availability.isAvailable { queue.remove(kind: .hud) }
-        if !media.availability.isAvailable { queue.remove(kind: .media) }
+        if !media.availability.isAvailable {
+            queue.remove(kind: .media)
+            // The activity is not the only thing a dead media service leaves
+            // behind: `controller.media` is what hover opens the panel for,
+            // and the position tick keeps advancing it. Clear both, or a
+            // stale now-playing card stays one hover away after the adapter
+            // has given up.
+            if presenter.controller.media != nil {
+                presenter.controller.setMedia(nil)
+                stopPositionTicking()
+            }
+        }
     }
 
     private func publish() {

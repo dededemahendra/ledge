@@ -117,18 +117,29 @@ final class MediaRemoteSource {
     }
 
     /// Capability probe. Exit 0 means MediaRemote access still works.
-    static func probe(locator: AdapterLocator) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
-        process.arguments = locator.testArguments()
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
+    ///
+    /// `async`, resumed from the process's termination handler — never
+    /// `waitUntilExit()`. This used to block whichever thread called it,
+    /// and `MediaService.start()` called it from inside its `AsyncStream`
+    /// builder, which Swift runs synchronously at stream creation on the
+    /// main actor: a slow perl start-up (cold disk, busy machine) stalled
+    /// app launch, menu bar item included.
+    static func probe(locator: AdapterLocator) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+            process.arguments = locator.testArguments()
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            process.terminationHandler = { finished in
+                continuation.resume(returning: finished.terminationStatus == 0)
+            }
+            do {
+                try process.run()
+            } catch {
+                // `run()` throwing means the handler will never fire.
+                continuation.resume(returning: false)
+            }
         }
     }
 }

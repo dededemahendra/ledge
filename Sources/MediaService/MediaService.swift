@@ -12,7 +12,13 @@ import OSLog
 public final class MediaService {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "media")
 
-    public private(set) var availability: ServiceAvailability = .available
+    public private(set) var availability: ServiceAvailability = .available {
+        didSet { if availability != oldValue { onAvailabilityChange?(availability) } }
+    }
+    /// Fired on the main actor whenever `availability` changes — a give-up,
+    /// a failed probe, or a later recovery — so the menu bar row can follow
+    /// instead of showing launch-time text forever.
+    public var onAvailabilityChange: ((ServiceAvailability) -> Void)?
     public private(set) var current = MediaPayload()
 
     private let locator: AdapterLocator?
@@ -21,6 +27,9 @@ public final class MediaService {
     private var policy = RestartPolicy()
     private var continuation: AsyncStream<MediaPayload>.Continuation?
     private var restartTask: Task<Void, Never>?
+    private var probeTask: Task<Void, Never>?
+    private var recoveryTask: Task<Void, Never>?
+    private var recoveryAttempts = 0
     private var sawUsableOutput = false
 
     public init(locator: AdapterLocator? = AdapterLocator.inMainBundle()) {
@@ -54,17 +63,31 @@ public final class MediaService {
                 return
             }
 
+            // A fresh policy per `start()`: `RestartPolicy.fatal` is a latch
+            // by design (the README's "do not reinvoke"), but it must not
+            // outlive the process it judged — a second `start()` launches a
+            // new one.
+            policy = RestartPolicy()
+            recoveryAttempts = 0
+            availability = .available
+
             // Probe before streaming, so a broken MediaRemote entitlement is a
             // clean `unavailable` rather than a dead stream nobody notices.
-            guard MediaRemoteSource.probe(locator: locator) else {
-                availability = .unavailable(reason: "MediaRemote access blocked")
-                Self.log.info("adapter test probe failed; media disabled")
-                continuation.finish()
-                return
+            // Off the main actor's synchronous path: see `probe`'s doc
+            // comment for the launch stall this used to cause. Until it
+            // answers, `availability` stays at its provisional `.available`.
+            probeTask = Task { @MainActor [weak self] in
+                let ok = await MediaRemoteSource.probe(locator: locator)
+                guard let self, !Task.isCancelled else { return }
+                self.probeTask = nil
+                guard ok else {
+                    self.availability = .unavailable(reason: "MediaRemote access blocked")
+                    Self.log.info("adapter test probe failed; media disabled, will re-probe")
+                    self.scheduleRecovery()
+                    return
+                }
+                self.launch()
             }
-
-            availability = .available
-            launch()
 
             continuation.onTermination = { [weak self] _ in
                 // `[weak self]` on THIS closure, not the inner `Task`: this
@@ -85,6 +108,10 @@ public final class MediaService {
     }
 
     public func stop() {
+        probeTask?.cancel()
+        probeTask = nil
+        recoveryTask?.cancel()
+        recoveryTask = nil
         restartTask?.cancel()
         restartTask = nil
         source?.terminate()
@@ -146,14 +173,43 @@ public final class MediaService {
                 self?.launch()
             }
         case .giveUp(let reason):
-            // Routed through `stop()` rather than a bare `continuation?.finish()`:
-            // same ordering requirement as everywhere else `finish()` is called --
-            // `onTermination` must be cleared first, or its `Task { self?.stop() }`
-            // fires after this method's own cleanup and re-enters harmlessly but
-            // redundantly. `stop()` already does this correctly in one place.
+            // The stream is deliberately NOT finished here (it used to be,
+            // via `stop()`): finishing it ended `AppModel`'s `for await`
+            // for good, so one bad adapter exit disabled media until the
+            // app was relaunched. Instead the process stays down, the
+            // README's "do not reinvoke on a fatal error" is honoured, and
+            // `scheduleRecovery()` waits a while before asking the adapter's
+            // own `test` command whether access works again. Only a passing
+            // probe launches a new process, under a fresh policy.
             availability = .unavailable(reason: reason)
-            Self.log.error("media given up: \(reason, privacy: .public)")
-            stop()
+            Self.log.error("media given up: \(reason, privacy: .public); will re-probe")
+            scheduleRecovery()
+        }
+    }
+
+    /// See `handleExit`'s give-up branch. Backoff from
+    /// `RestartPolicy.recoveryDelay`; cancelled by `stop()`.
+    private func scheduleRecovery() {
+        guard let locator else { return }
+        recoveryAttempts += 1
+        let delay = RestartPolicy.recoveryDelay(attempt: recoveryAttempts)
+        recoveryTask?.cancel()
+        recoveryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            let ok = await MediaRemoteSource.probe(locator: locator)
+            guard let self, !Task.isCancelled else { return }
+            self.recoveryTask = nil
+            guard ok else {
+                Self.log.info("media re-probe failed (attempt \(self.recoveryAttempts)); backing off")
+                self.scheduleRecovery()
+                return
+            }
+            Self.log.info("media re-probe passed; relaunching adapter")
+            self.policy = RestartPolicy()
+            self.recoveryAttempts = 0
+            self.availability = .available
+            self.launch()
         }
     }
 }

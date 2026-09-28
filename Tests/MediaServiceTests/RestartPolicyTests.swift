@@ -52,3 +52,26 @@ import Foundation
     p.noteHealthy()
     #expect(p.decide(.clean) == .restart(after: 0.5), "backoff starts over after a good run")
 }
+
+/// Recovery after a give-up is paced separately from restart backoff: a
+/// minute, doubling, capped at ten — generous, because nothing is reinvoked
+/// until the adapter's own `test` command passes.
+@Test func recoveryDelayStartsAtAMinuteDoublesAndCaps() {
+    #expect(RestartPolicy.recoveryDelay(attempt: 1) == 60)
+    #expect(RestartPolicy.recoveryDelay(attempt: 2) == 120)
+    #expect(RestartPolicy.recoveryDelay(attempt: 4) == 480)
+    #expect(RestartPolicy.recoveryDelay(attempt: 5) == 600)
+    #expect(RestartPolicy.recoveryDelay(attempt: 50) == RestartPolicy.recoveryCap)
+    #expect(RestartPolicy.recoveryDelay(attempt: 0) == 60, "a bad attempt number still waits the floor")
+}
+
+/// The fatal latch belongs to the process it judged. `MediaService` builds a
+/// fresh policy per `start()` and per successful recovery; this pins that a
+/// fresh value really does start clean, which is what makes that reset
+/// meaningful.
+@Test func aFreshPolicyForgetsAnEarlierFatalExit() {
+    var old = RestartPolicy()
+    #expect(old.decide(.nonZero(1)) == .giveUp(reason: "adapter exited with status 1; not reinvoking"))
+    var fresh = RestartPolicy()
+    #expect(fresh.decide(.clean) == .restart(after: 0.5))
+}

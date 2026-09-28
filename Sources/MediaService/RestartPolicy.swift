@@ -33,6 +33,20 @@ public struct RestartPolicy: Sendable {
         return min(delay, backoffCap)
     }
 
+    /// How long to wait before PROBING again after a give-up. Distinct from
+    /// `backoff` on purpose: that one paces reinvocations of a process that
+    /// keeps exiting; this one paces a capability test (the adapter's own
+    /// `test` command) after the README's "do not reinvoke on a fatal
+    /// error" has been honoured. Nothing is reinvoked until the probe
+    /// passes, so this can be generous — a minute, doubling to ten.
+    public static let recoveryFloor: TimeInterval = 60
+    public static let recoveryCap: TimeInterval = 600
+
+    public static func recoveryDelay(attempt: Int) -> TimeInterval {
+        let delay = recoveryFloor * pow(2, Double(max(0, attempt - 1)))
+        return min(delay, recoveryCap)
+    }
+
     /// Call after the adapter has produced usable output, so a long healthy run
     /// does not count earlier stumbles against it.
     public mutating func noteHealthy() {
