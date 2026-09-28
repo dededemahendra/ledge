@@ -1073,3 +1073,21 @@ brightness HUD is now the one-activity island — glyph (waves/rays lit by
 level) left, "50%" right; mute is the slashed speaker + "0%". The wide HUD
 island (`NotchMetrics.hud`, `hudEarWidth`), the ear label and the bar are
 removed. HUD, power and device blips now share one ear vocabulary.
+
+# Output switching in the panel (2026-09-29)
+
+## Verified
+
+- `make test`: glyph vocabulary shared with the route blip; the catalog on
+  this machine lists ≥1 output with exactly one default and unique UIDs;
+  re-setting the current default succeeds and an unknown UID is refused;
+  controller stores outputs and forwards `selectOutput`; the picker row
+  measures the same height as the control row and within the budget.
+- Headless snapshot of the card with the picker open.
+
+## Not verified
+
+- Live: hover with music playing, tap the output glyph (fifth control), pick
+  a device, hear the route change and see the device blip in the ears. Only
+  one output was present on this machine during the session, so the button
+  was dimmed here.

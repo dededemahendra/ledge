@@ -171,6 +171,23 @@ private func someMedia() -> MediaPresentation {
     #expect(c.parameters == c.metrics.oneActivity, "plugging in while music plays is glyph + percent, not the two-slot layout")
 }
 
+@MainActor
+@Test func outputsAreStoredForThePanelAndSelectOutputEmitsAnIntent() {
+    let c = makeController()
+    #expect(c.outputs.isEmpty)
+    let options = [
+        OutputOption(id: "builtin", name: "MacBook Air Speakers", symbolName: "laptopcomputer", isCurrent: true),
+        OutputOption(id: "bt-1", name: "AirPods Pro", symbolName: "airpods.pro", isCurrent: false),
+    ]
+    c.setOutputs(options)
+    #expect(c.outputs == options)
+
+    var received: NotchIntent?
+    c.onIntent = { received = $0 }
+    c.emit(.selectOutput(id: "bt-1"))
+    #expect(received == .selectOutput(id: "bt-1"))
+}
+
 // MARK: - Lock screen (spec §7)
 
 @MainActor

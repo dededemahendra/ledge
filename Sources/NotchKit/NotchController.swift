@@ -70,6 +70,25 @@ public enum NotchIntent: Sendable, Equatable {
     case toggleShuffle
     case toggleRepeat
     case seek(fraction: Double)
+    /// Make this output (an `OutputOption.id`, CoreAudio's device UID) the
+    /// default. `AppModel` hands it to `DeviceService`.
+    case selectOutput(id: String)
+}
+
+/// One entry of the panel's output picker. A pure value like
+/// `MediaPresentation`: `NotchKit` does not know CoreAudio.
+public struct OutputOption: Sendable, Equatable, Identifiable {
+    public let id: String
+    public let name: String
+    public let symbolName: String
+    public let isCurrent: Bool
+
+    public init(id: String, name: String, symbolName: String, isCurrent: Bool) {
+        self.id = id
+        self.name = name
+        self.symbolName = symbolName
+        self.isCurrent = isCurrent
+    }
 }
 
 /// Single source of truth for what the island is doing.
@@ -137,6 +156,14 @@ public final class NotchController {
     /// carries the richer artwork/position/duration the panel needs and no
     /// other kind has.
     public private(set) var media: MediaPresentation?
+
+    /// The panel's output picker, kept current by `AppModel` from
+    /// `DeviceService`. Empty until the device service reports.
+    public private(set) var outputs: [OutputOption] = []
+
+    public func setOutputs(_ outputs: [OutputOption]) {
+        self.outputs = outputs
+    }
 
     /// Set by whoever owns this controller (`AppModel`) to receive playback
     /// commands the panel emits. `nil` is a safe no-op default, same reasoning

@@ -84,6 +84,13 @@ final class AppModel {
             }
         })
 
+        // The panel's output picker follows CoreAudio's device list; set
+        // before `start()` so the initial enumeration is not missed.
+        device.onOutputsChange = { [weak self] outputs in
+            self?.presenter.controller.setOutputs(outputs.map {
+                OutputOption(id: $0.id, name: $0.name, symbolName: $0.symbolName, isCurrent: $0.isCurrent)
+            })
+        }
         let deviceStream = device.start()
         tasks.append(Task { [weak self] in
             for await event in deviceStream {
@@ -226,6 +233,7 @@ final class AppModel {
         case .previous:         media.send(.previousTrack)
         case .toggleShuffle:    media.send(.toggleShuffle)
         case .toggleRepeat:     media.send(.toggleRepeat)
+        case .selectOutput(let id): device.setDefaultOutput(uid: id)
         case .seek(let fraction):
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.

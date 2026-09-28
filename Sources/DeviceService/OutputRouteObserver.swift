@@ -51,7 +51,7 @@ final class OutputRouteObserver {
         onChange(route)
     }
 
-    static func currentRoute() -> Route? {
+    nonisolated static func currentRoute() -> Route? {
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -88,7 +88,7 @@ final class OutputRouteObserver {
         }
     }
 
-    private static func string(_ selector: AudioObjectPropertySelector, of device: AudioDeviceID) -> String? {
+    nonisolated static func string(_ selector: AudioObjectPropertySelector, of device: AudioDeviceID) -> String? {
         var addr = AudioObjectPropertyAddress(
             mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain
         )

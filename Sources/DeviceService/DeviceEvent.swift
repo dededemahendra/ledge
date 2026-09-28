@@ -35,26 +35,32 @@ public enum DeviceEvent: Sendable, Equatable {
         return nil
     }
 
-    /// SF Symbol for the leading ear. Product-specific glyphs where the
-    /// name gives them away, transport-generic ones otherwise.
+    /// SF Symbol for the leading ear.
     public var symbolName: String {
         switch self {
         case .outputChanged(let name, let transport, _):
-            let lower = name.lowercased()
-            if lower.contains("airpods max") { return "airpods.max" }
-            if lower.contains("airpods pro") { return "airpods.pro" }
-            if lower.contains("airpods")     { return "airpods" }
-            if lower.contains("beats")       { return "beats.headphones" }
-            // The headphone jack is the BUILT-IN device renamed ("External
-            // Headphones"), so the name has to win over the transport here
-            // or wired headphones get the laptop glyph.
-            if lower.contains("headphone")   { return "headphones" }
-            switch transport {
-            case .bluetooth:                       return "headphones"
-            case .airPlay:                         return "airplay.audio"
-            case .builtIn:                         return "laptopcomputer"
-            case .usb, .hdmi, .displayPort, .other: return "speaker.wave.2"
-            }
+            return Self.glyph(name: name, transport: transport)
+        }
+    }
+
+    /// One glyph vocabulary for every audio output — the route blip and the
+    /// panel's output picker (`OutputDevice.symbolName`) both use it.
+    /// Product-specific where the name gives it away, transport-generic
+    /// otherwise. The headphone jack is the BUILT-IN device renamed
+    /// ("External Headphones"), so the name has to win over the transport
+    /// or wired headphones get the laptop glyph.
+    public static func glyph(name: String, transport: AudioTransport) -> String {
+        let lower = name.lowercased()
+        if lower.contains("airpods max") { return "airpods.max" }
+        if lower.contains("airpods pro") { return "airpods.pro" }
+        if lower.contains("airpods")     { return "airpods" }
+        if lower.contains("beats")       { return "beats.headphones" }
+        if lower.contains("headphone")   { return "headphones" }
+        switch transport {
+        case .bluetooth:                       return "headphones"
+        case .airPlay:                         return "airplay.audio"
+        case .builtIn:                         return "laptopcomputer"
+        case .usb, .hdmi, .displayPort, .other: return "speaker.wave.2"
         }
     }
 }

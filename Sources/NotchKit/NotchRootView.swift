@@ -660,7 +660,8 @@ public struct NotchRootView: View {
                 accent: effectiveAccent,
                 artworkNamespace: artworkNamespace,
                 emit: { controller.emit($0) },
-                displayOnly: controller.isLocked
+                displayOnly: controller.isLocked,
+                outputs: controller.outputs
             )
             // `.leading` keeps the panel flush at the island's leading edge
             // like every other piece of island content; `maxHeight: .infinity`

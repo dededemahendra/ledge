@@ -7,7 +7,10 @@ import SwiftUI
 ///   row 1 — artwork · title/artist · visualizer, edge to edge
 ///   row 2 — full-width scrubber with the times INLINE at its ends
 ///   row 3 — five controls on their own centred row:
-///           shuffle · previous · play/pause · next · repeat
+///           shuffle · previous · play/pause · next · output
+///           (tapping output swaps this row for the output picker — a row
+///           of device chips; picking one switches the default output and
+///           swaps the controls back, so the card never changes height)
 ///
 /// Flat black card — Alcove's is, and anything else beside the real notch
 /// reads as a different object. The play glyph is simply LARGER than its
@@ -15,7 +18,8 @@ import SwiftUI
 /// in the adapter) but stateless for now — `MediaPayload` does not yet
 /// decode shuffleMode/repeatMode, so they fire without an active highlight.
 /// Alcove's fifth icon is screen-mirroring, which has no backing capability
-/// here, so repeat takes that slot rather than shipping a dead button.
+/// here; repeat held that slot until 2026-09-28, when the output picker
+/// took it (spec §7, DeviceService) — repeat was stateless anyway.
 ///
 /// Layout budget is hard: `expanded.height - notchRect.height` = 136pt on
 /// the measured display (expanded was raised 118 → 140 → 168 to carry this
@@ -45,6 +49,16 @@ struct MediaPanelView: View {
     /// a drag. Clicks cannot reliably reach a panel above the lock shield
     /// anyway, so the visible surface should promise nothing it can't do.
     let displayOnly: Bool
+    /// The output picker's entries (`NotchController.outputs`).
+    let outputs: [OutputOption]
+
+    /// Whether row 3 is showing the output picker instead of the controls.
+    /// Same spelled-out `State` as `dragFraction` below.
+    private var _showsOutputs: State<Bool>
+    private var showsOutputs: Bool {
+        get { _showsOutputs.wrappedValue }
+        nonmutating set { _showsOutputs.wrappedValue = newValue }
+    }
 
     /// In-progress scrub position, `nil` when not dragging. While non-nil the
     /// filled bar renders from THIS, 1:1 with the pointer — feedback must be
@@ -69,7 +83,11 @@ struct MediaPanelView: View {
         accent: Color,
         artworkNamespace: Namespace.ID,
         emit: @escaping (NotchIntent) -> Void,
-        displayOnly: Bool = false
+        displayOnly: Bool = false,
+        outputs: [OutputOption] = [],
+        /// Test seam: start with the picker open, so `NotchRenderTests` can
+        /// measure that row against the card's budget.
+        showsOutputsInitially: Bool = false
     ) {
         self.media = media
         self.reduceMotion = reduceMotion
@@ -78,6 +96,8 @@ struct MediaPanelView: View {
         self.artworkNamespace = artworkNamespace
         self.emit = emit
         self.displayOnly = displayOnly
+        self.outputs = outputs
+        _showsOutputs = State(initialValue: showsOutputsInitially)
     }
 
     var body: some View {
@@ -85,7 +105,18 @@ struct MediaPanelView: View {
             headerRow
             scrubRow
             if !displayOnly {
-                controlsRow
+                // The two rows share one 30pt slot and swap in place; a
+                // crossfade, not a spring — nothing moves, the row's
+                // meaning changes.
+                ZStack {
+                    if showsOutputs {
+                        outputsRow.transition(.blurReplace)
+                    } else {
+                        controlsRow.transition(.blurReplace)
+                    }
+                }
+                .frame(height: 30)
+                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: showsOutputs)
             }
         }
         .padding(.horizontal, 16)
@@ -270,10 +301,85 @@ struct MediaPanelView: View {
                 .frame(maxWidth: .infinity)
             controlButton("forward.fill", label: "Next", size: 17, opacity: 0.9, .next)
                 .frame(maxWidth: .infinity)
-            controlButton("repeat", label: "Repeat", size: 13, opacity: 0.6, .toggleRepeat)
+            outputButton
                 .frame(maxWidth: .infinity)
         }
         .frame(height: 30)
+    }
+
+    // MARK: - Output picker (row 3, alternate)
+
+    /// The fifth control: the current output's glyph. Tapping shows the
+    /// picker. Disabled (dimmed) with nothing to pick from — a single
+    /// output is not a choice.
+    private var outputButton: some View {
+        let current = outputs.first(where: \.isCurrent)
+        let symbol = current?.symbolName ?? "speaker.wave.2"
+        return Button {
+            showsOutputs = true
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .opacity(0.6)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+                .id(symbol)
+                .transition(.blurReplace)
+                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: symbol)
+        }
+        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+        .disabled(outputs.count < 2)
+        .accessibilityLabel("Output: \(current?.name ?? "unknown")")
+    }
+
+    /// One chip per output, the current one filled. Horizontal and
+    /// scrollable without a bar, since a Mac with AirPlay speakers around
+    /// can list five or six. Picking one emits `selectOutput` and returns
+    /// to the controls; the route blip then confirms the switch in the
+    /// ears the same way a manual switch would.
+    private var outputsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(outputs) { output in
+                    outputChip(output)
+                }
+                Button {
+                    showsOutputs = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .opacity(0.6)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+                .accessibilityLabel("Close output picker")
+            }
+            .frame(height: 30)
+        }
+    }
+
+    private func outputChip(_ output: OutputOption) -> some View {
+        Button {
+            emit(.selectOutput(id: output.id))
+            showsOutputs = false
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: output.symbolName)
+                    .font(.system(size: 10, weight: .medium))
+                Text(output.name)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(Capsule().fill(output.isCurrent ? contentColor : contentColor.opacity(0.14)))
+            .foregroundStyle(output.isCurrent ? Color.black : contentColor)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+        .accessibilityLabel(output.name)
+        .accessibilityAddTraits(output.isCurrent ? .isSelected : [])
     }
 
     private var playPauseButton: some View {

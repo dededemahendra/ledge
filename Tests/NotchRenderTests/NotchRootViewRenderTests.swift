@@ -749,3 +749,37 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
                 "overMusic=\(overMusic): \(result.contentOutsideIslandCount) content pixel(s) outside the island")
     }
 }
+
+/// The output picker replaces the control row in the SAME 30pt slot, so the
+/// card with the picker open must measure no taller than with the controls
+/// — and still inside the expanded budget — or opening it would clip.
+@MainActor
+@Test func outputPickerRowKeepsTheCardWithinItsBudget() {
+    let metrics = NotchMetrics(notchRect: testNotchRect)
+    let budget = metrics.expanded.height - metrics.notchRect.height
+    let media = MediaPresentation(title: "A Fairly Long Now-Playing Song Title", artist: "An Artist Name", artwork: nil, isPlaying: true, elapsed: 30, duration: 200)
+    let outputs = [
+        OutputOption(id: "builtin", name: "MacBook Air Speakers", symbolName: "laptopcomputer", isCurrent: true),
+        OutputOption(id: "bt-1", name: "Dede's AirPods Pro", symbolName: "airpods.pro", isCurrent: false),
+        OutputOption(id: "ap-1", name: "Living Room", symbolName: "airplay.audio", isCurrent: false),
+        OutputOption(id: "usb-1", name: "Studio Display Speakers", symbolName: "speaker.wave.2", isCurrent: false),
+    ]
+    let namespace = Namespace().wrappedValue
+
+    func idealHeight(pickerOpen: Bool) -> CGFloat {
+        let panel = MediaPanelView(
+            media: media, reduceMotion: true, contentColor: .red, accent: .red,
+            artworkNamespace: namespace, emit: { _ in }, outputs: outputs, showsOutputsInitially: pickerOpen
+        )
+        let renderer = ImageRenderer(content: panel.frame(width: metrics.expanded.width))
+        renderer.scale = 2
+        renderer.proposedSize = ProposedViewSize(width: metrics.expanded.width, height: nil)
+        guard let image = renderer.cgImage else { fatalError("no image") }
+        return CGFloat(image.height) / renderer.scale
+    }
+
+    let controls = idealHeight(pickerOpen: false)
+    let picker = idealHeight(pickerOpen: true)
+    #expect(picker <= budget, "picker row: \(picker)pt exceeds the \(budget)pt budget")
+    #expect(abs(picker - controls) < 1, "the picker (\(picker)pt) must occupy the controls' slot (\(controls)pt), not add a row")
+}

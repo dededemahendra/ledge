@@ -12,7 +12,20 @@ public final class DeviceService {
 
     private var deriver = DeviceEventDeriver()
     private var route: OutputRouteObserver?
+    private var catalog: OutputDeviceCatalog?
     private var continuation: AsyncStream<DeviceEvent>.Continuation?
+
+    /// Every output-capable device, the default flagged — for the panel's
+    /// output picker. Kept current by `OutputDeviceCatalog`.
+    public private(set) var outputs: [OutputDevice] = []
+    /// Fired on the main actor whenever `outputs` changes.
+    public var onOutputsChange: (([OutputDevice]) -> Void)?
+
+    /// Switches the default output. Fire-and-forget: the route observer
+    /// reports the result the same way it reports any other change.
+    public func setDefaultOutput(uid: String) {
+        OutputDeviceCatalog.setDefaultOutput(uid: uid)
+    }
 
     public init() {}
 
@@ -34,6 +47,14 @@ public final class DeviceService {
             }
             route.start()
             self.route = route
+
+            let catalog = OutputDeviceCatalog { [weak self] outputs in
+                guard let self else { return }
+                self.outputs = outputs
+                self.onOutputsChange?(outputs)
+            }
+            catalog.start()
+            self.catalog = catalog
             Self.log.info("device service ready")
 
             continuation.onTermination = { [weak self] _ in
@@ -43,6 +64,8 @@ public final class DeviceService {
     }
 
     public func stop() {
+        catalog?.stop()
+        catalog = nil
         route?.stop()
         route = nil
         continuation?.onTermination = nil
