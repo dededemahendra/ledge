@@ -430,14 +430,14 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: symbol
                 )
-            if controller.isHUDLeading {
+            if controller.hasLabelledEars {
                 // The reference HUD's ear: glyph, then a one-word label
-                // ("Sound"/"Display"), leading-aligned from the island's
-                // outer edge — not centred in the ear, which would drift
-                // the pair inward as the label's width changes. Only at
-                // `NotchMetrics.hud` size, which a leading HUD always
-                // gets: the 38pt ear of every other one-activity island
-                // has no room for a word.
+                // ("Sound"/"Display"; "Charging"/"On battery" for power),
+                // leading-aligned from the island's outer edge — not
+                // centred in the ear, which would drift the pair inward as
+                // the label's width changes. Only at `NotchMetrics.hud`
+                // size, which every labelled activity gets: the 38pt ear
+                // of the plain one-activity island has no room for a word.
                 //
                 // The glyph gets a fixed 18pt slot so the label's x is
                 // stable across symbols of different widths (the slashed
@@ -445,7 +445,7 @@ public struct NotchRootView: View {
                 // `variableValue` lighting more or fewer waves.
                 HStack(spacing: 6) {
                     glyph.frame(width: 18)
-                    hudLabel(activity.title)
+                    hudLabel(activity.earLabel)
                 }
                 .padding(.leading, 9)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -599,10 +599,18 @@ public struct NotchRootView: View {
             if let fill = activity.barFill {
                 trailingBar(fill)
             } else if let compact = activity.compactText {
+                // In the labelled layout the value sits where the HUD's bar
+                // ends — 10pt in from the island's edge, at the label's own
+                // 12pt semibold — so "Charging …… 95%" reads as one line
+                // with its ends aligned to the HUD's. Centred at the
+                // plain one-activity size, as before.
+                let labelled = controller.hasLabelledEars
                 Text(compact)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: labelled ? 12 : 11, weight: labelled ? .semibold : .medium))
                     .monospacedDigit()
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: labelled ? .trailing : .center)
+                    .padding(.trailing, labelled ? 10 : 0)
                     // `AppModel` gives every power record the same `id`
                     // ("power"), so `compact` changing (e.g. 87% -> 86%) is an
                     // in-place update to the SAME `Text`, not an insertion —

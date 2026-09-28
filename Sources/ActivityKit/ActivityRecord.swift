@@ -21,6 +21,11 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// activity); wins over `symbolName` when present — see
     /// `NotchController.ActivityDisplay.artwork`.
     public let artwork: Data?
+    /// One short word for the labelled-ear layout ("Charging"), where
+    /// `title` ("Charging · 95% · 20 min to full") is too long — see
+    /// `NotchController.ActivityDisplay.label`. `nil` means `title` is
+    /// already short enough to be the label (the HUD's "Sound").
+    public let label: String?
 
     public init(
         id: String,
@@ -32,7 +37,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         compactText: String? = nil,
         symbolName: String? = nil,
         barFill: Double? = nil,
-        artwork: Data? = nil
+        artwork: Data? = nil,
+        label: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -44,6 +50,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.symbolName = symbolName
         self.barFill = barFill.map { min(1, max(0, $0)) }
         self.artwork = artwork
+        self.label = label
     }
 
     public var isSticky: Bool { ttl == nil }

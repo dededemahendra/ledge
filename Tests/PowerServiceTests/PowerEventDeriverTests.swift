@@ -163,3 +163,21 @@ private func snapshot(
     #expect(PowerEvent.fullyCharged.compactText == "100%")
     #expect(PowerEvent.lowBattery(percent: 9).compactText == "9%")
 }
+
+/// The labelled-ear presentation (2026-09-28): one short word, one glyph.
+@Test func earLabelsAreShortWordsAndGlyphsFollowTheState() {
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20).earLabel == "Charging")
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).earLabel == "On AC")
+    #expect(PowerEvent.unplugged(percent: 87).earLabel == "Battery", "\"On battery\" measures 63pt, over the ear's 57pt budget")
+    #expect(PowerEvent.fullyCharged.earLabel == "Charged")
+    #expect(PowerEvent.lowBattery(percent: 9).earLabel == "Low", "\"Low battery\" measures 70pt; the empty glyph and the percentage say the rest")
+
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20).symbolName == "bolt.fill")
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).symbolName == "powerplug.fill")
+    #expect(PowerEvent.fullyCharged.symbolName == "battery.100percent.bolt")
+    #expect(PowerEvent.unplugged(percent: 87).symbolName == "battery.75percent")
+    #expect(PowerEvent.unplugged(percent: 95).symbolName == "battery.100percent")
+    #expect(PowerEvent.lowBattery(percent: 9).symbolName == "battery.0percent")
+    #expect(PowerEvent.lowBattery(percent: 19).symbolName == "battery.25percent")
+    #expect(PowerEvent.batterySymbol(percent: 50).hasPrefix("battery.50"))
+}

@@ -43,6 +43,47 @@ public enum PowerEvent: Sendable, Equatable {
         case .lowBattery(let percent):      return "\(percent)%"
         }
     }
+
+    /// The word beside the glyph in the labelled ear (the HUD's layout:
+    /// glyph + word left, value right, at `NotchMetrics.hud` size). No
+    /// digits — `compactText` carries them on the other side. Every word
+    /// here is measured to fit the ear's 57pt label budget at 12pt semibold
+    /// (measured 2026-09-28: "Charging" 54, "On AC" 37, "Battery" 44,
+    /// "Charged" 50, "Low" 24 — while "On battery" 63 and "Low battery" 70
+    /// would run under the hole). The glyph's fill level and the percentage
+    /// beside it say the rest; `activityTitle` keeps the long form for the
+    /// detail row.
+    public var earLabel: String {
+        switch self {
+        case .pluggedIn(_, let isCharging, _): return isCharging ? "Charging" : "On AC"
+        case .unplugged:                       return "Battery"
+        case .fullyCharged:                    return "Charged"
+        case .lowBattery:                      return "Low"
+        }
+    }
+
+    /// Glyph for the leading ear. A bolt while charging, a plug while held
+    /// on AC, a battery whose fill tracks the level otherwise.
+    public var symbolName: String {
+        switch self {
+        case .pluggedIn(_, true, _):   return "bolt.fill"
+        case .pluggedIn(_, false, _):  return "powerplug.fill"
+        case .fullyCharged:            return "battery.100percent.bolt"
+        case .unplugged(let percent), .lowBattery(let percent):
+            return Self.batterySymbol(percent: percent)
+        }
+    }
+
+    /// SF Symbols ships the battery at five fills; pick the nearest.
+    public static func batterySymbol(percent: Int) -> String {
+        switch percent {
+        case ..<13: return "battery.0percent"
+        case ..<38: return "battery.25percent"
+        case ..<63: return "battery.50percent"
+        case ..<88: return "battery.75percent"
+        default:    return "battery.100percent"
+        }
+    }
 }
 
 /// Turns a stream of snapshots into the handful of moments worth showing.

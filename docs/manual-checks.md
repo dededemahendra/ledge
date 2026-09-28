@@ -1025,3 +1025,19 @@ User asked what to replace the paused-state accent progress sliver with.
 Answer: nothing new — the same visualizer bars, held at their resting pose
 and dimmed to 40 %, so playing→paused stills one element instead of swapping
 two. Progress lives in the panel's scrubber. `compactMediaProgress` removed.
+
+# Power blip polish (2026-09-28)
+
+Plugging in over music used to land in the two-slot layout with a grey dot.
+`PowerEvent` now carries `symbolName` + `earLabel`; `ActivityRecord`/
+`ActivityDisplay` carry `label`; `NotchController.hasLabelledEars` (HUD or
+power) selects the `hud` island; the trailing value is right-aligned at the
+label's weight, 10pt in, so its end lines up with the HUD's bar.
+
+## Verified
+
+- `make test`; snapshots of charging alone and over music.
+
+## Not verified
+
+- Live plug/unplug with music playing.

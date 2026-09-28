@@ -173,8 +173,10 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 @MainActor
 @Test func oneActivityContentRendersInsideTheIslandAndClearOfTheNotch() {
     let controller = makeController()
+    // A generic activity (not hud/power/device, which each have their own
+    // island now): the plain one-activity layout — dot left, value right.
     controller.setActivities(
-        [.init(id: "power", title: "Charging · 42%", compactText: "42%")], overflow: 0
+        [.init(id: "notification", title: "Mail · 3 new", compactText: "3")], overflow: 0
     )
     #expect(controller.state == .activity)
     #expect(controller.parameters == controller.metrics.oneActivity)
@@ -205,8 +207,10 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     let controller = makeController()
     controller.setActivities(
         [
-            .init(id: "power", title: "Charging · 42%", detail: "24 min to full", compactText: "42%"),
-            .init(id: "device", title: "AirPods Pro connected"),
+            // Neither hud, power nor device leads here — each of those has
+            // its own island now; the two-slot layout serves the rest.
+            .init(id: "notification", title: "Mail · 3 new", detail: "From Alice", compactText: "3"),
+            .init(id: "media", title: "Song", detail: "Artist"),
         ],
         overflow: 0
     )
@@ -282,8 +286,10 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     let controller = makeController()
     controller.setActivities(
         [
-            .init(id: "power", title: "Charging · 42%", detail: "24 min to full", compactText: "42%"),
-            .init(id: "device", title: "AirPods Pro connected"),
+            // Neither hud, power nor device leads here — each of those has
+            // its own island now; the two-slot layout serves the rest.
+            .init(id: "notification", title: "Mail · 3 new", detail: "From Alice", compactText: "3"),
+            .init(id: "media", title: "Song", detail: "Artist"),
         ],
         overflow: 0
     )
@@ -717,4 +723,29 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
             "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect \(result.holeRect)")
     #expect(result.contentOutsideIslandCount == 0,
             "\(result.contentOutsideIslandCount) content pixel(s) outside the island bounds \(result.islandBounds)")
+}
+
+/// Power at the labelled-ear island: bolt + "Charging" left, "95%" right,
+/// inside the island and clear of the notch — alone and over music.
+@MainActor
+@Test func powerLabelledEarsRenderInsideTheIslandAndClearOfTheNotch() {
+    for overMusic in [false, true] {
+        let controller = makeController()
+        var activities: [NotchController.ActivityDisplay] = [
+            .init(id: "power", title: "Charging · 95% · 20 min to full", compactText: "95%", symbolName: "bolt.fill", label: "Charging")
+        ]
+        if overMusic {
+            controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+            activities.append(.init(id: "media", title: "Song", detail: "Artist"))
+        }
+        controller.setActivities(activities, overflow: 0)
+        #expect(controller.parameters == controller.metrics.hud)
+
+        let result = renderAndClassify(controller)
+        #expect(result.hasContentInsideIsland, "overMusic=\(overMusic): nothing rendered")
+        #expect(result.contentInsideNotchCount == 0,
+                "overMusic=\(overMusic): \(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
+        #expect(result.contentOutsideIslandCount == 0,
+                "overMusic=\(overMusic): \(result.contentOutsideIslandCount) content pixel(s) outside the island")
+    }
 }
