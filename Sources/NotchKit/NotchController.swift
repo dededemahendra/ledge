@@ -103,14 +103,6 @@ public final class NotchController {
         /// render (AirPods, from the system's own assets). Wins over
         /// `symbolName`, which stays as the fallback when decoding fails.
         public let artwork: Data?
-        /// The word beside the glyph in the labelled-ear layout
-        /// (`NotchRootView.leadingEar`, `hasLabelledEars`). Falls back to
-        /// `title`, which for the HUD is already the one word ("Sound");
-        /// power carries a long `title` for the detail row and a short
-        /// `label` ("Charging") for the ear.
-        public let label: String?
-
-        public var earLabel: String { label ?? title }
 
         public init(
             id: String,
@@ -119,8 +111,7 @@ public final class NotchController {
             compactText: String? = nil,
             symbolName: String? = nil,
             barFill: Double? = nil,
-            artwork: Data? = nil,
-            label: String? = nil
+            artwork: Data? = nil
         ) {
             self.id = id
             self.title = title
@@ -129,7 +120,6 @@ public final class NotchController {
             self.symbolName = symbolName
             self.barFill = barFill.map { min(1, max(0, $0)) }
             self.artwork = artwork
-            self.label = label
         }
     }
 
@@ -193,18 +183,14 @@ public final class NotchController {
     /// `AppModel` inserts every power record with this id.
     public static let powerActivityID = "power"
 
-    /// A charging/battery blip leads. Same treatment as the HUD (2026-09-28):
-    /// the `NotchMetrics.hud` island, glyph + one word on the left
-    /// ("Charging", "On battery"), the percentage on the right — whatever is
-    /// queued behind it. It used to fall into the two-slot layout over music
-    /// with a grey dot for a glyph.
+    /// A charging/battery blip leads: the plain one-activity island, glyph
+    /// left (bolt, plug, battery fill), percentage right, no words — the
+    /// user's call (2026-09-28) after a labelled "Charging …… 95%" row was
+    /// tried. Whatever is queued behind it waits; it used to fall into the
+    /// two-slot layout over music with a grey dot for a glyph.
     public var isPowerLeading: Bool {
         activities.first?.id == Self.powerActivityID
     }
-
-    /// The labelled-ear layout: glyph + word left, value right, at
-    /// `NotchMetrics.hud` size. HUD and power today.
-    public var hasLabelledEars: Bool { isHUDLeading || isPowerLeading }
 
     /// A device blip leads. It never grows the island (user's call,
     /// 2026-09-28, after "External Headphones" landed in the two-slot
@@ -223,8 +209,8 @@ public final class NotchController {
         case .peek:
             return metrics.peek
         case .activity:
-            if hasLabelledEars { return metrics.hud }
-            if isDeviceLeading { return metrics.oneActivity }
+            if isHUDLeading { return metrics.hud }
+            if isDeviceLeading || isPowerLeading { return metrics.oneActivity }
             return activityCount >= 2 ? metrics.twoActivities : metrics.oneActivity
         case .expanded:
             return metrics.expanded

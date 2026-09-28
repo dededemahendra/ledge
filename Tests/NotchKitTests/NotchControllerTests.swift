@@ -156,22 +156,19 @@ private func someMedia() -> MediaPresentation {
     #expect(c.parameters == c.metrics.oneActivity, "headphones plugged in while music plays is an ear swap, not a slab")
 }
 
-/// Power gets the HUD's labelled-ear island, alone or over music.
+/// Power keeps the plain one-activity island — glyph left, percentage right,
+/// no words — alone or over music; never the two-slot layout.
 @MainActor
-@Test func aLeadingPowerActivityGetsTheLabelledIslandLikeTheHUD() {
+@Test func aLeadingPowerActivityKeepsTheCompactIslandEvenOverMusic() {
     let c = makeController()
-    let power = NotchController.ActivityDisplay(id: "power", title: "Charging · 95% · 20 min to full", compactText: "95%", symbolName: "bolt.fill", label: "Charging")
+    let power = NotchController.ActivityDisplay(id: "power", title: "Charging · 95% · 20 min to full", compactText: "95%", symbolName: "bolt.fill")
     c.setActivities([power], overflow: 0)
-    #expect(c.isPowerLeading && c.hasLabelledEars)
-    #expect(c.parameters == c.metrics.hud)
-    #expect(power.earLabel == "Charging", "the ear shows the short word, not the detail-row title")
+    #expect(c.isPowerLeading)
+    #expect(c.parameters == c.metrics.oneActivity)
 
     c.setMedia(someMedia())
     c.setActivities([power, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
-    #expect(c.parameters == c.metrics.hud, "plugging in while music plays is one labelled row, not the two-slot layout")
-
-    let hud = NotchController.ActivityDisplay(id: "hud", title: "Sound", symbolName: "speaker.wave.3.fill", barFill: 0.4)
-    #expect(hud.earLabel == "Sound", "no label means the title is the label")
+    #expect(c.parameters == c.metrics.oneActivity, "plugging in while music plays is glyph + percent, not the two-slot layout")
 }
 
 // MARK: - Lock screen (spec §7)
@@ -198,9 +195,9 @@ private func someMedia() -> MediaPresentation {
     c.setLocked(true)
     #expect(c.state == .hidden, "no media, no activity — an empty slab on the lock screen would be noise")
 
-    c.setActivities([.init(id: "power", title: "Charging · 42%", compactText: "42%", symbolName: "bolt.fill", label: "Charging")], overflow: 0)
+    c.setActivities([.init(id: "power", title: "Charging · 42%", compactText: "42%", symbolName: "bolt.fill")], overflow: 0)
     #expect(c.state == .activity, "charging state still shows in the ears while locked")
-    #expect(c.parameters == c.metrics.hud, "power uses the labelled-ear island")
+    #expect(c.parameters == c.metrics.oneActivity)
 }
 
 @MainActor

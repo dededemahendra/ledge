@@ -333,7 +333,7 @@ growth itself becomes the signal that something happened.
 | Hidden | — | window ordered out |
 | Peek (hover) | 179 × 38 pt | **no content** — see below |
 | 1 activity | ~255 × 32 pt | leading ear: artwork 20 pt; trailing ear: waveform |
-| Volume/brightness HUD or power blip live (whatever is behind it) | notch + 2 × 90 pt (~359) × 32 pt | leading ear: glyph + "Sound"/"Display"; trailing ear: 68 pt level bar |
+| Volume/brightness HUD live (whatever is behind it) | notch + 2 × 90 pt (~359) × 32 pt | leading ear: glyph + "Sound"/"Display"; trailing ear: 68 pt level bar |
 | 2 activities | ~342 × 62 pt | ears keep glanceable glyphs; detail row below the hole |
 | 3+ activities | ~342 × 62 pt | top two by priority, `+N` pip in trailing ear |
 | Expanded (hover with media, or pinned by click) | ~390 × 168 pt | full panel below the hole; ears keep glyphs |
@@ -396,11 +396,11 @@ builders `compactLeading`, `compactTrailing`, `detailRow`, `expanded`.
 
 ### PowerService — no permission, public API
 
-**Presentation (2026-09-28):** a power blip uses the HUD's labelled-ear island —
-glyph (bolt charging, plug held on AC, battery-fill otherwise) + one word
-("Charging", "On AC", "Battery", "Charged", "Low") on the left, the
-percentage on the right — alone or over music. `activityTitle` keeps the long
-form for the detail row.
+**Presentation (2026-09-28):** a power blip is the plain one-activity island,
+alone or over music — glyph (bolt charging, plug held on AC, battery-fill
+otherwise) on the left, the percentage on the right, no words (a labelled
+"Charging …… 95%" row was tried and dropped at the user's request).
+`activityTitle` keeps the long form for the detail row.
 
 `IOPSNotificationCreateRunLoopSource` plus `IOPSCopyPowerSourcesInfo`. Emits
 plug/unplug, percentage threshold crossings (20 / 10 / 5%), fully-charged,

@@ -162,8 +162,7 @@ final class AppModel {
                 ttl: ActivityKind.power.defaultTTL,
                 title: event.activityTitle,
                 compactText: event.compactText,
-                symbolName: event.symbolName,
-                label: event.earLabel
+                symbolName: event.symbolName
             )
         )
         publish()
@@ -339,8 +338,7 @@ final class AppModel {
                 compactText: record.compactText,
                 symbolName: record.symbolName,
                 barFill: record.barFill,
-                artwork: record.artwork,
-                label: record.label
+                artwork: record.artwork
             )
         }
         // `setActivities` sets the count itself — do not also call

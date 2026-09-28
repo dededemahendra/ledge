@@ -725,21 +725,21 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
             "\(result.contentOutsideIslandCount) content pixel(s) outside the island bounds \(result.islandBounds)")
 }
 
-/// Power at the labelled-ear island: bolt + "Charging" left, "95%" right,
-/// inside the island and clear of the notch — alone and over music.
+/// Power at the one-activity island: bolt left, "95%" right, inside the
+/// island and clear of the notch — alone and over music.
 @MainActor
-@Test func powerLabelledEarsRenderInsideTheIslandAndClearOfTheNotch() {
+@Test func powerGlyphAndPercentRenderInsideTheIslandAndClearOfTheNotch() {
     for overMusic in [false, true] {
         let controller = makeController()
         var activities: [NotchController.ActivityDisplay] = [
-            .init(id: "power", title: "Charging · 95% · 20 min to full", compactText: "95%", symbolName: "bolt.fill", label: "Charging")
+            .init(id: "power", title: "Charging · 95% · 20 min to full", compactText: "95%", symbolName: "bolt.fill")
         ]
         if overMusic {
             controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
             activities.append(.init(id: "media", title: "Song", detail: "Artist"))
         }
         controller.setActivities(activities, overflow: 0)
-        #expect(controller.parameters == controller.metrics.hud)
+        #expect(controller.parameters == controller.metrics.oneActivity)
 
         let result = renderAndClassify(controller)
         #expect(result.hasContentInsideIsland, "overMusic=\(overMusic): nothing rendered")

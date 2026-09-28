@@ -164,14 +164,8 @@ private func snapshot(
     #expect(PowerEvent.lowBattery(percent: 9).compactText == "9%")
 }
 
-/// The labelled-ear presentation (2026-09-28): one short word, one glyph.
-@Test func earLabelsAreShortWordsAndGlyphsFollowTheState() {
-    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20).earLabel == "Charging")
-    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).earLabel == "On AC")
-    #expect(PowerEvent.unplugged(percent: 87).earLabel == "Battery", "\"On battery\" measures 63pt, over the ear's 57pt budget")
-    #expect(PowerEvent.fullyCharged.earLabel == "Charged")
-    #expect(PowerEvent.lowBattery(percent: 9).earLabel == "Low", "\"Low battery\" measures 70pt; the empty glyph and the percentage say the rest")
-
+/// The ear glyph follows the state (2026-09-28); the ear shows no words.
+@Test func glyphsFollowTheState() {
     #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20).symbolName == "bolt.fill")
     #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).symbolName == "powerplug.fill")
     #expect(PowerEvent.fullyCharged.symbolName == "battery.100percent.bolt")

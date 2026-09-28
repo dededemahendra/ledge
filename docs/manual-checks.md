@@ -1059,3 +1059,9 @@ Fix, two layers (`HUDService.handleObservedBrightness`):
 
 Not verified live; auto-brightness drift that happens to land on the grid
 without the tap can still show a HUD.
+
+## Power blip, second pass: no words
+
+User: "remove the text". The power blip is back to the one-activity island
+with the new glyphs (bolt/plug/battery fill) left and the percentage right;
+the `label` plumbing added for it is removed again. HUD words stay.
