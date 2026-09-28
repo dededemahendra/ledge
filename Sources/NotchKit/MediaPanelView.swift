@@ -30,7 +30,7 @@ struct MediaPanelView: View {
     /// place decides it.
     let contentColor: Color
     /// Artwork-derived (`ArtworkAccent`), kept for the compact ear's paused
-    /// progress sliver. The card itself is white-on-black like Alcove's.
+    /// visualizer bars. The card itself is white-on-black like Alcove's.
     let accent: Color
     /// Pairs the compact ear's 20pt artwork with the 56pt one below into a
     /// single morphing element across expand/collapse. The pair is exclusive

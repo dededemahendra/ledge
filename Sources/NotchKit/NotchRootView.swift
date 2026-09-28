@@ -157,7 +157,7 @@ public struct NotchRootView: View {
     private var artworkNamespace: Namespace.ID { _artworkNamespace.wrappedValue }
 
     /// Accent derived from the current artwork (`ArtworkAccent`), cached here
-    /// so the compact ear's progress sliver and the expanded card always
+    /// so the compact ear's visualizer bars and the expanded card always
     /// agree, and recomputed only when the artwork actually changes (see the
     /// `.onChange` in `body`) — never per frame.
     private var _accent: State<Color> = State(initialValue: ArtworkAccent.fallback)
@@ -581,7 +581,7 @@ public struct NotchRootView: View {
     @ViewBuilder private var trailingEar: some View {
         if controller.isDeviceLeading, controller.media != nil, controller.state != .expanded,
            let activity = controller.activities.first {
-            // The device's icon in place of the visualizer/progress sliver
+            // The device's icon in place of the visualizer bars
             // for the blip's lifetime — see `leadingEar`'s first branch.
             deviceIcon(activity)
         } else if controller.isHUDLeading, let fill = controller.activities.first?.barFill {
@@ -626,22 +626,20 @@ public struct NotchRootView: View {
                       let media = controller.media,
                       controller.state != .expanded {
                 // Compact now-playing, spec §6's original "trailing ear:
-                // waveform": animated visualizer bars while playing (static
-                // pose under Reduce Motion), and the accent progress sliver
-                // while paused — life when there is sound, position when
-                // there is not. The brief's notch-edge progress ring stays
-                // impossible: it would draw across the cutout, where there
-                // are no pixels and the no-content invariant forbids drawing
-                // regardless. At `.expanded` the panel takes over and this
-                // yields to the fallback below.
-                if media.isPlaying {
-                    AudioVisualizerBars(
-                        color: effectiveAccent,
-                        isAnimating: !controller.reduceMotion
-                    )
-                } else {
-                    compactMediaProgress(media.progress)
-                }
+                // waveform": the visualizer bars, breathing while music
+                // plays and held still, dimmed, while paused. ONE element
+                // with two states (2026-09-28): a paused track used to swap
+                // in an accent-coloured progress sliver instead, which read
+                // as a stray dash — position belongs to the panel's
+                // scrubber, where it comes with times. Same paused
+                // treatment the expanded card gives its own bars. The
+                // brief's notch-edge progress ring stays impossible: it
+                // would draw across the cutout. At `.expanded` the panel
+                // takes over and this yields to the fallback below.
+                AudioVisualizerBars(
+                    color: effectiveAccent.opacity(media.isPlaying ? 1 : 0.4),
+                    isAnimating: media.isPlaying && !controller.reduceMotion
+                )
             } else {
                 // Not decorative — load-bearing. An activity with neither
                 // `barFill` nor `compactText` (exactly media's shape: title +
@@ -693,28 +691,6 @@ public struct NotchRootView: View {
         .frame(height: 5)
         .padding(.leading, 12)
         .padding(.trailing, 10)
-    }
-
-    /// See the `trailingEar` media branch for why this exists and why it is
-    /// here rather than along the island's bottom edge. Accent-tinted so the
-    /// compact and expanded states visibly belong to the same track.
-    private func compactMediaProgress(_ progress: Double) -> some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Capsule().fill(contentColor.opacity(0.15))
-                Capsule()
-                    .fill(effectiveAccent)
-                    .frame(width: max(0, geometry.size.width * progress))
-                    // The same 1Hz-tick smoothing the panel's scrubber uses —
-                    // a continuous slide, not per-second jumps.
-                    .animation(
-                        controller.reduceMotion ? nil : .linear(duration: 1),
-                        value: progress
-                    )
-            }
-        }
-        .frame(height: 2.5)
-        .padding(.horizontal, 5)
     }
 
     /// Budget below the hole is tight: at two (or three+, which shares the

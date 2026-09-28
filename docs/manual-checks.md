@@ -1018,3 +1018,10 @@ jack's "External Headphones" gets the headphones glyph (name beats transport).
 
 - Live: plug/unplug headphones while playing — expect the right ear to swap
   to the headphones glyph for 3 s and back to the visualizer.
+
+# Paused media ear (2026-09-28)
+
+User asked what to replace the paused-state accent progress sliver with.
+Answer: nothing new — the same visualizer bars, held at their resting pose
+and dimmed to 40 %, so playing→paused stills one element instead of swapping
+two. Progress lives in the panel's scrubber. `compactMediaProgress` removed.
