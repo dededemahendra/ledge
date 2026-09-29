@@ -1425,3 +1425,14 @@ dismissed; stop it — the island clears. Start Clock's stopwatch: if the island
 shows it counting, the layout guess held; if not, the log line "clock:
 unparsed records" names the keys to read. Click either — the Clock opens on
 that tab.
+
+## Security review follow-up (2026-09-29)
+
+Two findings on the `ledge://` scheme: the menu bar probe dumped the user's
+menu bar contents into the shared system log on any app's say-so, and the
+timer log printed the Clock timer's title. The probe is now debug-only and
+writes to `~/Library/Logs/Ledge/menubar-probe.txt` (user-readable only); the
+title is logged private; timer minutes are clamped to a day. The scheme itself
+stays open on purpose — the worst it can do is start or stop this app's own
+timer, browsers confirm custom schemes, and the Clock's timers are never
+controlled from it.

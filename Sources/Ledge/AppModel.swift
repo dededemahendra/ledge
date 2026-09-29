@@ -399,19 +399,32 @@ final class AppModel {
     /// the island's own click (toggle) and, since the scheme is registered,
     /// Shortcuts, Raycast or `open` from a shell. Anything else is ignored.
     func openURL(_ url: URL) {
+        #if DEBUG
+        // Development only, and never into the shared system log: the
+        // menu bar's contents are the user's own (a live activity's text,
+        // say), so the dump goes to a file under ~/Library/Logs/Ledge that
+        // only this user can read. Release builds ignore the URL.
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/menubar" {
-            for line in MenuBarProbe.dump() { Self.log.notice("probe: \(line, privacy: .public)") }
+            let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let file = dir.appending(path: "menubar-probe.txt")
+            try? MenuBarProbe.dump().joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
+            Self.log.notice("probe: written to \(file.path, privacy: .public)")
             return
         }
+        #endif
         guard url.scheme == "ledge", url.host() == "timer" else {
             Self.log.notice("ignored url \(url.absoluteString, privacy: .public)")
             return
         }
+        // Any app or page can open this scheme; the worst it can do is start
+        // or stop this app's own timer, and browsers confirm custom schemes
+        // first. The Clock's timers are never touched from here.
         switch url.path() {
         case "/start":
             let minutes = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first { $0.name == "minutes" }?.value.flatMap(Int.init) ?? 5
-            startTimer(minutes: max(1, minutes))
+            startTimer(minutes: min(24 * 60, max(1, minutes)))
         case "/stopwatch": startStopwatch()
         case "/toggle":    toggleTimerPause()
         case "/stop":      stopTimer()
@@ -548,7 +561,7 @@ final class AppModel {
         guard source != timerSource || record.compactText != timerShown?.compactText
                 || record.barFill != timerShown?.barFill || record.symbolName != timerShown?.symbolName else { return }
         if source != timerSource || timerShown == nil {
-            Self.log.notice("\(source, privacy: .public) timer in the island as \(record.compactText ?? "", privacy: .public) (\(record.title, privacy: .public))")
+            Self.log.notice("\(source, privacy: .public) timer in the island as \(record.compactText ?? "", privacy: .public) (\(record.title, privacy: .private))")
         }
         timerSource = source
         timerShown = record
