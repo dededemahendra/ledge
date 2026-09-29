@@ -1355,3 +1355,10 @@ User's screenshot: the calendar was full of timed Reminders, not events, so
 beside events (own permission prompt, checklist glyph, click opens Reminders).
 Judge live: allow Reminders; hover with nothing playing — the next timed
 reminder shows with its countdown; the log line now counts both kinds.
+
+## Recurring reminders (2026-09-29)
+
+Second log read: "1 event(s) and 0 timed reminder(s)" although the day is
+daily reminders — EventKit's single-object model. Rules are now expanded into
+the window. Judge live: the log line's reminder count is non-zero; hover with
+nothing playing shows the next occurrence ("Wake Up!" 06:15 tomorrow, say).

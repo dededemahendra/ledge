@@ -860,3 +860,13 @@ a time of day is an item like an event — `MeetingEvent.Kind.reminder`, the
 has no duration, a click opening Reminders — and one without a time is skipped.
 Completed reminders never load (the query is for incomplete ones). Either
 permission alone is enough; both refused is the menu row.
+
+**Recurring reminders (2026-09-29, same day).** EventKit keeps a recurring
+reminder as one object whose due date is its earliest uncompleted occurrence —
+a daily "Wake Up!" left unticked this morning is due this morning — while
+Calendar projects the rule forward. So the service queries incomplete
+reminders with NO lower bound on the due date and expands each recurrence rule
+itself (`ReminderOccurrences`, pure: daily/weekly with named days/monthly/
+yearly, interval, end date; bounded stepping) into the next day. Each
+occurrence is its own item and reminder; an overdue non-recurring reminder
+yields nothing, since it is not upcoming.

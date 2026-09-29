@@ -155,14 +155,16 @@ public final class CalendarService {
         }
     }
 
-    /// Incomplete reminders due in the window that carry a time of day.
-    /// `fetchReminders` calls back off the main queue; only the mapped,
-    /// `Sendable` values cross back.
+    /// Incomplete reminders with a time of day, as occurrences inside the
+    /// window. No lower bound on the due date: a recurring reminder left
+    /// unticked is due in the PAST, and only its rule says when it is next
+    /// (see `ReminderOccurrences`). `fetchReminders` calls back off the
+    /// main queue; only the mapped, `Sendable` values cross back.
     private func fetchTimedReminders(from: Date, to: Date) async -> [MeetingEvent] {
-        let predicate = store.predicateForIncompleteReminders(withDueDateStarting: from, ending: to, calendars: nil)
+        let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: to, calendars: nil)
         return await withCheckedContinuation { continuation in
             store.fetchReminders(matching: predicate) { reminders in
-                continuation.resume(returning: (reminders ?? []).compactMap(MeetingEvent.init(ekReminder:)))
+                continuation.resume(returning: (reminders ?? []).flatMap { MeetingEvent.occurrences(of: $0, from: from, to: to) })
             }
         }
     }
@@ -212,6 +214,25 @@ extension MeetingEvent {
 }
 
 extension MeetingEvent {
+    /// The reminder's occurrences inside `from...to`: its own due date when
+    /// that falls in the window, plus what its recurrence rule projects
+    /// into it. An overdue non-recurring reminder yields nothing — it is
+    /// not upcoming.
+    static func occurrences(of reminder: EKReminder, from: Date, to: Date) -> [MeetingEvent] {
+        guard let base = MeetingEvent(ekReminder: reminder) else { return [] }
+        var items = (base.start >= from && base.start <= to) ? [base] : []
+        if let rule = reminder.recurrenceRules?.first.flatMap(RecurrenceRule.init(ekRule:)) {
+            for date in ReminderOccurrences.expand(due: base.start, rule: rule, from: from, to: to) {
+                items.append(MeetingEvent(
+                    id: "\(reminder.calendarItemIdentifier)@\(Int(date.timeIntervalSince1970))",
+                    kind: .reminder, title: base.title, start: date,
+                    end: date.addingTimeInterval(reminderWindow), joinURL: base.joinURL
+                ))
+            }
+        }
+        return items
+    }
+
     /// `nil` for a reminder with no time of day (nothing to count down to)
     /// or no title. Completed ones never reach here — the query asks for
     /// incomplete reminders only.
@@ -227,6 +248,25 @@ extension MeetingEvent {
             start: due,
             end: due.addingTimeInterval(Self.reminderWindow),
             joinURL: MeetingLinkDetector.joinURL(url: reminder.url, location: nil, notes: reminder.notes)
+        )
+    }
+}
+
+extension RecurrenceRule {
+    init?(ekRule rule: EKRecurrenceRule) {
+        let frequency: Frequency
+        switch rule.frequency {
+        case .daily:   frequency = .daily
+        case .weekly:  frequency = .weekly
+        case .monthly: frequency = .monthly
+        case .yearly:  frequency = .yearly
+        @unknown default: return nil
+        }
+        self.init(
+            frequency: frequency,
+            interval: rule.interval,
+            weekdays: Set((rule.daysOfTheWeek ?? []).map { $0.dayOfTheWeek.rawValue }),
+            endDate: rule.recurrenceEnd?.endDate
         )
     }
 }
