@@ -179,3 +179,19 @@ Layout observed:
 - `MTTimerStorageMigratedToCoreData` is true, but the daemon's group container
   is empty and the plist keeps being updated, so the plist is what there is.
 - URL schemes registered by Clock.app: `clock-timer://`, `clock-stopwatch://`.
+
+## iPhone Live Activities on the Mac (2026-09-29, macOS 27)
+
+`liveactivitiesd` (`SessionCore.framework/Support`) receives them; its known
+clients are `MenuBarAgent`, Control Center, `chronod` and its
+`WidgetRenderer-Activities`. Nothing is persisted: the daemon's group container
+is empty and chronod caches no renders. Control Center's `LiveActivityState`
+(JSON in `com.apple.controlcenter`) reports `CompanionPaired` — false on this
+Mac at the time, so no activity could be observed.
+
+The only readable surface is Accessibility: `MenuBarAgent`'s
+`AXExtrasMenuBar` lists every system extra as `AXGroup` (`AXHostingView`) →
+`AXMenuBarItem` (`AXMenuExtra`) with `AXIdentifier` (`com.apple.menuextra.*`),
+`AXDescription`, `AXValue` and `AXFrame`; Control Center itself exposes no
+extras bar (-25212). `ledge://probe/menubar` dumps the tree to the log
+(`MenuBarProbe`) so a live activity's shape can be learned once one shows.

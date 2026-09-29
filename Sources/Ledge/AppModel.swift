@@ -399,6 +399,10 @@ final class AppModel {
     /// the island's own click (toggle) and, since the scheme is registered,
     /// Shortcuts, Raycast or `open` from a shell. Anything else is ignored.
     func openURL(_ url: URL) {
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/menubar" {
+            for line in MenuBarProbe.dump() { Self.log.notice("probe: \(line, privacy: .public)") }
+            return
+        }
         guard url.scheme == "ledge", url.host() == "timer" else {
             Self.log.notice("ignored url \(url.absoluteString, privacy: .public)")
             return
