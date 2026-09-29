@@ -435,16 +435,23 @@ public final class NotchController {
         // carries a link — a meeting reminder's join URL — are buttons for
         // as long as they show (2026-09-29): the click opens the link, and
         // wins over pinning the card behind it.
-        if isPreviewingUpcoming, let url = upcoming?.url {
-            emit(.open(url))
-            return
-        }
-        if let url = activities.first?.url {
+        if let url = linkURL {
             emit(.open(url))
             return
         }
         guard media != nil else { return }
         click()
+    }
+
+    /// The link a tap would open right now: the previewed event's, or the
+    /// leading blip's while it shows; `nil` at `.expanded` (the panel's
+    /// own buttons take clicks there). The view reads this to dip the
+    /// content on press and show the link pointer — the island only
+    /// looks like a button when it is one.
+    public var linkURL: URL? {
+        guard state != .expanded else { return nil }
+        if isPreviewingUpcoming { return upcoming?.url }
+        return activities.first?.url
     }
 
     /// Unpins. If the cursor is still over the island and there is media

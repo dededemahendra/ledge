@@ -42,25 +42,45 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         kind == .event ? "calendar" : "checklist"
     }
 
-    /// Time to the start for an ear: whole minutes rounded up under an
-    /// hour ("42m"), hours and minutes above ("2h", "2h 10m"), "Now" once
-    /// under way.
+    /// Time to the start for an ear, as precise as it is near: whole
+    /// minutes rounded up under an hour ("42m"), hours and minutes under
+    /// three ("2h 10m"), hours alone beyond that ("9h" — nobody needs the
+    /// minutes on tomorrow morning's alarm), "Now" once under way.
     public func countdownText(at now: Date) -> String {
         let remaining = start.timeIntervalSince(now)
         guard remaining > 0 else { return "Now" }
         let minutes = max(1, Int((remaining / 60).rounded(.up)))
         if minutes < 60 { return "\(minutes)m" }
-        let hours = minutes / 60, rest = minutes % 60
-        return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+        if minutes < 180 {
+            let hours = minutes / 60, rest = minutes % 60
+            return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+        }
+        return "\(Int((Double(minutes) / 60).rounded()))h"
     }
 
-    /// The caption line under the hole: "Title · 10:00".
-    public func captionText(locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent) -> String {
+    /// The caption line under the hole: "Title · 10:00" today, and
+    /// "Title · Tomorrow at 06:15" when the day differs — the time alone
+    /// would read as this morning's.
+    public func captionText(
+        at now: Date = Date(), locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        calendar.timeZone = timeZone
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone
         formatter.timeStyle = .short
         formatter.dateStyle = .none
+        if calendar.isDate(start, inSameDayAs: now) {
+            return "\(title) · \(formatter.string(from: start))"
+        }
+        // Relative to `now`, not to the wall clock (which is all
+        // `doesRelativeDateFormatting` knows), so this stays testable.
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(start, inSameDayAs: tomorrow) {
+            return "\(title) · Tomorrow at \(formatter.string(from: start))"
+        }
+        formatter.dateStyle = .medium
         return "\(title) · \(formatter.string(from: start))"
     }
 }
@@ -93,6 +113,6 @@ public struct MeetingReminder: Sendable, Equatable {
 
     /// The caption line under the hole: "Title · 10:00".
     public func captionText(locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent) -> String {
-        event.captionText(locale: locale, timeZone: timeZone)
+        event.captionText(at: at, locale: locale, timeZone: timeZone)
     }
 }

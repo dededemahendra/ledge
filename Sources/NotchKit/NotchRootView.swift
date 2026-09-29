@@ -286,6 +286,14 @@ public struct NotchRootView: View {
     /// the menu bar's "Toggle Panel".
     private let onTap: () -> Void
 
+    /// Mouse held down on a clickable island (`controller.linkURL`): the
+    /// content dips like a button's, on press-down, not release.
+    private var _pressed: State<Bool> = State(initialValue: false)
+    private var pressed: Bool {
+        get { _pressed.wrappedValue }
+        nonmutating set { _pressed.wrappedValue = newValue }
+    }
+
     /// The target height from before whichever transition is currently
     /// running, so `expanding` below reflects whether the island is
     /// actually growing or shrinking — not which named state it happens to
@@ -385,6 +393,12 @@ public struct NotchRootView: View {
                 // the island actually is.
                 .overlay(alignment: .top) {
                     islandContent(parameters: parameters)
+                        // Press feedback where a click does something
+                        // (`NotchController.linkURL`): the same dip as the
+                        // panel's buttons, so a clickable blip feels like one.
+                        .scaleEffect(pressed && controller.linkURL != nil && !controller.reduceMotion ? 0.96 : 1, anchor: .top)
+                        .opacity(pressed && controller.linkURL != nil ? PressableButtonStyle.pressedOpacity : 1)
+                        .animation(.spring(response: 0.2, dampingFraction: 1.0), value: pressed)
                         // Interpolated size for the ears — see
                         // `AnimatedIslandParameters`. Driven by the same
                         // `.animation(value: parameters)` below as the shape.
@@ -448,6 +462,15 @@ public struct NotchRootView: View {
         // `interactivePath`) already restricts which points ever reach this
         // view, so no extra region check is needed here.
         .onTapGesture { onTap() }
+        // Press state for the dip above. Simultaneous, so the tap still
+        // fires; zero distance, so it flips on mouse-down.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in if !pressed { pressed = true } }
+                .onEnded { _ in pressed = false }
+        )
+        // The link pointer over a clickable island, the arrow elsewhere.
+        .pointerStyle(controller.linkURL != nil ? .link : .default)
         .animation(
             NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
             value: parameters

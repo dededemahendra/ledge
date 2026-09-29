@@ -1370,3 +1370,12 @@ completion, formed inside a `@MainActor` method, was inferred main-actor
 isolated and Swift 6's runtime check trapped off-main. Now `@Sendable`. Any
 EventKit/other-framework callback formed in an actor-isolated method needs
 the same care. Judge: the app stays up after launch and the reload line logs.
+
+## Calendar polish (2026-09-29)
+
+Countdown: minutes under an hour, hours+minutes under three, hours alone
+beyond ("9h"). Caption: "Tomorrow at 06:15" when the item is not today (relative
+to the app's own clock, not the formatter's). A clickable island — the preview
+or a link blip — dips on mouse-down like the panel's buttons and shows the link
+pointer; nowhere else. Judge live: hover with nothing playing — pointer becomes
+a hand, press — content dips, release — Reminders opens.

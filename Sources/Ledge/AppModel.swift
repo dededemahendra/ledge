@@ -334,15 +334,17 @@ final class AppModel {
     /// The next event for the hover preview (`NotchController.upcoming`),
     /// refreshed on the 250 ms tick so the countdown stays honest while the
     /// cursor rests. The caption's time formatting is cached per event.
-    private var upcomingCaption: (id: String, text: String)?
+    private var upcomingCaption: (id: String, day: Date, text: String)?
     private func refreshUpcoming() {
         let now = Date()
         guard let event = calendar.nextEvent(at: now) else {
             presenter.setUpcoming(nil)
             return
         }
-        if upcomingCaption?.id != event.id {
-            upcomingCaption = (event.id, event.captionText())
+        // Keyed on the day too: "Tomorrow at 06:15" becomes "06:15" at midnight.
+        let day = Calendar.current.startOfDay(for: now)
+        if upcomingCaption?.id != event.id || upcomingCaption?.day != day {
+            upcomingCaption = (event.id, day, event.captionText(at: now))
         }
         presenter.setUpcoming(UpcomingEvent(
             title: event.title,

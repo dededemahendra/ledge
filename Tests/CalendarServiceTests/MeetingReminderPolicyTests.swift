@@ -53,10 +53,13 @@ private func event(_ id: String = "standup", startingIn seconds: TimeInterval, l
     #expect(policy.due(for: [a], at: t0 + 2).map(\.event.id) == ["a"])
 }
 
-@Test func captionShowsTitleAndStartTime() {
+@Test func captionShowsTitleAndStartTimeAndNamesTheDayWhenItIsNotToday() {
+    let gb = Locale(identifier: "en_GB"), utc = TimeZone(identifier: "UTC")!
     let e = MeetingEvent(id: "x", title: "Design review", start: Date(timeIntervalSince1970: 1_700_000_000), end: Date(timeIntervalSince1970: 1_700_003_600), joinURL: nil)
     let r = MeetingReminder(event: e, stage: .soon, at: e.start - 300)
-    #expect(r.captionText(locale: Locale(identifier: "en_GB"), timeZone: TimeZone(identifier: "UTC")!) == "Design review · 22:13")
+    #expect(r.captionText(locale: gb, timeZone: utc) == "Design review · 22:13")
+    #expect(e.captionText(at: e.start - 24 * 3600, locale: gb, timeZone: utc) == "Design review · Tomorrow at 22:13")
+    #expect(e.captionText(at: e.start - 3 * 24 * 3600, locale: gb, timeZone: utc) == "Design review · 14 Nov 2023 at 22:13")
 }
 
 @Test func countdownReadsMinutesThenHoursAndNowOnceStarted() {
@@ -64,5 +67,7 @@ private func event(_ id: String = "standup", startingIn seconds: TimeInterval, l
     #expect(event(startingIn: 90).countdownText(at: t0) == "2m", "rounded up")
     #expect(event(startingIn: 2 * 3600).countdownText(at: t0) == "2h")
     #expect(event(startingIn: 2 * 3600 + 10 * 60).countdownText(at: t0) == "2h 10m")
+    #expect(event(startingIn: 9 * 3600 + 27 * 60).countdownText(at: t0) == "9h", "far out, hours are enough")
+    #expect(event(startingIn: 9 * 3600 + 40 * 60).countdownText(at: t0) == "10h", "…to the nearest")
     #expect(event(startingIn: -60).countdownText(at: t0) == "Now")
 }
