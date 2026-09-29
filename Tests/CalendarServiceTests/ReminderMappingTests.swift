@@ -17,6 +17,8 @@ import EventKit
     let due = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 30, hour: 6, minute: 0))!
     #expect(item?.start == due)
     #expect(item?.end == due.addingTimeInterval(MeetingEvent.reminderWindow))
+    #expect(item?.detailURL?.absoluteString == "x-apple-reminderkit://REMCDReminder/\(timed.calendarItemIdentifier)",
+            "a click lands on the reminder itself")
 
     let untimed = EKReminder(eventStore: store)
     untimed.title = "Buy milk"
@@ -26,4 +28,9 @@ import EventKit
     let blank = EKReminder(eventStore: store)
     blank.dueDateComponents = DateComponents(year: 2026, month: 9, day: 30, hour: 7)
     #expect(MeetingEvent(ekReminder: blank) == nil, "no title: nothing to say")
+}
+
+@Test func eventKitIdentifiersArePercentEncodedInDeepLinks() {
+    #expect(MeetingEvent.detailURL(scheme: "ical://ekevent/", identifier: "AB12:CD34/RID=5")?.absoluteString
+            == "ical://ekevent/AB12:CD34%2FRID=5")
 }

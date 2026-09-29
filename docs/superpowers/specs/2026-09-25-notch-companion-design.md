@@ -870,3 +870,11 @@ itself (`ReminderOccurrences`, pure: daily/weekly with named days/monthly/
 yearly, interval, end date; bounded stepping) into the next day. Each
 occurrence is its own item and reminder; an overdue non-recurring reminder
 yields nothing, since it is not upcoming.
+
+**Enhance (2026-09-29, evening).** A click lands on the item itself:
+`ical://ekevent/<eventIdentifier>` for an event, `x-apple-reminderkit://
+REMCDReminder/<calendarItemIdentifier>` for a reminder — both registered
+handlers on this macOS (checked without opening anything) — with the app as the
+fallback when the system refuses the link. An event's caption shows its span
+("Test · 21:00–22:00", "Tomorrow 09:00–10:00"), a reminder its time
+("Tomorrow at 06:15"), so an item under way says when it ends.

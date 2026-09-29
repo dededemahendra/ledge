@@ -21,19 +21,26 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
     /// "Now" before the next item takes over.
     public let end: Date
     /// A video-call link found in the item (see `MeetingLinkDetector`), or
-    /// `nil` — then a click on the blip opens Calendar or Reminders.
+    /// `nil` — then a click on the blip opens the item itself.
     public let joinURL: URL?
+    /// The item in its own app — Calendar's `ical://ekevent/<id>` or
+    /// Reminders' `x-apple-reminderkit://REMCDReminder/<id>` (both
+    /// registered handlers on macOS 27, checked 2026-09-29) — so a click
+    /// lands on the event, not on the app's last view. `nil` for an
+    /// unsaved item.
+    public let detailURL: URL?
 
     /// How long a due reminder stays "Now" (it has no duration of its own).
     public static let reminderWindow: TimeInterval = 15 * 60
 
-    public init(id: String, kind: Kind = .event, title: String, start: Date, end: Date, joinURL: URL?) {
+    public init(id: String, kind: Kind = .event, title: String, start: Date, end: Date, joinURL: URL?, detailURL: URL? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
         self.start = start
         self.end = end
         self.joinURL = joinURL
+        self.detailURL = detailURL
     }
 
     /// The leading ear's glyph: the calendar for an event, the checklist
@@ -58,30 +65,39 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         return "\(Int((Double(minutes) / 60).rounded()))h"
     }
 
-    /// The caption line under the hole: "Title · 10:00" today, and
-    /// "Title · Tomorrow at 06:15" when the day differs — the time alone
-    /// would read as this morning's.
+    /// The caption line under the hole. An event shows its span — "Title ·
+    /// 21:00–22:00", so one under way says when it ends — and a reminder
+    /// its time, "Title · 06:15". When the day differs the day is named:
+    /// "Tomorrow 09:00–10:00", "Tomorrow at 06:15" (a bare time would read
+    /// as this morning's); further out, the date.
     public func captionText(
         at now: Date = Date(), locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent
     ) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = locale
         calendar.timeZone = timeZone
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.timeZone = timeZone
-        formatter.timeStyle = .short
-        formatter.dateStyle = .none
+        let time = DateFormatter()
+        time.locale = locale
+        time.timeZone = timeZone
+        time.timeStyle = .short
+        time.dateStyle = .none
+        let when = kind == .event
+            ? "\(time.string(from: start))–\(time.string(from: end))"
+            : time.string(from: start)
         if calendar.isDate(start, inSameDayAs: now) {
-            return "\(title) · \(formatter.string(from: start))"
+            return "\(title) · \(when)"
         }
         // Relative to `now`, not to the wall clock (which is all
         // `doesRelativeDateFormatting` knows), so this stays testable.
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(start, inSameDayAs: tomorrow) {
-            return "\(title) · Tomorrow at \(formatter.string(from: start))"
+            return kind == .event ? "\(title) · Tomorrow \(when)" : "\(title) · Tomorrow at \(when)"
         }
-        formatter.dateStyle = .medium
-        return "\(title) · \(formatter.string(from: start))"
+        let day = DateFormatter()
+        day.locale = locale
+        day.timeZone = timeZone
+        day.dateStyle = .medium
+        day.timeStyle = .none
+        return "\(title) · \(day.string(from: start)) \(when)"
     }
 }
 

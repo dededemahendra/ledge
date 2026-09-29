@@ -14,8 +14,8 @@ run anywhere else either.
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
-| Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 14:00" under the hole; click to join, or to open Calendar or Reminders |
-| An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open Calendar or Reminders |
+| Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00–22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
+| An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
 | Charger in/out, low or full battery | battery glyph left (bolt while charging, plug when held on AC; green charging, red low), percentage right, 3 s |

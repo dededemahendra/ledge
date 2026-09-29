@@ -1379,3 +1379,11 @@ to the app's own clock, not the formatter's). A clickable island — the preview
 or a link blip — dips on mouse-down like the panel's buttons and shows the link
 pointer; nowhere else. Judge live: hover with nothing playing — pointer becomes
 a hand, press — content dips, release — Reminders opens.
+
+## Deep links and event spans (2026-09-29)
+
+From the user's recording: the click opened Calendar at its last view, not the
+event. Now `ical://ekevent/<id>` / `x-apple-reminderkit://REMCDReminder/<id>`,
+falling back to the app if refused. Event captions show start–end. Judge live:
+click the preview of an event — Calendar opens ON that event; of a reminder —
+Reminders opens on it. Still unverified live: the link pointer and press dip.

@@ -214,8 +214,17 @@ extension MeetingEvent {
             title: title,
             start: start,
             end: end,
-            joinURL: MeetingLinkDetector.joinURL(url: event.url, location: event.location, notes: event.notes)
+            joinURL: MeetingLinkDetector.joinURL(url: event.url, location: event.location, notes: event.notes),
+            detailURL: event.eventIdentifier.flatMap { Self.detailURL(scheme: "ical://ekevent/", identifier: $0) }
         )
+    }
+
+    /// `scheme` + the identifier, kept verbatim where a URL path allows it
+    /// (UUID hyphens, the colon EventKit puts in event identifiers) and
+    /// escaped where it does not (a slash would end the path).
+    static func detailURL(scheme: String, identifier: String) -> URL? {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+        return identifier.addingPercentEncoding(withAllowedCharacters: allowed).flatMap { URL(string: scheme + $0) }
     }
 }
 
@@ -232,7 +241,7 @@ extension MeetingEvent {
                 items.append(MeetingEvent(
                     id: "\(reminder.calendarItemIdentifier)@\(Int(date.timeIntervalSince1970))",
                     kind: .reminder, title: base.title, start: date,
-                    end: date.addingTimeInterval(reminderWindow), joinURL: base.joinURL
+                    end: date.addingTimeInterval(reminderWindow), joinURL: base.joinURL, detailURL: base.detailURL
                 ))
             }
         }
@@ -253,7 +262,8 @@ extension MeetingEvent {
             title: title,
             start: due,
             end: due.addingTimeInterval(Self.reminderWindow),
-            joinURL: MeetingLinkDetector.joinURL(url: reminder.url, location: nil, notes: reminder.notes)
+            joinURL: MeetingLinkDetector.joinURL(url: reminder.url, location: nil, notes: reminder.notes),
+            detailURL: Self.detailURL(scheme: "x-apple-reminderkit://REMCDReminder/", identifier: reminder.calendarItemIdentifier)
         )
     }
 }

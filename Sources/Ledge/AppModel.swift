@@ -318,7 +318,7 @@ final class AppModel {
                 title: reminder.event.title,
                 compactText: reminder.compactText,
                 symbolName: reminder.event.symbolName,
-                url: reminder.event.joinURL ?? Self.openAppURL(for: reminder.event.kind)
+                url: reminder.event.joinURL ?? reminder.event.detailURL ?? Self.openAppURL(for: reminder.event.kind)
             )
         )
         showCaption(reminder.captionText(), for: ActivityKind.calendar.defaultTTL ?? NotchController.captionDuration)
@@ -351,21 +351,31 @@ final class AppModel {
             symbolName: event.symbolName,
             compactText: event.countdownText(at: now),
             caption: upcomingCaption?.text ?? event.title,
-            url: event.joinURL ?? Self.openAppURL(for: event.kind)
+            url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind)
         ))
+    }
+
+    /// A click on a calendar item: the join link, else the item's own deep
+    /// link (`MeetingEvent.detailURL`), else — or if the system refuses the
+    /// deep link — the item's app. `ledge://calendar|reminders` are this
+    /// model's own stand-ins for "the app", never handed to the system.
+    private func open(_ url: URL) {
+        let appFor: [String: String] = [
+            "ledge": url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal",
+            "ical": "com.apple.iCal",
+            "x-apple-reminderkit": "com.apple.reminders",
+        ]
+        if url.scheme != "ledge", NSWorkspace.shared.open(url) { return }
+        if let bundle = url.scheme.flatMap({ appFor[$0] }),
+           let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
+            NSWorkspace.shared.openApplication(at: app, configuration: .init())
+        }
     }
 
     private func handle(_ intent: NotchIntent) {
         switch intent {
         case .open(let url):
-            if url.scheme == "ledge" {
-                let bundle = url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal"
-                if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
-                    NSWorkspace.shared.openApplication(at: app, configuration: .init())
-                }
-            } else {
-                NSWorkspace.shared.open(url)
-            }
+            open(url)
         case .togglePlayPause: media.send(.togglePlayPause)
         case .next:             media.send(.nextTrack)
         case .previous:         media.send(.previousTrack)
