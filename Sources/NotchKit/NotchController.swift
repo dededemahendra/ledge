@@ -360,14 +360,16 @@ public final class NotchController {
         recomputeState()
     }
 
-    /// A no-op with no island to expand (zero-width notch rect — no notch on
-    /// this Mac, or a display-hot-plug gap). Without this guard, "Toggle
-    /// Panel" latches `.expanded` with no window ever created to show it,
-    /// and `recomputeState()`'s very first line returns early on
-    /// `.expanded` forever after — hover becomes permanently inert until
-    /// Toggle Panel is pressed again.
+    /// Pins the now-playing card open. A no-op without a card (2026-09-29:
+    /// the expanded panel is only ever the card — a click on a lone blip
+    /// used to pin open the pre-card title-and-bar layout around it) and
+    /// without an island to expand (zero-width notch rect — no notch on
+    /// this Mac, or a display-hot-plug gap; without that guard a pin
+    /// latched `.expanded` with no window ever created to show it, and
+    /// `recomputeState()`'s first line returned early on `.expanded`
+    /// forever after — hover permanently inert).
     public func click() {
-        guard metrics.notchRect.width > 0 else { return }
+        guard metrics.notchRect.width > 0, media != nil else { return }
         isPinnedOpen = true
         state = .expanded
     }
@@ -381,14 +383,15 @@ public final class NotchController {
     ///   The panel's own buttons still get their taps first.
     /// - on a pinned panel: unpin. If the cursor is still there it stays
     ///   hover-open, so nothing visibly changes — but leaving now closes it.
-    /// - otherwise: pin open, but only when there is something to show; a
-    ///   click on an empty peek must not open an empty slab.
+    /// - otherwise: pin the card open, but only when there is a card; a
+    ///   click on an empty peek or on a lone blip must not open an empty
+    ///   slab (2026-09-29: nor the old title-and-bar list around the blip).
     public func tap() {
         if state == .expanded {
             if isPinnedOpen { dismiss() }
             return
         }
-        guard media != nil || activityCount > 0 else { return }
+        guard media != nil else { return }
         click()
     }
 

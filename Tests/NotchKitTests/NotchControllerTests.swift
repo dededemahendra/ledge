@@ -30,18 +30,17 @@ private func makeController(reduceMotion: Bool = false) -> NotchController {
 @MainActor
 @Test func clickExpandsAndDismissCollapses() {
     let c = makeController()
-    c.setHovered(true)
+    c.setMedia(someMedia())
     c.click()
     #expect(c.state == .expanded)
     c.dismiss()
-    #expect(c.state == .peek, "cursor is still over the island after dismissing")
-    c.setHovered(false)
     #expect(c.state == .hidden)
 }
 
 @MainActor
 @Test func expandedSurvivesTheCursorLeaving() {
     let c = makeController()
+    c.setMedia(someMedia())
     c.setHovered(true)
     c.click()
     c.setHovered(false)
@@ -345,6 +344,7 @@ private func someMedia() -> MediaPresentation {
 @MainActor
 @Test func activityArrivingWhileExpandedDoesNotCollapseThePanel() {
     let c = makeController()
+    c.setMedia(someMedia())
     c.setHovered(true)
     c.click()
     c.setActivityCount(2)
@@ -381,6 +381,7 @@ private func someMedia() -> MediaPresentation {
     #expect(c.parameters == c.metrics.oneActivity, "more activities never grow the island; they queue")
     c.setActivityCount(5)
     #expect(c.parameters == c.metrics.oneActivity)
+    c.setMedia(someMedia())
     c.click()
     #expect(c.parameters == c.metrics.expanded)
 }
@@ -416,6 +417,7 @@ private func someMedia() -> MediaPresentation {
 @MainActor
 @Test func changingMetricsUpdatesParametersImmediately() {
     let c = makeController()
+    c.setMedia(someMedia())
     c.setHovered(true)
     c.click()
     #expect(c.parameters == c.metrics.expanded)
@@ -441,8 +443,21 @@ private func someMedia() -> MediaPresentation {
 @Test func clickWithoutHoverStillExpands() {
     // A click can arrive from a hit test without a preceding hover event.
     let c = makeController()
+    c.setMedia(someMedia())
     c.click()
     #expect(c.state == .expanded)
+}
+
+/// The expanded panel is only ever the now-playing card (2026-09-29): a
+/// click on a lone blip must not pin open the old title-and-bar slab.
+@MainActor
+@Test func clickWithoutACardDoesNothing() {
+    let c = makeController()
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
+    c.click()
+    #expect(c.state == .activity && !c.isPinnedOpen)
+    c.tap()
+    #expect(c.state == .activity && !c.isPinnedOpen, "nor via a tap")
 }
 
 @MainActor
@@ -453,6 +468,7 @@ private func someMedia() -> MediaPresentation {
     // and `recomputeState()` early-returns on `.expanded` forever after —
     // hover becomes permanently inert until Toggle Panel is pressed again.
     let c = NotchController(metrics: NotchMetrics(notchRect: .zero))
+    c.setMedia(someMedia())
     c.click()
     #expect(c.state == .hidden)
 }
@@ -465,17 +481,18 @@ private func someMedia() -> MediaPresentation {
 @MainActor
 @Test func dismissWithALiveActivityLandsOnActivity() {
     let c = makeController()
-    c.setHovered(true)
+    c.setMedia(someMedia())
     c.setActivityCount(1)
     c.click()
     #expect(c.state == .expanded)
     c.dismiss()
-    #expect(c.state == .activity, "a live activity outranks hover once the panel closes")
+    #expect(c.state == .activity, "a live activity is what the island falls back to once the panel closes")
 }
 
 @MainActor
 @Test func dismissWithNothingToFallBackToLandsOnHidden() {
     let c = makeController()
+    c.setMedia(someMedia())
     c.click()                     // hover never set, no activities
     c.dismiss()
     #expect(c.state == .hidden)
@@ -491,7 +508,7 @@ private func someMedia() -> MediaPresentation {
 
 /// The player quitting (or crashing) takes the card with it; a panel pinned
 /// on that card must not outlive it as an empty slab (2026-09-29). Nil-to-nil
-/// media, though, is stream noise and must leave a blip's own pin alone.
+/// media, though, is stream noise and must leave a live blip alone.
 @MainActor
 @Test func thePlayerQuittingReleasesAPinnedPanel() {
     // Production order: the app model drops the card, then republishes the
@@ -515,11 +532,9 @@ private func someMedia() -> MediaPresentation {
     d.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
     #expect(d.state == .activity && !d.isPinnedOpen)
 
-    // A pin made on a blip's own detail (no card) survives media noise.
+    // Nil-to-nil media is stream noise: a live blip is left exactly as it was.
     let e = makeController()
     e.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
-    e.tap()
-    #expect(e.state == .expanded && e.isPinnedOpen)
     e.setMedia(nil)
-    #expect(e.isPinnedOpen && e.state == .expanded, "nil to nil is not the card going away")
+    #expect(e.state == .activity && !e.isPinnedOpen)
 }

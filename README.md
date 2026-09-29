@@ -29,7 +29,7 @@ previous · play/pause · next · repeat. The star works for Apple Music only
 (Spotify has no local way to like a track); the first tap makes macOS ask once
 to let Ledge control Music, and until that tap Ledge never talks to Music. The output button opens a list of every audio
 output below the controls (the card grows to fit); pick one to switch. Click the island to pin the card open; click
-elsewhere, or Escape, to unpin. Two-finger swipe left or right over the island
+elsewhere, or Escape, to unpin. A click on a blip with nothing playing does nothing. Two-finger swipe left or right over the island
 to skip tracks.
 
 ## Build and run

@@ -1311,3 +1311,11 @@ player as an empty slab. `setMedia(nil)` now releases the pin when the card
 departs (nil-to-nil leaves a blip's own pin alone). Judge live: play, click
 the notch to pin, quit the player — the island collapses at once; with a
 volume blip live it lands on the blip.
+
+## Blip click (2026-09-29)
+
+Clicking a volume/battery/device blip used to pin open the pre-card
+title-and-bar layout at full card size. The expanded panel is now only ever the
+now-playing card: `click()`/`tap()` need media, the legacy list is deleted.
+Judge live: with nothing playing, press volume and click the blip — nothing
+opens; with music playing, click the blip — the card pins as before.

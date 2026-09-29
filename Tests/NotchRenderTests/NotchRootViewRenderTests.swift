@@ -205,10 +205,9 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 @MainActor
 @Test func expandedContentRendersInsideTheIslandAndClearOfTheNotch() {
     let controller = makeController()
-    controller.setActivities(
-        [.init(id: "power", title: "Charging · 42%", detail: "24 min to full", compactText: "42%")],
-        overflow: 0
-    )
+    // The expanded panel is only ever the now-playing card (2026-09-29).
+    controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
     controller.click()
     #expect(controller.state == .expanded)
     #expect(controller.parameters == controller.metrics.expanded)
@@ -461,9 +460,8 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
 @MainActor
 @Test func renderedIslandFillMatchesTheComputedShapePath() {
     let controller = makeController()
-    controller.setActivities(
-        [.init(id: "power", title: "Charging · 42%", compactText: "42%")], overflow: 0
-    )
+    controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
     controller.click()   // expanded: the tallest, widest state — most margin for error
 
     let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)

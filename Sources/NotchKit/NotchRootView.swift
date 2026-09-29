@@ -650,8 +650,8 @@ public struct NotchRootView: View {
             // level in a glyph. Non-HUD symbols carry no `barFill` (nil) and
             // no variable layers, so this is inert for them.
             //
-            // Keyed and animated exactly like `trailingEar`'s `compact` text and
-            // `detailTitle`'s title below: `AppModel` gives every HUD record the
+            // Keyed and animated exactly like `trailingEar`'s `compact` text:
+            // `AppModel` gives every HUD record the
             // same id ("hud"), so a symbol changing (now only the mute slash
             // toggling — the level symbol itself is constant) is an in-place
             // update to the SAME view, not an insertion — `.transition` only
@@ -779,7 +779,7 @@ public struct NotchRootView: View {
     /// (`ActivityKind.media.rawValue` — a string, not the enum itself, since
     /// `NotchKit` has no dependency on `ActivityKit`; see `Package.swift`).
     /// Same cross-module id convention already relied on above and in
-    /// `trailingEar`/`detailTitle` below (`AppModel` gives every HUD/power
+    /// `trailingEar` below (`AppModel` gives every HUD/power
     /// record a fixed id too — "hud", "power" — so a value changing there is
     /// an in-place update, not an insertion).
     private static let mediaActivityID = "media"
@@ -923,69 +923,14 @@ public struct NotchRootView: View {
             // so anything past the budget clips downward, never into the ears.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(controller.activities) { activity in
-                    detailTitle(activity.title)
-                    if let fill = activity.barFill {
-                        detailBar(fill)
-                    }
-                    if let detail = activity.detail {
-                        Text(detail)
-                            .font(.system(size: 9))
-                            .foregroundStyle(contentColor.opacity(0.6))
-                            .lineLimit(1)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // Unreachable in practice since 2026-09-29: `.expanded` is only
+            // ever the now-playing card (`NotchController.click()` needs
+            // media, and the card's departure unpins). The pre-card
+            // title-and-bar list that lived here is gone with it. A real
+            // view, not `EmptyView`, for the same frame-collapse reason as
+            // `trailingEar`'s fallback.
+            Color.clear
         }
-    }
-
-    /// One activity title, keyed and transitioned exactly like `trailingEar`'s
-    /// `compact` text above. `.transition` alone only supplies the
-    /// insertion/removal `.id(title)` creates; it still needs an ANIMATED
-    /// transaction to actually play, which `.animation(value: parameters)`
-    /// on the root view does NOT supply for a title change on its own (a
-    /// title changing leaves `parameters` — state/activityCount/metrics —
-    /// equal, so that root-level animation never attaches). This local
-    /// `.animation(value:)` supplies one directly, keyed on the title
-    /// itself so only an actual change animates.
-    private func detailTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .medium))
-            .lineLimit(1)
-            .id(title)
-            .transition(.blurReplace)
-            .animation(
-                NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
-                value: title
-            )
-    }
-
-    /// `barFill`'s progress bar, shown directly below its activity's title —
-    /// the same slot `detail` occupies when present, each gated by its own
-    /// `if let` so an activity with neither contributes no extra height.
-    /// Fixed at 4pt tall via the outer `.frame(height:)` regardless of what
-    /// `GeometryReader` itself would report as an ideal size — that is what
-    /// makes this a small, KNOWN addition to `detailRow`'s ideal-height
-    /// measurement in `NotchRenderTests`, rather than an unbounded one.
-    private func detailBar(_ fill: Double) -> some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Capsule().fill(contentColor.opacity(0.22))
-                Capsule()
-                    .fill(contentColor)
-                    .frame(width: geometry.size.width * fill)
-                    // Same slide-not-jump tuning as the panel's scrubber.
-                    .animation(
-                        controller.reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 1.0),
-                        value: fill
-                    )
-            }
-        }
-        .frame(height: 4)
     }
 
     #if DEBUG

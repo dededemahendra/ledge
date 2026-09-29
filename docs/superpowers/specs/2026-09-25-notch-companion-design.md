@@ -254,8 +254,13 @@ and a panel pinned on that card is released with it — the island falls back to
 a live blip, a peek, or idle on the normal collapse. Nothing is shown for the
 quit itself: the user closed the app; a "closed" blip would be noise. Paused is
 unchanged (frozen cover, dimmed output glyph). Only the card's departure
-releases a pin; nil-to-nil media from the stream leaves a blip's own pinned
-detail alone.
+releases a pin; nil-to-nil media from the stream leaves a live blip alone.
+
+**Changed 2026-09-29: the expanded panel is only ever the now-playing card.**
+A click pins only when there is a card to pin (`click()` and `tap()` need
+media); a click on a lone volume/brightness/battery/device blip does nothing.
+The pre-card title-and-bar detail list that a pin used to open around a blip is
+deleted. So `.expanded` implies media, and a pin implies media.
 
 - Auto-collapse timers are **cancelled while hovered** — never yank the island out
   from under the cursor.
