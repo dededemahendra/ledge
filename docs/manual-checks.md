@@ -1330,3 +1330,11 @@ the blip appears; click it — the browser opens the link; at the start, "Now".
 With music playing the blip leads the ears and the cover returns after 8 s.
 Decline the permission once to see the menu row "Calendar needs Calendars
 access…".
+
+## Next-event preview on hover (2026-09-29)
+
+With nothing playing and no blip, rest the cursor on the notch: the island
+grows to the captioned size with the calendar glyph, the countdown and
+"Title · 14:00"; click joins. With music playing or a blip live the preview
+yields. The reminder blip's caption now shows too (it was gated to media).
+Headless render of the preview checked. Judge live with an event later today.

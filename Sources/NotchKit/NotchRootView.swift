@@ -492,11 +492,13 @@ public struct NotchRootView: View {
             // sharpens it over the spring (the root's `.animation(value:
             // parameters)` is the transaction). Before this the card was
             // simply sliced by the moving clip mask on the way out.
-            if controller.hasCaption, let caption = controller.caption {
-                // Song-change caption (see `NotchController.caption`): one
-                // line under the hole, fading in over the island's spring
-                // and out again when it goes. Keyed on the text so a second
-                // change inside the window crossfades in place.
+            if let caption = controller.captionText {
+                // Song-change or meeting caption (see `NotchController.
+                // caption`), or the previewed next event on hover
+                // (`NotchController.upcoming`): one line under the hole,
+                // fading in over the island's spring and out again when it
+                // goes. Keyed on the text so a second change inside the
+                // window crossfades in place.
                 captionRow(caption)
                     .frame(width: parameters.width, height: parameters.height - notch.height)
                     .id(caption)
@@ -561,7 +563,7 @@ public struct NotchRootView: View {
     private var earContentKey: String {
         let first = controller.activities.first
         let hint = controller.skipHint.map { $0 == .next ? "n" : "p" } ?? "-"
-        return "\(first?.id ?? "-")|\(controller.media == nil ? 0 : 1)|\(hint)"
+        return "\(first?.id ?? "-")|\(controller.media == nil ? 0 : 1)|\(hint)|\(controller.isPreviewingUpcoming ? "u" : "-")"
     }
 
     /// Spec §6/§10: content must stay inside the island's own rect and clear
@@ -606,7 +608,12 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if let hint = controller.skipHint, controller.media != nil, controller.state != .expanded {
+        if controller.isPreviewingUpcoming {
+            // The next event on hover (`NotchController.upcoming`): the
+            // meeting blip's glyph, same size and weight as a blip's.
+            Image(systemName: "calendar")
+                .font(.system(size: 13, weight: .medium))
+        } else if let hint = controller.skipHint, controller.media != nil, controller.state != .expanded {
             // Swipe-to-skip feedback (`NotchController.skipHint`): the skip
             // glyph takes the artwork's place for a beat. The ear key
             // includes it, so this is a crossfade in and back out.
@@ -829,7 +836,10 @@ public struct NotchRootView: View {
     /// three digits at a glance, so volume/brightness now show glyph + bar;
     /// battery keeps glyph + `87%`, having no `barFill` to prefer.
     @ViewBuilder private var trailingEar: some View {
-        if controller.isDeviceLeading, controller.media != nil, controller.state != .expanded,
+        if controller.isPreviewingUpcoming, let upcoming = controller.upcoming {
+            // The next event's countdown — "42m", "2h 10m", "Now".
+            compactValue(upcoming.compactText)
+        } else if controller.isDeviceLeading, controller.media != nil, controller.state != .expanded,
            let activity = controller.activities.first {
             // The device's icon in place of the visualizer bars
             // for the blip's lifetime — see `leadingEar`'s first branch.

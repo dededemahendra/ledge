@@ -559,3 +559,48 @@ private func someMedia() -> MediaPresentation {
     #expect(opened.count == 1, "a blip without a link is just a blip…")
     #expect(c.isPinnedOpen, "…so the tap pins the card as usual")
 }
+
+/// With nothing playing and no blip live, hover previews the next event
+/// in the meeting blip's own layout (2026-09-29); a tap joins.
+@MainActor
+@Test func hoverWithNothingPlayingPreviewsTheNextEvent() {
+    let c = makeController()
+    var opened: [NotchIntent] = []
+    c.onIntent = { opened.append($0) }
+    let url = URL(string: "https://zoom.us/j/1")!
+    c.setUpcoming(UpcomingEvent(title: "Design review", compactText: "42m", caption: "Design review · 14:00", url: url))
+    c.setHovered(true)
+    #expect(c.state == .peek && c.isPreviewingUpcoming)
+    #expect(c.parameters == c.metrics.captioned, "ears plus the caption line, like the reminder blip")
+    #expect(c.captionText == "Design review · 14:00")
+    c.tap()
+    #expect(opened == [.open(url)])
+    #expect(c.state == .peek && !c.isPinnedOpen, "a tap joins; it never pins")
+    c.setHovered(false)
+    #expect(c.state == .hidden && !c.isPreviewingUpcoming)
+
+    c.setActivityCount(1)
+    c.setHovered(true)
+    #expect(c.state == .activity && !c.isPreviewingUpcoming, "a live blip wins")
+    c.setActivityCount(0)
+    c.setMedia(someMedia())
+    #expect(c.state == .expanded && !c.isPreviewingUpcoming, "the card wins")
+    c.setMedia(nil)
+    c.setUpcoming(nil)
+    #expect(c.state == .peek && c.parameters == c.metrics.peek, "nothing coming up: the plain peek")
+}
+
+/// A meeting blip carries its own caption; any other blip pre-empting the
+/// island takes it whole (the media-only gate hid the reminder's title
+/// until 2026-09-29).
+@MainActor
+@Test func aMeetingBlipCarriesItsCaptionButAHUDOverItDoesNot() {
+    let c = makeController()
+    let meeting = NotchController.ActivityDisplay(id: "calendar", title: "Standup", compactText: "5m", symbolName: "calendar")
+    c.setActivities([meeting], overflow: 0)
+    c.setCaption("Standup · 10:00")
+    #expect(c.hasCaption && c.captionText == "Standup · 10:00")
+    #expect(c.parameters == c.metrics.captioned)
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"), meeting], overflow: 0)
+    #expect(!c.hasCaption && c.parameters == c.metrics.oneActivity)
+}

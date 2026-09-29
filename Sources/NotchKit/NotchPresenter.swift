@@ -339,6 +339,14 @@ public final class NotchPresenter {
         visible && hovered
     }
 
+    /// The previewed next event (`NotchController.upcoming`) changes the
+    /// peek's shape, so it goes through the presenter for the window resync.
+    public func setUpcoming(_ upcoming: UpcomingEvent?) {
+        guard upcoming != controller.upcoming else { return }
+        controller.setUpcoming(upcoming)
+        syncWindowToVisibility()
+    }
+
     /// A song-change caption (`NotchController.caption`) grows the island,
     /// so it goes through the presenter for the window resync.
     public func setCaption(_ caption: String?) {

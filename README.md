@@ -14,6 +14,7 @@ run anywhere else either.
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
+| Nothing playing, cursor resting on the island | the next event: calendar glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 14:00" under the hole; click to join or open Calendar |
 | A meeting 5 min away, and again as it starts | calendar glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open Calendar |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |

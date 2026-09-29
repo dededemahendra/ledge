@@ -170,7 +170,10 @@ final class AppModel {
         // TTL expiry would otherwise stall while a menu is tracking or a
         // drag is in progress (same fix as PowerService's run-loop source).
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.prune() }
+            MainActor.assumeIsolated {
+                self?.prune()
+                self?.refreshUpcoming()
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         pruneTimer = timer
@@ -308,7 +311,7 @@ final class AppModel {
     private func handle(_ reminder: MeetingReminder) {
         queue.insert(
             ActivityRecord(
-                id: ActivityKind.calendar.rawValue,
+                id: NotchController.calendarActivityID,   // == ActivityKind.calendar.rawValue
                 kind: .calendar,
                 insertedAt: Date(),
                 ttl: ActivityKind.calendar.defaultTTL,
@@ -325,6 +328,27 @@ final class AppModel {
     /// Stands in for "open the Calendar app" on a reminder without a call
     /// link; never handed to the system as a URL.
     private static let openCalendarURL = URL(string: "ledge://calendar")!
+
+    /// The next event for the hover preview (`NotchController.upcoming`),
+    /// refreshed on the 250 ms tick so the countdown stays honest while the
+    /// cursor rests. The caption's time formatting is cached per event.
+    private var upcomingCaption: (id: String, text: String)?
+    private func refreshUpcoming() {
+        let now = Date()
+        guard let event = calendar.nextEvent(at: now) else {
+            presenter.setUpcoming(nil)
+            return
+        }
+        if upcomingCaption?.id != event.id {
+            upcomingCaption = (event.id, event.captionText())
+        }
+        presenter.setUpcoming(UpcomingEvent(
+            title: event.title,
+            compactText: event.countdownText(at: now),
+            caption: upcomingCaption?.text ?? event.title,
+            url: event.joinURL ?? Self.openCalendarURL
+        ))
+    }
 
     private func handle(_ intent: NotchIntent) {
         switch intent {
@@ -486,7 +510,10 @@ final class AppModel {
         if !power.availability.isAvailable { queue.remove(kind: .power) }
         if !hud.availability.isAvailable { queue.remove(kind: .hud) }
         if !device.availability.isAvailable { queue.remove(kind: .device) }
-        if !calendar.availability.isAvailable { queue.remove(kind: .calendar) }
+        if !calendar.availability.isAvailable {
+            queue.remove(kind: .calendar)
+            presenter.setUpcoming(nil)
+        }
         if !media.availability.isAvailable {
             queue.remove(kind: .media)
             // The activity is not the only thing a dead media service leaves

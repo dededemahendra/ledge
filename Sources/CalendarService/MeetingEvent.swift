@@ -21,6 +21,28 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         self.end = end
         self.joinURL = joinURL
     }
+
+    /// Time to the start for an ear: whole minutes rounded up under an
+    /// hour ("42m"), hours and minutes above ("2h", "2h 10m"), "Now" once
+    /// under way.
+    public func countdownText(at now: Date) -> String {
+        let remaining = start.timeIntervalSince(now)
+        guard remaining > 0 else { return "Now" }
+        let minutes = max(1, Int((remaining / 60).rounded(.up)))
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60, rest = minutes % 60
+        return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+    }
+
+    /// The caption line under the hole: "Title · 10:00".
+    public func captionText(locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return "\(title) · \(formatter.string(from: start))"
+    }
 }
 
 /// Where in an event's run-up a reminder fires.
@@ -46,21 +68,11 @@ public struct MeetingReminder: Sendable, Equatable {
 
     /// The trailing ear: whole minutes to the start, rounded up, or "Now".
     public var compactText: String {
-        switch stage {
-        case .now:  return "Now"
-        case .soon:
-            let minutes = max(1, Int((event.start.timeIntervalSince(at) / 60).rounded(.up)))
-            return "\(minutes)m"
-        }
+        stage == .now ? "Now" : event.countdownText(at: at)
     }
 
     /// The caption line under the hole: "Title · 10:00".
     public func captionText(locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.timeZone = timeZone
-        formatter.timeStyle = .short
-        formatter.dateStyle = .none
-        return "\(event.title) · \(formatter.string(from: event.start))"
+        event.captionText(locale: locale, timeZone: timeZone)
     }
 }

@@ -665,3 +665,20 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(result.contentOutsideIslandCount == 0,
             "\(result.contentOutsideIslandCount) content pixel(s) outside the island bounds \(result.islandBounds)")
 }
+
+/// The hover preview of the next event (2026-09-29): the peek at
+/// `captioned` size with the calendar glyph, the countdown and the caption
+/// line — all inside the island, none of it in the notch.
+@MainActor
+@Test func upcomingPreviewRendersInsideTheIslandAndClearOfTheNotch() {
+    let controller = makeController()
+    controller.setUpcoming(UpcomingEvent(title: "Design review", compactText: "42m", caption: "Design review · 14:00", url: nil))
+    controller.setHovered(true)
+    #expect(controller.state == .peek)
+    #expect(controller.parameters == controller.metrics.captioned)
+
+    let result = renderAndClassify(controller)
+    #expect(result.hasContentInsideIsland, "no content pixel inside \(result.islandBounds) — the preview did not render")
+    #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
+    #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
+}

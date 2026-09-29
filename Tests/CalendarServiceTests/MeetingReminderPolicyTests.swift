@@ -58,3 +58,11 @@ private func event(_ id: String = "standup", startingIn seconds: TimeInterval, l
     let r = MeetingReminder(event: e, stage: .soon, at: e.start - 300)
     #expect(r.captionText(locale: Locale(identifier: "en_GB"), timeZone: TimeZone(identifier: "UTC")!) == "Design review · 22:13")
 }
+
+@Test func countdownReadsMinutesThenHoursAndNowOnceStarted() {
+    #expect(event(startingIn: 42 * 60).countdownText(at: t0) == "42m")
+    #expect(event(startingIn: 90).countdownText(at: t0) == "2m", "rounded up")
+    #expect(event(startingIn: 2 * 3600).countdownText(at: t0) == "2h")
+    #expect(event(startingIn: 2 * 3600 + 10 * 60).countdownText(at: t0) == "2h 10m")
+    #expect(event(startingIn: -60).countdownText(at: t0) == "Now")
+}

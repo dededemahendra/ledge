@@ -840,3 +840,14 @@ under way. An exact one-shot timer is armed for the next due time, under a
 which is the user's own key press and gone in 1.5 s. `ActivityRecord.url` /
 `ActivityDisplay.url` carry the click target; `NotchController.tap()` emits
 `.open(url)` for a leading blip that has one, which wins over pinning the card.
+
+**Hover preview (2026-09-29, same day).** With nothing playing and no blip
+live, the peek shows the event under way or next up in the meeting blip's own
+layout — the island at `captioned` size, calendar glyph and countdown in the
+ears, "Title · 14:00" under the hole — and a click joins (or opens Calendar).
+`NotchController.upcoming` is refreshed on `AppModel`'s 250 ms tick from
+`CalendarService.nextEvent(at:)` (equal values are dropped before they can
+re-render); the presenter resyncs the window when it changes. The card and any
+live blip still win over the preview. Found and fixed alongside: the caption
+line was gated to media leading, so the reminder blip's own "Title · 10:00"
+never showed; `hasCaption` now also accepts the calendar blip leading.

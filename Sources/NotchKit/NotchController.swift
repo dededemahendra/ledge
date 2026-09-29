@@ -235,8 +235,40 @@ public final class NotchController {
         self.caption = caption
     }
 
+    /// A song caption belongs to media leading; a meeting blip
+    /// (2026-09-29) carries its own — "Title · 10:00". Any other blip
+    /// pre-empting the island takes it whole.
     public var hasCaption: Bool {
-        state == .activity && isMediaLeading && caption != nil
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading)
+    }
+
+    /// `AppModel` inserts the meeting reminder with this id.
+    public static let calendarActivityID = "calendar"
+
+    public var isCalendarLeading: Bool {
+        activities.first?.id == Self.calendarActivityID
+    }
+
+    /// The next calendar event, shown on hover when there is nothing else
+    /// to show — see `UpcomingEvent` and `isPreviewingUpcoming`.
+    public private(set) var upcoming: UpcomingEvent?
+
+    public func setUpcoming(_ upcoming: UpcomingEvent?) {
+        guard upcoming != self.upcoming else { return }   // set every tick; only a change should re-render
+        self.upcoming = upcoming
+    }
+
+    /// Hovered, nothing playing, no blip live, and an event coming up: the
+    /// peek becomes the meeting blip's layout with that event in it.
+    public var isPreviewingUpcoming: Bool {
+        state == .peek && upcoming != nil
+    }
+
+    /// What the caption line under the hole says right now, if anything:
+    /// the song/meeting caption at activity size, or the previewed event.
+    public var captionText: String? {
+        if isPreviewingUpcoming { return upcoming?.caption }
+        return hasCaption ? caption : nil
     }
 
     /// Feedback for a swipe-to-skip: the skip glyph takes the leading ear
@@ -336,7 +368,7 @@ public final class NotchController {
         case .hidden:
             return metrics.collapsed
         case .peek:
-            return metrics.peek
+            return upcoming != nil ? metrics.captioned : metrics.peek
         case .activity:
             // One size for every activity, however many are queued
             // (2026-09-29): the "grow down when crowded" two-slot layout
@@ -399,9 +431,14 @@ public final class NotchController {
             if isPinnedOpen { dismiss() }
             return
         }
-        // A blip that carries a link — a meeting reminder's join URL — is a
-        // button for as long as it shows (2026-09-29): the click opens it,
-        // and wins over pinning the card behind it.
+        // The previewed event (hover, nothing playing) and a blip that
+        // carries a link — a meeting reminder's join URL — are buttons for
+        // as long as they show (2026-09-29): the click opens the link, and
+        // wins over pinning the card behind it.
+        if isPreviewingUpcoming, let url = upcoming?.url {
+            emit(.open(url))
+            return
+        }
         if let url = activities.first?.url {
             emit(.open(url))
             return

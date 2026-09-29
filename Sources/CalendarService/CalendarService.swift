@@ -99,6 +99,12 @@ public final class CalendarService {
         reload()
     }
 
+    /// The event under way or next up, for the hover preview
+    /// (`NotchController.upcoming`). `nil` with nothing in the next day.
+    public func nextEvent(at now: Date) -> MeetingEvent? {
+        events.first { $0.end > now }
+    }
+
     /// The next day of events, mapped to `MeetingEvent`s.
     private func reload() {
         let now = Date()
