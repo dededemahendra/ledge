@@ -32,10 +32,19 @@ public struct MediaPresentation: Sendable, Equatable {
         case off, one, all
     }
 
+    /// The card's favourite star. `.unsupported` disables it (every source
+    /// but Apple Music); `.unknown` is enabled but hollow, before the first
+    /// tap opts into asking Music; then `.on`/`.off` follow the track.
+    public enum Favorite: Sendable, Equatable {
+        case unsupported, unknown, on, off
+    }
+    public let favorite: Favorite
+
     public init(
         title: String, artist: String?, artwork: Data?,
         isPlaying: Bool, elapsed: Double, duration: Double?,
-        isShuffling: Bool? = nil, repeatMode: RepeatMode? = nil
+        isShuffling: Bool? = nil, repeatMode: RepeatMode? = nil,
+        favorite: Favorite = .unsupported
     ) {
         self.title = title
         self.artist = artist
@@ -45,6 +54,7 @@ public struct MediaPresentation: Sendable, Equatable {
         self.duration = duration
         self.isShuffling = isShuffling
         self.repeatMode = repeatMode
+        self.favorite = favorite
     }
 
     /// `0...1`, or exactly `0` when duration is unknown or zero — a live
@@ -97,6 +107,8 @@ public enum NotchIntent: Sendable, Equatable {
     /// artwork or title — the Dynamic Island's own gesture for "take me
     /// there"). `AppModel` resolves which app from the live payload.
     case openSource
+    /// The card's star: favourite or un-favourite the current track.
+    case toggleFavorite
 }
 
 /// One entry of the panel's output picker. A pure value like
@@ -146,6 +158,13 @@ public final class NotchController {
         /// render (AirPods, from the system's own assets). Wins over
         /// `symbolName`, which stays as the fallback when decoding fails.
         public let artwork: Data?
+        /// Colour for the glyph when the state means something the system
+        /// colours too: `.positive` (green, charging/charged) or `.warning`
+        /// (red, low battery). `nil` is the island's white.
+        public enum Tint: Sendable, Equatable {
+            case positive, warning
+        }
+        public let tint: Tint?
 
         public init(
             id: String,
@@ -154,7 +173,8 @@ public final class NotchController {
             compactText: String? = nil,
             symbolName: String? = nil,
             barFill: Double? = nil,
-            artwork: Data? = nil
+            artwork: Data? = nil,
+            tint: Tint? = nil
         ) {
             self.id = id
             self.title = title
@@ -163,6 +183,7 @@ public final class NotchController {
             self.symbolName = symbolName
             self.barFill = barFill.map { min(1, max(0, $0)) }
             self.artwork = artwork
+            self.tint = tint
         }
     }
 

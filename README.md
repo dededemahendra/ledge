@@ -16,15 +16,17 @@ run anywhere else either.
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
-| Charger in/out, low or full battery | bolt/plug/battery glyph left, percentage right, 3 s |
+| Charger in/out, low or full battery | bolt/plug/battery glyph left (green charging, red low), percentage right, 3 s |
 | Audio output changes | the device's render or glyph, battery when known, 3 s |
 
 Browsers and everything else that MediaRemote reports are ignored on purpose
 (`MediaSourcePolicy`). One blip owns the island at a time; the rest queue.
 
 **The card** (hover with music playing): artwork and titles — click them to
-bring the app forward — a scrubber with times, then shuffle · previous ·
-play/pause · next · output. The output button opens a list of every audio
+bring the app forward — a scrubber with times, then favourite · shuffle ·
+previous · play/pause · next · output. The star works for Apple Music only
+(Spotify has no local way to like a track); the first tap makes macOS ask once
+to let Ledge control Music, and until that tap Ledge never talks to Music. The output button opens a list of every audio
 output below the controls (the card grows to fit); pick one to switch. Click the island to pin the card open; click
 elsewhere, or Escape, to unpin. Two-finger swipe left or right over the island
 to skip tracks.
@@ -47,7 +49,7 @@ is just Quit (plus a row when something is broken). It registers itself as a
 login item on first launch — macOS says so once, and the switch lives in
 System Settings › General › Login Items.
 
-## The one permission
+## Permissions
 
 **Accessibility**, asked for at launch, for one thing: intercepting the five
 volume/brightness keys so the system never draws its own overlay. On macOS 27
@@ -56,7 +58,9 @@ bar — and consuming the key is the only way to keep it off screen
 (`docs/private-api-notes.md` has the measurements). Without the grant the keys
 work through the system as before, overlay included, and the menu shows a row
 that opens the right Settings pane. Nothing else asks for anything: volume,
-brightness, battery, output routes and media are all observed by value.
+brightness, battery, output routes and media are all observed by value. The
+one other prompt, **Automation for Music**, appears only when you first tap the
+card's favourite star.
 
 ## What it deliberately doesn't do
 

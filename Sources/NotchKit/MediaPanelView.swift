@@ -6,8 +6,8 @@ import SwiftUI
 ///
 ///   row 1 — artwork · title/artist · visualizer, edge to edge
 ///   row 2 — full-width scrubber with the times INLINE at its ends
-///   row 3 — five controls on their own centred row:
-///           shuffle · previous · play/pause · next · output
+///   row 3 — six controls on their own centred row:
+///           favourite · shuffle · previous · play/pause · next · output
 ///   row 4 — (while the output picker is open) one row per audio output,
 ///           below the controls; the card grows downward to hold them and
 ///           shrinks back after a pick
@@ -306,6 +306,8 @@ struct MediaPanelView: View {
     /// transport inside, play in the middle.
     private var controlsRow: some View {
         HStack(spacing: 0) {
+            favoriteButton
+                .frame(maxWidth: .infinity)
             shuffleButton
                 .frame(maxWidth: .infinity)
             controlButton("backward.fill", label: "Previous", size: 17, opacity: 0.9, .previous)
@@ -389,6 +391,31 @@ struct MediaPanelView: View {
         .frame(height: NotchMetrics.outputRowHeight)
         .accessibilityLabel(output.name)
         .accessibilityAddTraits(output.isCurrent ? .isSelected : [])
+    }
+
+    /// The favourite star (2026-09-29, the reference card's first control):
+    /// filled when the track is favourited, hollow when not or not yet
+    /// asked, dimmed and disabled for sources that cannot favourite (every
+    /// one but Apple Music — see `MusicFavorites`).
+    private var favoriteButton: some View {
+        let state = media.favorite
+        let on = state == .on
+        return Button {
+            emit(.toggleFavorite)
+        } label: {
+            Image(systemName: on ? "star.fill" : "star")
+                .font(.system(size: 13, weight: .semibold))
+                .opacity(state == .unsupported ? 0.25 : (on ? 1 : 0.6))
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+                .id(on)
+                .transition(.blurReplace)
+                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: on)
+        }
+        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+        .disabled(state == .unsupported)
+        .accessibilityLabel("Favourite")
+        .accessibilityValue(state == .on ? "on" : (state == .off ? "off" : "unknown"))
     }
 
     /// Shuffle with its state (2026-09-29): full-strength glyph plus a dot

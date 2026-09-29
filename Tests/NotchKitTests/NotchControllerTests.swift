@@ -188,6 +188,8 @@ private func someMedia() -> MediaPresentation {
     #expect(received == .selectOutput(id: "bt-1"))
     c.emit(.openSource)
     #expect(received == .openSource)
+    c.emit(.toggleFavorite)
+    #expect(received == .toggleFavorite)
 }
 
 /// The picker's open state sizes the island, so it lives in the controller:

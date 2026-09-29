@@ -175,3 +175,11 @@ private func snapshot(
     #expect(PowerEvent.lowBattery(percent: 19).symbolName == "battery.25percent")
     #expect(PowerEvent.batterySymbol(percent: 50).hasPrefix("battery.50"))
 }
+
+@Test func tintFollowsTheSystemsOwnBatteryColours() {
+    #expect(PowerEvent.pluggedIn(percent: 40, isCharging: true, timeToFullMinutes: 30).tint == .positive, "green while charging")
+    #expect(PowerEvent.fullyCharged.tint == .positive)
+    #expect(PowerEvent.lowBattery(percent: 9).tint == .warning, "red when low")
+    #expect(PowerEvent.unplugged(percent: 80).tint == nil, "plain on battery")
+    #expect(PowerEvent.pluggedIn(percent: 80, isCharging: false, timeToFullMinutes: nil).tint == nil, "held on AC is not charging")
+}

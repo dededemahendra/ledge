@@ -44,6 +44,21 @@ public enum PowerEvent: Sendable, Equatable {
         }
     }
 
+    /// Colour meaning for the glyph, matching the system's own battery
+    /// indicator: green while charging or charged, red when low, none
+    /// otherwise (2026-09-29).
+    public enum Tint: Sendable, Equatable {
+        case positive, warning
+    }
+
+    public var tint: Tint? {
+        switch self {
+        case .pluggedIn(_, true, _), .fullyCharged: return .positive
+        case .lowBattery:                           return .warning
+        case .pluggedIn(_, false, _), .unplugged:   return nil
+        }
+    }
+
     /// Glyph for the leading ear. A bolt while charging, a plug while held
     /// on AC, a battery whose fill tracks the level otherwise.
     public var symbolName: String {

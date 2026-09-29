@@ -11,5 +11,6 @@
     <key>LSMinimumSystemVersion</key><string>27.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSAppleEventsUsageDescription</key><string>Ledge favourites the current track in Music when you tap the star.</string>
 </dict>
 </plist>

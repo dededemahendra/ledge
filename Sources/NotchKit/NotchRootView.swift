@@ -425,6 +425,17 @@ public struct NotchRootView: View {
         .foregroundStyle(contentColor)
     }
 
+    private func tintColor(for tint: NotchController.ActivityDisplay.Tint?) -> Color? {
+        #if DEBUG
+        if NotchRenderTestHook.contentColor != nil { return nil }
+        #endif
+        switch tint {
+        case .positive?: return Color(nsColor: .systemGreen)
+        case .warning?:  return Color(nsColor: .systemRed)
+        case nil:        return nil
+        }
+    }
+
     /// "Title · Artist": the title carries the weight, the artist sits back.
     /// Left-aligned like the reference, under the artwork's ear. One line,
     /// tail-truncated; the caption row is 26pt, the text 11pt.
@@ -557,6 +568,10 @@ public struct NotchRootView: View {
             // `parameters` — state/activityCount/metrics — stays equal).
             let glyph = Image(systemName: symbol, variableValue: activity.barFill)
                 .font(.system(size: 13, weight: .medium))
+                // Colour only where the system's own indicator colours
+                // itself (green charging, red low). Never under the render
+                // test hook, whose classifier expects one content colour.
+                .foregroundStyle(tintColor(for: activity.tint) ?? contentColor)
                 .id(symbol)
                 .transition(.blurReplace)
                 .animation(

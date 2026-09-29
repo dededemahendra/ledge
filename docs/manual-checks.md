@@ -1192,3 +1192,17 @@ scroll-wheel monitor in `NotchPresenter`; on commit an intent, a haptic, and a
 
 Verified: tests + a headless snapshot of the captioned island. Not verified
 live: the spring down/up on a real track change; the swipe on the trackpad.
+
+# Battery colour and the favourite star (2026-09-29)
+
+Power blip glyph: green (`.positive`) while charging or charged, red
+(`.warning`) when low, white otherwise — `ActivityTint` on the record, never
+applied under the render-test hook. Favourite: `MusicFavorites` (Ledge target)
+drives Music via `NSAppleScript` (`favorited of current track`), off the main
+actor; never queries until the star has been tapped once (`favorites.synced`
+in UserDefaults), so the Automation prompt only ever appears in context.
+`NSAppleEventsUsageDescription` added to Info.plist.in. Spotify and the rest:
+star disabled.
+
+Not verified live: the prompt and the toggle against Music (only a browser
+was playing here); the green/red glyphs on a real plug/unplug.

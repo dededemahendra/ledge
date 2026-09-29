@@ -80,3 +80,10 @@ private func presentation(elapsed: Double, duration: Double?) -> MediaPresentati
     #expect(known.isShuffling == true)
     #expect(known.repeatMode == .all)
 }
+
+@Test func favouriteDefaultsToUnsupported() {
+    let m = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 100)
+    #expect(m.favorite == .unsupported, "only Apple Music can favourite; everything else disables the star")
+    let known = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 100, favorite: .on)
+    #expect(known.favorite == .on)
+}

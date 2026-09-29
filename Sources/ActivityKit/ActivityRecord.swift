@@ -1,5 +1,13 @@
 import Foundation
 
+/// A colour meaning for a glyph — the island is white-on-black everywhere
+/// except where colour carries information the system's own indicators
+/// use it for: green while charging, red when low.
+public enum ActivityTint: Sendable, Equatable {
+    case positive
+    case warning
+}
+
 /// One thing the island is currently saying.
 public struct ActivityRecord: Sendable, Equatable, Identifiable {
     public let id: String
@@ -21,6 +29,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// activity); wins over `symbolName` when present — see
     /// `NotchController.ActivityDisplay.artwork`.
     public let artwork: Data?
+    /// Colour for `symbolName`, when the state warrants one — see
+    /// `ActivityTint`. `nil` is the island's white.
+    public let tint: ActivityTint?
 
     public init(
         id: String,
@@ -32,7 +43,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         compactText: String? = nil,
         symbolName: String? = nil,
         barFill: Double? = nil,
-        artwork: Data? = nil
+        artwork: Data? = nil,
+        tint: ActivityTint? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -44,6 +56,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.symbolName = symbolName
         self.barFill = barFill.map { min(1, max(0, $0)) }
         self.artwork = artwork
+        self.tint = tint
     }
 
     public var isSticky: Bool { ttl == nil }

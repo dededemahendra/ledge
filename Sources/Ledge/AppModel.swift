@@ -19,6 +19,7 @@ final class AppModel {
     private let hud = HUDService()
     private let media = MediaService()
     private let device = DeviceService()
+    private let favorites = MusicFavorites()
 
     private var queue = ActivityQueue()
     private var tasks: [Task<Void, Never>] = []
@@ -136,6 +137,8 @@ final class AppModel {
                 OutputOption(id: $0.id, name: $0.name, symbolName: $0.symbolName, isCurrent: $0.isCurrent)
             })
         }
+        favorites.onChange = { [weak self] in self?.refreshMediaPresentation() }
+
         let deviceStream = device.start()
         tasks.append(Task { [weak self] in
             for await event in deviceStream {
@@ -214,7 +217,8 @@ final class AppModel {
                 ttl: ActivityKind.power.defaultTTL,
                 title: event.activityTitle,
                 compactText: event.compactText,
-                symbolName: event.symbolName
+                symbolName: event.symbolName,
+                tint: event.tint.map { $0 == .positive ? .positive : .warning }
             )
         )
         publish()
@@ -263,10 +267,12 @@ final class AppModel {
         }
 
         // A new song announces itself for a few seconds (the reference
-        // app's caption row); pause/resume of the same song does not.
+        // app's caption row); pause/resume of the same song does not. The
+        // favourite star follows the track the same way.
         if title != captionedTitle {
             captionedTitle = title
             showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
+            favorites.trackChanged(bundleIdentifier: payload.bundleIdentifier)
         }
 
         queue.insert(
@@ -293,6 +299,7 @@ final class AppModel {
         case .toggleRepeat:     media.send(.toggleRepeat)
         case .selectOutput(let id): device.setDefaultOutput(uid: id)
         case .openSource:           openSourceApp()
+        case .toggleFavorite:       favorites.toggle()
         case .seek(let fraction):
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.
@@ -388,7 +395,8 @@ final class AppModel {
                     case .one: .one
                     case .all: .all
                     }
-                }
+                },
+                favorite: favorites.state
             )
         )
     }
@@ -457,7 +465,8 @@ final class AppModel {
                 compactText: record.compactText,
                 symbolName: record.symbolName,
                 barFill: record.barFill,
-                artwork: record.artwork
+                artwork: record.artwork,
+                tint: record.tint.map { $0 == .positive ? .positive : .warning }
             )
         }
         // `setActivities` sets the count itself — do not also call
