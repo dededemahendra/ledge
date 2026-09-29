@@ -488,3 +488,38 @@ private func someMedia() -> MediaPresentation {
     #expect(c.activityCount == 0)
     #expect(c.state == .hidden)
 }
+
+/// The player quitting (or crashing) takes the card with it; a panel pinned
+/// on that card must not outlive it as an empty slab (2026-09-29). Nil-to-nil
+/// media, though, is stream noise and must leave a blip's own pin alone.
+@MainActor
+@Test func thePlayerQuittingReleasesAPinnedPanel() {
+    // Production order: the app model drops the card, then republishes the
+    // activities without the media one.
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.tap()
+    #expect(c.state == .expanded && c.isPinnedOpen)
+    c.setMedia(nil)
+    #expect(!c.isPinnedOpen, "a pin is a pin on the card; no card, no pin")
+    c.setActivities([], overflow: 0)
+    #expect(c.state == .hidden, "back to idle, not an empty slab")
+
+    // A blip live at that moment: the island lands on the blip, not the panel.
+    let d = makeController()
+    d.setMedia(someMedia())
+    d.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    d.tap()
+    d.setMedia(nil)
+    d.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
+    #expect(d.state == .activity && !d.isPinnedOpen)
+
+    // A pin made on a blip's own detail (no card) survives media noise.
+    let e = makeController()
+    e.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
+    e.tap()
+    #expect(e.state == .expanded && e.isPinnedOpen)
+    e.setMedia(nil)
+    #expect(e.isPinnedOpen && e.state == .expanded, "nil to nil is not the card going away")
+}

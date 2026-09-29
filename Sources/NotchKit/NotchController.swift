@@ -465,7 +465,15 @@ public final class NotchController {
         if media?.artwork != self.media?.artwork {
             mediaArtworkImage = media?.artwork.flatMap(NSImage.init(data:))
         }
+        // A pin is a pin on the now-playing card (2026-09-29): when the
+        // player quits or crashes and takes the card with it, the pin goes
+        // too, so the island falls back to a blip, a peek or idle instead
+        // of holding a 390x168 slab with nothing in it. Only the card's
+        // DEPARTURE releases it — nil-to-nil is stream noise (a disallowed
+        // source's diff, say) and must not unpin a blip's own detail panel.
+        let cardWentAway = self.media != nil && media == nil
         self.media = media
+        if cardWentAway { isPinnedOpen = false }
         // Media is what hover opens (see `recomputeState`), so media
         // arriving under a cursor already parked on the island must open
         // the panel, and media going away must close a hover-opened one.

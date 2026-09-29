@@ -248,6 +248,15 @@ is told (`HoverIntentTracker`); the window accepts mouse events on the raw
 pointer position, so a click on a visible island during the dwell still lands
 and pins the panel immediately.
 
+**Changed 2026-09-29: the pin dies with the card.** When the player quits or
+crashes, the stream's "no media" drops the card, the caption and the scrubber,
+and a panel pinned on that card is released with it — the island falls back to
+a live blip, a peek, or idle on the normal collapse. Nothing is shown for the
+quit itself: the user closed the app; a "closed" blip would be noise. Paused is
+unchanged (frozen cover, dimmed output glyph). Only the card's departure
+releases a pin; nil-to-nil media from the stream leaves a blip's own pinned
+detail alone.
+
 - Auto-collapse timers are **cancelled while hovered** — never yank the island out
   from under the cursor.
 - `peek` is the notch height + 6 pt with glanceable hints.

@@ -1302,3 +1302,12 @@ still opens on time. Mouse acceptance follows the raw pointer position, so a
 click during the dwell still pins. Judge live: sweep the cursor up through the
 notch to the menu bar — nothing should move; rest on it — the card opens after
 a beat; click a blip straight away — it pins.
+
+## Player quits (2026-09-29)
+
+User asked what to show when the music app closes: nothing — back to idle.
+Already the case for a hover-opened card; a PINNED card used to outlive the
+player as an empty slab. `setMedia(nil)` now releases the pin when the card
+departs (nil-to-nil leaves a blip's own pin alone). Judge live: play, click
+the notch to pin, quit the player — the island collapses at once; with a
+volume blip live it lands on the blip.
