@@ -1284,3 +1284,11 @@ Press dip 0.88/0.65 -> 0.93/0.80 on a 0.2 s critically damped spring (every
 play <-> pause swaps on a plain 0.2 s crossfade instead of a blur. Hover
 highlight and the one-time row cascade unchanged. Judge live: click play and
 next a few times — the control should dip, not flinch.
+
+## Volume/brightness blip, toned down (2026-09-29)
+
+User: the volume and brightness control animations were too much. Per key
+press the speaker/sun glyph no longer bounces (its waves/rays still light up
+with the level); the percentage still rolls, with a 10% tick instead of 20%.
+The blip's arrival (island pop, ear emerge) and the island pulse on a new
+blip are unchanged. Judge live: hold volume up — one quiet motion per step.

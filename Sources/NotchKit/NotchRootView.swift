@@ -119,7 +119,9 @@ struct ValueBump<Trigger: Equatable>: ViewModifier {
         content.keyframeAnimator(initialValue: 1.0, trigger: trigger) { view, scale in
             view.scaleEffect(enabled ? scale : 1)
         } keyframes: { _ in
-            SpringKeyframe(1.2, duration: 0.12, spring: .snappy)
+            // 10%, down from 20% (2026-09-29): a tick beside the rolling
+            // digits, not a jump.
+            SpringKeyframe(1.1, duration: 0.12, spring: .snappy)
             SpringKeyframe(1.0, duration: 0.3, spring: .bouncy)
         }
     }
@@ -665,12 +667,12 @@ public struct NotchRootView: View {
                 // test hook, whose classifier expects one content colour.
                 .foregroundStyle(tintColor(for: activity.tint) ?? contentColor)
                 // A symbol swap (mute on/off, bolt -> plug) MORPHS with SF
-                // Symbols' replace effect, and every press bounces the
-                // glyph with its own bounce — the waves lighting up and the
-                // speaker nudging together is the press.
+                // Symbols' replace effect. The glyph does NOT bounce on
+                // every press any more (2026-09-29, user's call — with the
+                // number bumping beside it, two motions per key press was
+                // "too much"): the waves lighting up with the level is the
+                // press; the number's roll is the motion.
                 .contentTransition(.symbolEffect(.replace.downUp))
-                .symbolEffect(.bounce, options: controller.reduceMotion ? .nonRepeating.speed(100) : .default,
-                              value: activity.compactText ?? "")
                 .animation(
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: symbol
