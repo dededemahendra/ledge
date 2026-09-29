@@ -362,9 +362,9 @@ final class AppModel {
     /// deep link — the item's app. `ledge://calendar|reminders` are this
     /// model's own stand-ins for "the app", never handed to the system.
     private func open(_ url: URL) {
-        // The running timer's own click (`Self.timerToggleURL`): pause/resume.
-        if url == Self.timerToggleURL {
-            toggleTimerPause()
+        // The running timer's own click (`Self.timerToggleURL`).
+        if url.scheme == "ledge", url.host() == "timer" {
+            openURL(url)
             return
         }
         let appFor: [String: String] = [
@@ -395,13 +395,35 @@ final class AppModel {
         timer.map { ($0.isPaused, $0.isStopwatch) }
     }
 
+    /// `ledge://timer/start?minutes=5`, `/stopwatch`, `/toggle`, `/stop` —
+    /// the island's own click (toggle) and, since the scheme is registered,
+    /// Shortcuts, Raycast or `open` from a shell. Anything else is ignored.
+    func openURL(_ url: URL) {
+        guard url.scheme == "ledge", url.host() == "timer" else {
+            Self.log.notice("ignored url \(url.absoluteString, privacy: .public)")
+            return
+        }
+        switch url.path() {
+        case "/start":
+            let minutes = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first { $0.name == "minutes" }?.value.flatMap(Int.init) ?? 5
+            startTimer(minutes: max(1, minutes))
+        case "/stopwatch": startStopwatch()
+        case "/toggle":    toggleTimerPause()
+        case "/stop":      stopTimer()
+        default:           Self.log.notice("ignored timer url \(url.absoluteString, privacy: .public)")
+        }
+    }
+
     func startTimer(minutes: Int) {
+        Self.log.notice("timer: start \(minutes, privacy: .public) min")
         timer = LiveTimer(kind: .countdown(TimeInterval(minutes * 60)), at: Date())
         timerShown = nil
         refreshTimer()
     }
 
     func startStopwatch() {
+        Self.log.notice("timer: stopwatch")
         timer = LiveTimer(kind: .stopwatch, at: Date())
         timerShown = nil
         refreshTimer()
@@ -410,11 +432,13 @@ final class AppModel {
     func toggleTimerPause() {
         guard timer != nil else { return }
         timer?.togglePause(at: Date())
+        Self.log.notice("timer: \(self.timer?.isPaused == true ? "paused" : "resumed", privacy: .public)")
         timerShown = nil
         refreshTimer()
     }
 
     func stopTimer() {
+        Self.log.notice("timer: stop")
         timer = nil
         timerShown = nil
         queue.remove(kind: .timer)
@@ -426,6 +450,7 @@ final class AppModel {
         guard let timer else { return }
         let now = Date()
         if timer.isFinished(at: now) {
+            Self.log.notice("timer: done")
             self.timer = nil
             timerShown = nil
             NSSound.beep()
@@ -450,6 +475,9 @@ final class AppModel {
         )
         guard record.compactText != timerShown?.compactText || record.barFill != timerShown?.barFill
                 || record.symbolName != timerShown?.symbolName else { return }
+        if timerShown == nil {
+            Self.log.notice("timer: in the island as \(record.compactText ?? "", privacy: .public); state \(String(describing: self.presenter.controller.state), privacy: .public) → will publish")
+        }
         timerShown = record
         queue.insert(record)
         publish()

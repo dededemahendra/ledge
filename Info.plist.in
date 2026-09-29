@@ -11,6 +11,13 @@
     <key>LSMinimumSystemVersion</key><string>27.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key><string>@BUNDLE_ID@.url</string>
+            <key>CFBundleURLSchemes</key><array><string>ledge</string></array>
+        </dict>
+    </array>
     <key>NSRemindersFullAccessUsageDescription</key><string>Ledge shows a reminder that has a time in the notch a few minutes before it is due.</string>
     <key>NSCalendarsFullAccessUsageDescription</key><string>Ledge shows a meeting reminder in the notch a few minutes before an event, with a click to join the call.</string>
     <key>NSAppleEventsUsageDescription</key><string>Ledge favourites the current track in Music when you tap the star.</string>

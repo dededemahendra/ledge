@@ -1407,3 +1407,12 @@ click it — the pause glyph and a frozen clock; click again — it resumes; men
 (use 5) run out: the alert sound, "Done" for 8 s, then idle. With music
 playing the timer leads; hover still opens the card. Headless renders of the
 four states checked.
+
+## Timer "not working" (2026-09-29 22:55)
+
+Driven from the shell — `open "ledge://timer/start?minutes=5"`, then
+`/toggle` — the persisted log shows start → "in the island as 5:00" →
+counting → paused at 4:16: engine, tick, display and click-to-pause all work.
+The `ledge://` scheme is now registered (also handy for Shortcuts/Raycast) and
+the timer logs its transitions at `.notice`; the menu logs each open. Next:
+the user's menu path, read from the log.
