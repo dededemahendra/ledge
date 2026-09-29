@@ -68,3 +68,34 @@ import SwiftUI
     #expect(!NotchAnimation.isExpanding(from: expanded, to: collapsed))
     #expect(!NotchAnimation.isExpanding(from: activity, to: activity), "no change is not growth")
 }
+
+/// The visualizer's level function: bounded, alive, and not in lockstep.
+@Test func visualizerLevelsStayInRangeAndBarsDoNotMoveAsOne() {
+    var minSeen = 1.0, maxSeen = 0.0
+    var identical = 0, samples = 0
+    for step in 0..<600 {   // ten seconds at 60 Hz
+        let t = Double(step) / 60
+        let levels = (0..<4).map { AudioVisualizerBars.level(bar: $0, time: t) }
+        minSeen = min(minSeen, levels.min()!)
+        maxSeen = max(maxSeen, levels.max()!)
+        if abs(levels[0] - levels[1]) < 0.01 { identical += 1 }
+        samples += 1
+    }
+    #expect(minSeen >= 0 && maxSeen <= 1)
+    #expect(maxSeen - minSeen > 0.5, "it must actually move: range \(minSeen)...\(maxSeen)")
+    #expect(Double(identical) / Double(samples) < 0.1, "neighbouring bars share motion but are not the same bar")
+}
+
+/// Continuity: at the display's refresh rate no single frame jumps more
+/// than a fraction of the range — what makes it read as motion, not steps.
+@Test func visualizerIsContinuousFrameToFrame() {
+    var worst = 0.0
+    var previous = (0..<4).map { AudioVisualizerBars.level(bar: $0, time: 0) }
+    for step in 1..<600 {
+        let t = Double(step) / 60
+        let levels = (0..<4).map { AudioVisualizerBars.level(bar: $0, time: t) }
+        for bar in 0..<4 { worst = max(worst, abs(levels[bar] - previous[bar])) }
+        previous = levels
+    }
+    #expect(worst < 0.35, "largest per-frame change \(worst) — the beat's attack is the only fast edge, and it stays under the range")
+}
