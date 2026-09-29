@@ -1,9 +1,8 @@
 import AppKit
 
 /// The app's only chrome: a menu bar item. Minimal by design (2026-09-29):
-/// it says nothing while everything works — no status rows — and shows a
-/// row only for a problem, clickable when there is something the user can
-/// do about it. Two actions, then Quit.
+/// Quit, and above it a row for each problem — only when there is one —
+/// clickable when there is something the user can do about it.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
     private let item: NSStatusItem
