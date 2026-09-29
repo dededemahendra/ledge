@@ -125,6 +125,23 @@ struct ValueBump<Trigger: Equatable>: ViewModifier {
     }
 }
 
+/// The cover flips in edge-on when the track changes (the reference app's
+/// "artwork flip", 2026-09-29): a jump to -90° about the vertical axis,
+/// then a bouncy spring back to flat, keyed on the title. Nothing at rest.
+struct FlipOnChange<Trigger: Equatable>: ViewModifier {
+    let trigger: Trigger
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        content.keyframeAnimator(initialValue: 0.0, trigger: trigger) { view, angle in
+            view.rotation3DEffect(.degrees(enabled ? angle : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
+        } keyframes: { _ in
+            LinearKeyframe(-90, duration: 0.001)
+            SpringKeyframe(0, duration: 0.6, spring: .bouncy)
+        }
+    }
+}
+
 /// The ears row, laid out from the LIVE island width (see
 /// `AnimatedIslandParameters`), with both ears keyed on the identity of
 /// what they show: when one blip replaces another at the same island size
@@ -165,12 +182,19 @@ private struct IslandEarsRow<Leading: View, Trailing: View>: View {
     /// insertion carries its own spring so the pop happens even when the
     /// surrounding transaction is a crossfade (one blip replacing another
     /// at the same size). Reduce Motion: a plain crossfade.
-    private var earTransition: AnyTransition {
+    /// `towardsHole`: +1 for the leading ear (the hole is to its right),
+    /// -1 for the trailing (hole to its left). New content starts 10pt
+    /// towards the hole — as if sliding out from under the notch, the
+    /// Dynamic Island's own gesture — while scaling up from 60% and
+    /// sharpening, all on the blip spring. Removal just dissolves.
+    private func earTransition(towardsHole: CGFloat) -> AnyTransition {
         guard !reduceMotion else { return AnyTransition(BlurReplaceTransition(configuration: .downUp)) }
+        let emerge = OffsetTransition(CGSize(width: 10 * towardsHole, height: 0))
+            .combined(with: ScaleTransition(0.6))
+            .combined(with: BlurReplaceTransition(configuration: .downUp))
+            .animation(NotchAnimation.pop)
         return .asymmetric(
-            insertion: AnyTransition(
-                ScaleTransition(0.6).combined(with: BlurReplaceTransition(configuration: .downUp)).animation(NotchAnimation.pop)
-            ),
+            insertion: AnyTransition(emerge),
             removal: AnyTransition(BlurReplaceTransition(configuration: .downUp))
         )
     }
@@ -181,12 +205,12 @@ private struct IslandEarsRow<Leading: View, Trailing: View>: View {
         HStack(spacing: 0) {
             ZStack { leading }
                 .id(key)
-                .transition(earTransition)
+                .transition(earTransition(towardsHole: 1))
                 .frame(width: ear, height: notch.height)
             Color.clear.frame(width: notch.width, height: notch.height)   // the hole
             ZStack { trailing }
                 .id(key)
-                .transition(earTransition)
+                .transition(earTransition(towardsHole: -1))
                 .frame(width: ear, height: notch.height)
         }
         .animation(animation, value: key)
@@ -400,7 +424,7 @@ public struct NotchRootView: View {
         .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { view, scale in
             view.scaleEffect(controller.reduceMotion ? 1 : scale, anchor: .top)
         } keyframes: { _ in
-            SpringKeyframe(1.05, duration: 0.14, spring: .snappy)
+            SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
             SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
         }
         // Flatten before shadowing so the island casts ONE silhouette shadow
@@ -474,7 +498,7 @@ public struct NotchRootView: View {
                 captionRow(caption)
                     .frame(width: parameters.width, height: parameters.height - notch.height)
                     .id(caption)
-                    .transition(.blurReplace)
+                    .transition(BlurReplaceTransition(configuration: .downUp).combined(with: OffsetTransition(CGSize(width: 0, height: 6))))
             } else if parameters.height > notch.height + 8 {
                 detailRow
                     .frame(maxWidth: .infinity)
@@ -636,15 +660,17 @@ public struct NotchRootView: View {
             // `parameters` — state/activityCount/metrics — stays equal).
             let glyph = Image(systemName: symbol, variableValue: activity.barFill)
                 .font(.system(size: 13, weight: .medium))
-                // Every press bumps the glyph too — the waves lighting up
-                // and the whole speaker nudging together is the press.
-                .modifier(ValueBump(trigger: activity.compactText ?? "", enabled: !controller.reduceMotion))
                 // Colour only where the system's own indicator colours
                 // itself (green charging, red low). Never under the render
                 // test hook, whose classifier expects one content colour.
                 .foregroundStyle(tintColor(for: activity.tint) ?? contentColor)
-                .id(symbol)
-                .transition(.blurReplace)
+                // A symbol swap (mute on/off, bolt -> plug) MORPHS with SF
+                // Symbols' replace effect, and every press bounces the
+                // glyph with its own bounce — the waves lighting up and the
+                // speaker nudging together is the press.
+                .contentTransition(.symbolEffect(.replace.downUp))
+                .symbolEffect(.bounce, options: controller.reduceMotion ? .nonRepeating.speed(100) : .default,
+                              value: activity.compactText ?? "")
                 .animation(
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: symbol
@@ -701,14 +727,14 @@ public struct NotchRootView: View {
             .font(.system(size: 11, weight: .medium))
             .monospacedDigit()
             .lineLimit(1)
-            .id(compact)
-            .transition(.blurReplace)
+            // Digits ROLL between values (Apple's numeric text transition)
+            // instead of crossfading — 50% -> 55% reads as a dial turning.
+            // No `.id`: the Text must stay the same view for that.
+            .contentTransition(.numericText())
             .animation(
                 NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                 value: compact
             )
-            // Not keyed by `.id` (that would crossfade); the bump rides on
-            // the swap.
             .modifier(ValueBump(trigger: compact, enabled: !controller.reduceMotion))
     }
 
@@ -761,6 +787,7 @@ public struct NotchRootView: View {
             }
             .frame(width: 20, height: 20)
         }
+        .modifier(FlipOnChange(trigger: media.title, enabled: !controller.reduceMotion))
     }
 
     /// The current output's glyph (headphones, laptop, AirPods…) for the

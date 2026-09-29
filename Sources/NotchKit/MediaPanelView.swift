@@ -52,6 +52,27 @@ struct MediaPanelView: View {
     /// `nil` shows the placeholder.
     let artworkImage: NSImage?
 
+    /// The cascade (2026-09-29): on appear the header, the scrubber and the
+    /// controls rise 6pt into place with a slight stagger, the way the
+    /// Dynamic Island's expanded content settles in. Starts revealed under
+    /// Reduce Motion and under the render-test hook, whose single frame
+    /// must be the resting one. Same spelled-out `State` as the rest.
+    private var _revealed: State<Bool>
+    private var revealed: Bool {
+        get { _revealed.wrappedValue }
+        nonmutating set { _revealed.wrappedValue = newValue }
+    }
+
+    private func cascade<V: View>(_ view: V, order: Int) -> some View {
+        view
+            .opacity(revealed ? 1 : 0)
+            .offset(y: revealed ? 0 : 6)
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8).delay(Double(order) * 0.045),
+                value: revealed
+            )
+    }
+
     /// Whether the output list is open below the controls
     /// (`NotchController.isOutputPickerOpen` — the controller owns it, since
     /// it sizes the island). `toggleOutputs` flips it.
@@ -96,14 +117,19 @@ struct MediaPanelView: View {
         self.artworkImage = artworkImage
         self.outputPickerOpen = outputPickerOpen
         self.toggleOutputs = toggleOutputs
+        var startRevealed = reduceMotion
+        #if DEBUG
+        if NotchRenderTestHook.contentColor != nil { startRevealed = true }
+        #endif
+        _revealed = State(initialValue: startRevealed)
     }
 
     var body: some View {
         VStack(spacing: 7) {
-            headerRow
-            scrubRow
+            cascade(headerRow, order: 0)
+            cascade(scrubRow, order: 1)
             if !displayOnly {
-                controlsRow
+                cascade(controlsRow, order: 2)
                 // The output list grows the card downward (the island's
                 // height follows via `NotchMetrics.expanded(outputRows:)`);
                 // the rows fade in over that spring.
@@ -118,6 +144,7 @@ struct MediaPanelView: View {
         .padding(.top, 4)
         .padding(.bottom, 8)
         .foregroundStyle(contentColor)
+        .onAppear { revealed = true }
     }
 
     // MARK: - Row 1: artwork · title/artist · visualizer
@@ -204,6 +231,7 @@ struct MediaPanelView: View {
             Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.45), radius: 6, y: 2)
+        .modifier(FlipOnChange(trigger: media.title, enabled: !reduceMotion))
     }
 
     // MARK: - Row 2: full-width scrubber, times inline at the ends

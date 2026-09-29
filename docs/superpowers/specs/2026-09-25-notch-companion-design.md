@@ -307,6 +307,14 @@ Collapse is deliberately duller — closing should not draw attention.
 `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion` is true, replace the
 entire spring system with a 0.15 s crossfade and an instant size change.
 
+**More motion, 2026-09-29 (user's call: "need more animations").** Ear content
+emerges from under the notch (10 pt towards the hole, scaling from 60 %,
+sharpening) on the blip spring; the value's digits roll (`numericText`); glyph
+swaps morph (`symbolEffect(.replace)`) and each press bounces the glyph; the
+cover flips in edge-on on a track change (`FlipOnChange`); the card's header,
+scrubber and controls cascade up into place on expand; the caption slides up as
+it fades in; the island pulse is 7 %. Reduce Motion: none of it.
+
 **Pop, 2026-09-29 (user's call: "magnification when interactions").** A blip
 arriving from the bare notch uses its own spring (`NotchAnimation.pop`,
 0.42/0.62, ~8 % overshoot in width; height cannot overshoot at notch height),

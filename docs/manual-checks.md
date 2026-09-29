@@ -1241,3 +1241,10 @@ the blip's size, so the pop spring never ran. `NotchController.blipPulse`
 counts blips that land without a shape change (and blip-to-blip
 replacements); the view keyframes the whole island 1 → 1.05 → 1 from its top
 edge on each change. Tested; judge on the notch with music playing.
+
+# More motion (2026-09-29)
+
+Emerge-from-notch ear transitions, rolling digits, symbol replace + bounce,
+cover flip on track change, card cascade on appear (`revealed` state; starts
+revealed under Reduce Motion and the render-test hook so single-frame renders
+are the resting frame), caption slide-up, 7 % pulse. Judge on the notch.
