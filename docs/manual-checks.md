@@ -1338,3 +1338,12 @@ grows to the captioned size with the calendar glyph, the countdown and
 "Title · 14:00"; click joins. With music playing or a blip live the preview
 yields. The reminder blip's caption now shows too (it was gated to media).
 Headless render of the preview checked. Judge live with an event later today.
+
+## "I can't see the preview" (2026-09-29)
+
+Diagnosed from the persisted log: access granted (status 3), "0 event(s) in
+the next day" — nothing to preview. The service now logs its access outcome
+and each reload's event count at `.notice`, so this is answerable with
+`/usr/bin/log show --predicate 'subsystem == "com.dedemahendra.ledge" AND
+category == "calendar"'`. Note the full path: zsh's builtin `log` shadows it
+and silently prints nothing.

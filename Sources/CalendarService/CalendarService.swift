@@ -60,18 +60,25 @@ public final class CalendarService {
 
     private func requestAccessAndBegin() async {
         var granted = false
-        switch EKEventStore.authorizationStatus(for: .event) {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        switch status {
         case .fullAccess:
             granted = true
         case .notDetermined:
-            granted = (try? await store.requestFullAccessToEvents()) ?? false
+            do {
+                granted = try await store.requestFullAccessToEvents()
+            } catch {
+                Self.log.error("calendar access request failed: \(error.localizedDescription, privacy: .public)")
+            }
         default:
             granted = false
         }
         guard !Task.isCancelled else { return }
+        // `.notice`, not `.info`: persisted, so a "why no reminders?" can be
+        // answered from `log show` after the fact.
+        Self.log.notice("calendar access: status \(status.rawValue, privacy: .public), granted \(granted, privacy: .public)")
         guard granted else {
             availability = .needsPermission("Calendars access (System Settings → Privacy & Security → Calendars)")
-            Self.log.info("calendar access not granted; meeting reminders off")
             return
         }
         availability = .available
@@ -111,10 +118,12 @@ public final class CalendarService {
         let predicate = store.predicateForEvents(
             withStart: now.addingTimeInterval(-3600), end: now.addingTimeInterval(24 * 3600), calendars: nil
         )
-        events = store.events(matching: predicate)
+        let all = store.events(matching: predicate)
+        events = all
             .compactMap(MeetingEvent.init(ekEvent:))
             .filter { $0.end > now }
             .sorted { $0.start < $1.start }
+        Self.log.notice("calendar reload: \(all.count, privacy: .public) event(s) in the next day, \(self.events.count, privacy: .public) to remind about; next: \(self.events.first?.title ?? "none", privacy: .private)")
         evaluate()
     }
 
