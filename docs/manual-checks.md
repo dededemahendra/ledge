@@ -1216,3 +1216,12 @@ both the ear's and the card's artwork. The equalizer bars are gone
 (`AudioVisualizerBars` deleted with its tests); the compact trailing ear and
 the card's top-right show the current output's glyph, dim when paused.
 Not verified live: the spin and its pause/resume.
+
+# Controls like Apple Music (2026-09-29)
+
+`MusicControlButton`: glyph on a rounded highlight under the pointer, filled
+highlight with a dark glyph while on, dimmed/disabled when unsupported.
+Row: shuffle · previous · play/pause (28pt heavy) · next · repeat (cycles via
+the adapter's toggle; `repeat.1` when one). Star beside the title; the output
+glyph top-right is the picker's button (filled while the list is open).
+Verified headlessly (snapshot); hover highlights need the pointer.

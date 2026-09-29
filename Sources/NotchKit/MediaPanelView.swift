@@ -4,10 +4,10 @@ import SwiftUI
 /// The expanded media card, laid out to match Alcove's structure (from the
 /// user's screenshot of the real thing):
 ///
-///   row 1 — artwork (a spinning disc) · title/artist · output glyph
+///   row 1 — artwork (a spinning disc) · title/artist · star · output button
 ///   row 2 — full-width scrubber with the times INLINE at its ends
-///   row 3 — six controls on their own centred row:
-///           favourite · shuffle · previous · play/pause · next · output
+///   row 3 — Apple Music's transport row:
+///           shuffle · previous · play/pause · next · repeat
 ///   row 4 — (while the output picker is open) one row per audio output,
 ///           below the controls; the card grows downward to hold them and
 ///           shrinks back after a pick
@@ -174,12 +174,8 @@ struct MediaPanelView: View {
 
             Spacer(minLength: 8)
 
-            // Top-right: the current output's glyph, where the reference
-            // card parks its equalizer (replaced at the user's request,
-            // 2026-09-29). Bright while playing, dim while paused.
-            Image(systemName: outputs.first(where: \.isCurrent)?.symbolName ?? "speaker.wave.2")
-                .font(.system(size: 13, weight: .medium))
-                .opacity(media.isPlaying ? 0.85 : 0.35)
+            favoriteButton
+            outputHeaderButton
         }
     }
 
@@ -299,52 +295,81 @@ struct MediaPanelView: View {
 
     // MARK: - Row 3: shuffle · previous · play/pause · next · repeat
 
-    /// Five controls spread evenly on their own full-width row like Alcove's,
-    /// the play glyph simply larger than its neighbours — hierarchy from
-    /// size, no chip behind it. Symmetric: mode toggles at the edges,
-    /// transport inside, play in the middle.
+    /// Apple Music's transport row (user's call, 2026-09-29): play/pause at
+    /// the focal size, the skips a step down, shuffle and repeat small and
+    /// grey until on — then on a filled highlight, the way Music marks them
+    /// — and a soft rounded highlight under the pointer on every control.
+    /// Five slots evenly spread. The favourite star lives beside the title
+    /// and the output button is the header's glyph, as in Music itself.
     private var controlsRow: some View {
         HStack(spacing: 0) {
-            favoriteButton
-                .frame(maxWidth: .infinity)
-            shuffleButton
-                .frame(maxWidth: .infinity)
-            controlButton("backward.fill", label: "Previous", size: 17, opacity: 0.9, .previous)
-                .frame(maxWidth: .infinity)
-            playPauseButton
-                .frame(maxWidth: .infinity)
-            controlButton("forward.fill", label: "Next", size: 17, opacity: 0.9, .next)
-                .frame(maxWidth: .infinity)
-            outputButton
-                .frame(maxWidth: .infinity)
+            MusicControlButton(
+                symbol: "shuffle", label: "Shuffle", size: 14,
+                mode: media.isShuffling == nil ? .unavailable : (media.isShuffling == true ? .active : .idle),
+                contentColor: contentColor, reduceMotion: reduceMotion
+            ) { emit(.toggleShuffle) }
+            .frame(maxWidth: .infinity)
+
+            MusicControlButton(
+                symbol: "backward.fill", label: "Previous", size: 20,
+                contentColor: contentColor, reduceMotion: reduceMotion
+            ) { emit(.previous) }
+            .frame(maxWidth: .infinity)
+
+            MusicControlButton(
+                symbol: media.isPlaying ? "pause.fill" : "play.fill",
+                label: media.isPlaying ? "Pause" : "Play", size: 28, weight: .heavy, width: 40,
+                contentColor: contentColor, reduceMotion: reduceMotion
+            ) { emit(.togglePlayPause) }
+            .frame(maxWidth: .infinity)
+
+            MusicControlButton(
+                symbol: "forward.fill", label: "Next", size: 20,
+                contentColor: contentColor, reduceMotion: reduceMotion
+            ) { emit(.next) }
+            .frame(maxWidth: .infinity)
+
+            MusicControlButton(
+                symbol: media.repeatMode == .one ? "repeat.1" : "repeat", label: "Repeat", size: 14,
+                mode: media.repeatMode == nil ? .unavailable : (media.repeatMode == .off ? .idle : .active),
+                contentColor: contentColor, reduceMotion: reduceMotion
+            ) { emit(.toggleRepeat) }
+            .frame(maxWidth: .infinity)
         }
         .frame(height: 30)
     }
 
-    // MARK: - Output picker (list below the controls)
+    // MARK: - Header buttons: favourite star, output glyph
 
-    /// The fifth control: the current output's glyph. Tapping opens or
-    /// closes the list; lit while open. Disabled (dimmed) with nothing to
-    /// pick from — a single output is not a choice.
-    private var outputButton: some View {
-        let current = outputs.first(where: \.isCurrent)
-        let symbol = current?.symbolName ?? "speaker.wave.2"
-        return Button {
-            toggleOutputs()
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .opacity(outputPickerOpen ? 1 : 0.6)
-                .frame(width: 30, height: 30)
-                .contentShape(Rectangle())
-                .id(symbol)
-                .transition(.blurReplace)
-                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: symbol)
-        }
-        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
-        .disabled(outputs.count < 2)
-        .accessibilityLabel("Output: \(current?.name ?? "unknown")")
+    /// Beside the title, where Music keeps it: filled when the track is
+    /// favourited, hollow when not (or not yet asked), dimmed and disabled
+    /// for sources that cannot favourite — see `MusicFavorites`.
+    private var favoriteButton: some View {
+        let state = media.favorite
+        return MusicControlButton(
+            symbol: state == .on ? "star.fill" : "star", label: "Favourite", size: 13,
+            mode: state == .unsupported ? .unavailable : .idle, width: 28,
+            contentColor: contentColor, reduceMotion: reduceMotion
+        ) { emit(.toggleFavorite) }
+        .opacity(state == .on || state == .unsupported ? 1 : 0.7)
+        .accessibilityValue(state == .on ? "on" : (state == .off ? "off" : "unknown"))
     }
+
+    /// Top-right, where the reference card parks its equalizer: the current
+    /// output's glyph, and the button that opens the output list below the
+    /// controls — lit (filled) while the list is open, disabled with fewer
+    /// than two outputs, since one output is not a choice.
+    private var outputHeaderButton: some View {
+        let current = outputs.first(where: \.isCurrent)
+        return MusicControlButton(
+            symbol: current?.symbolName ?? "speaker.wave.2", label: "Output: \(current?.name ?? "unknown")",
+            size: 13, weight: .medium,
+            mode: outputs.count < 2 ? .unavailable : (outputPickerOpen ? .active : .idle), width: 28,
+            contentColor: contentColor, reduceMotion: reduceMotion
+        ) { toggleOutputs() }
+    }
+
+    // MARK: - Output picker (list below the controls)
 
     /// One row per output, full name, the current one ticked and lightly
     /// backed. Picking one emits `selectOutput` and closes the list; the
@@ -392,91 +417,4 @@ struct MediaPanelView: View {
         .accessibilityAddTraits(output.isCurrent ? .isSelected : [])
     }
 
-    /// The favourite star (2026-09-29, the reference card's first control):
-    /// filled when the track is favourited, hollow when not or not yet
-    /// asked, dimmed and disabled for sources that cannot favourite (every
-    /// one but Apple Music — see `MusicFavorites`).
-    private var favoriteButton: some View {
-        let state = media.favorite
-        let on = state == .on
-        return Button {
-            emit(.toggleFavorite)
-        } label: {
-            Image(systemName: on ? "star.fill" : "star")
-                .font(.system(size: 13, weight: .semibold))
-                .opacity(state == .unsupported ? 0.25 : (on ? 1 : 0.6))
-                .frame(width: 30, height: 30)
-                .contentShape(Rectangle())
-                .id(on)
-                .transition(.blurReplace)
-                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: on)
-        }
-        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
-        .disabled(state == .unsupported)
-        .accessibilityLabel("Favourite")
-        .accessibilityValue(state == .on ? "on" : (state == .off ? "off" : "unknown"))
-    }
-
-    /// Shuffle with its state (2026-09-29): full-strength glyph plus a dot
-    /// beneath when on — the Music app's own indicator language — dim when
-    /// off, and dimmer still and disabled when the source does not report
-    /// shuffle at all (`isShuffling == nil`: browsers), so the button never
-    /// claims a state it cannot know or a power it does not have.
-    private var shuffleButton: some View {
-        let state = media.isShuffling
-        let on = state == true
-        return Button {
-            emit(.toggleShuffle)
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: "shuffle")
-                    .font(.system(size: 13, weight: .semibold))
-                Circle()
-                    .fill(contentColor)
-                    .frame(width: 3, height: 3)
-                    .opacity(on ? 1 : 0)
-            }
-            .opacity(state == nil ? 0.25 : (on ? 1 : 0.6))
-            .frame(width: 30, height: 30)
-            .contentShape(Rectangle())
-            .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: on)
-        }
-        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
-        .disabled(state == nil)
-        .accessibilityLabel("Shuffle")
-        .accessibilityValue(state == nil ? "unavailable" : (on ? "on" : "off"))
-    }
-
-    private var playPauseButton: some View {
-        let symbol = media.isPlaying ? "pause.fill" : "play.fill"
-        return Button {
-            emit(.togglePlayPause)
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 24, weight: .semibold))
-                .id(symbol)
-                .transition(.blurReplace)
-                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: symbol)
-                .frame(width: 34, height: 30)   // hit slop beyond the glyph
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
-        .accessibilityLabel(media.isPlaying ? "Pause" : "Play")
-    }
-
-    private func controlButton(
-        _ symbol: String, label: String, size: CGFloat, opacity: Double, _ intent: NotchIntent
-    ) -> some View {
-        Button {
-            emit(intent)
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: size, weight: .semibold))
-                .opacity(opacity)
-                .frame(width: 30, height: 30)   // hit slop beyond the glyph
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
-        .accessibilityLabel(label)
-    }
 }

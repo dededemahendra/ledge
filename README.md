@@ -23,8 +23,9 @@ Browsers and everything else that MediaRemote reports are ignored on purpose
 (`MediaSourcePolicy`). One blip owns the island at a time; the rest queue.
 
 **The card** (hover with music playing): artwork and titles — click them to
-bring the app forward — a scrubber with times, then favourite · shuffle ·
-previous · play/pause · next · output. The star works for Apple Music only
+bring the app forward — with a favourite star and the output button beside
+them — a scrubber with times, then Apple Music's transport row: shuffle ·
+previous · play/pause · next · repeat. The star works for Apple Music only
 (Spotify has no local way to like a track); the first tap makes macOS ask once
 to let Ledge control Music, and until that tap Ledge never talks to Music. The output button opens a list of every audio
 output below the controls (the card grows to fit); pick one to switch. Click the island to pin the card open; click
