@@ -1153,3 +1153,11 @@ pinned:
 - lock screen: the artwork button is disabled in display-only mode.
 - artwork decoded once per change (`NotchController.mediaArtworkImage`).
 Deferred: a shared process-supervisor type (one subprocess exists).
+
+# Launch at login (2026-09-29)
+
+`LoginItem.ensureRegistered()` (`SMAppService.mainApp.register()`) on every
+launch; a menu row with a fix appears if approval is pending or the app moved.
+Verified: build + tests; the registration itself and the system notice need
+the real launch (`make dev` did it — check System Settings › General › Login
+Items for "Ledge").

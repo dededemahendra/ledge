@@ -40,7 +40,9 @@ make install       # release build into /Applications
 ```
 
 The app is a menu-bar-less agent; its only chrome is a status item whose menu
-is just Quit (plus a row when something is broken).
+is just Quit (plus a row when something is broken). It registers itself as a
+login item on first launch — macOS says so once, and the switch lives in
+System Settings › General › Login Items.
 
 ## The one permission
 

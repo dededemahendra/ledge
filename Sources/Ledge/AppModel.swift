@@ -65,6 +65,9 @@ final class AppModel {
         note("HUD", hud.availability)
         note("Media", media.availability)
         note("Devices", device.availability)
+        if let login = LoginItem.issue {
+            issues.append(Issue(text: login.text, fix: login.fix))
+        }
         if case .needsPermission = hud.systemHUDReplacement {
             issues.append(Issue(text: "System HUD needs Accessibility…", fix: {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {

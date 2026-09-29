@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var model: AppModel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        LoginItem.ensureRegistered()
+
         let presenter = NotchPresenter()
         presenter.start()
         self.presenter = presenter
