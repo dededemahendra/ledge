@@ -1248,3 +1248,11 @@ Emerge-from-notch ear transitions, rolling digits, symbol replace + bounce,
 cover flip on track change, card cascade on appear (`revealed` state; starts
 revealed under Reduce Motion and the render-test hook so single-frame renders
 are the resting frame), caption slide-up, 7 % pulse. Judge on the notch.
+
+# Output list polish (2026-09-29)
+
+Rows: hover highlight, press dip (`ListRowButtonStyle`, no shrink), the
+highlight and tick glide to the picked row (`matchedGeometryEffect`, optimistic
+`pendingOutput` until CoreAudio confirms), the list holds ~0.5 s then closes;
+rows cascade in. The list sits outside the spaced stack so it costs nothing
+while closed (the budget tests caught the 7 pt spacing slot). Judge on the notch.

@@ -79,6 +79,22 @@ struct MediaPanelView: View {
     let outputPickerOpen: Bool
     let toggleOutputs: () -> Void
 
+    /// The row just picked, shown as current until CoreAudio confirms the
+    /// route (the highlight and tick glide there at once); `nil` otherwise.
+    private var _pendingOutput: State<String?> = State(initialValue: nil)
+    private var pendingOutput: String? {
+        get { _pendingOutput.wrappedValue }
+        nonmutating set { _pendingOutput.wrappedValue = newValue }
+    }
+    private var _hoveredOutput: State<String?> = State(initialValue: nil)
+    private var hoveredOutput: String? {
+        get { _hoveredOutput.wrappedValue }
+        nonmutating set { _hoveredOutput.wrappedValue = newValue }
+    }
+    /// Hero pair for the highlight and the tick moving between rows.
+    private var _pickerNamespace: Namespace = Namespace()
+    private var pickerNamespace: Namespace.ID { _pickerNamespace.wrappedValue }
+
     /// In-progress scrub position, `nil` when not dragging. While non-nil the
     /// filled bar renders from THIS, 1:1 with the pointer — feedback must be
     /// continuous during the gesture, not delivered at the end — and the
@@ -125,19 +141,22 @@ struct MediaPanelView: View {
     }
 
     var body: some View {
-        VStack(spacing: 7) {
-            cascade(headerRow, order: 0)
-            cascade(scrubRow, order: 1)
-            if !displayOnly {
-                cascade(controlsRow, order: 2)
-                // The output list grows the card downward (the island's
-                // height follows via `NotchMetrics.expanded(outputRows:)`);
-                // the rows fade in over that spring.
-                if outputPickerOpen {
-                    outputsList
-                        .padding(.top, NotchMetrics.outputListInset - 7)   // net of the VStack spacing
-                        .transition(.blurReplace)
+        VStack(spacing: 0) {
+            VStack(spacing: 7) {
+                cascade(headerRow, order: 0)
+                cascade(scrubRow, order: 1)
+                if !displayOnly {
+                    cascade(controlsRow, order: 2)
                 }
+            }
+            // The output list grows the card downward (the island's height
+            // follows via `NotchMetrics.expanded(outputRows:)`); its rows
+            // insert individually, each with its own entrance, so the list
+            // itself is always present — outside the spaced stack, so an
+            // empty list costs nothing while closed.
+            if !displayOnly {
+                outputsList
+                    .padding(.top, outputPickerOpen ? NotchMetrics.outputListInset : 0)
             }
         }
         .padding(.horizontal, 16)
@@ -399,50 +418,92 @@ struct MediaPanelView: View {
 
     // MARK: - Output picker (list below the controls)
 
-    /// One row per output, full name, the current one ticked and lightly
-    /// backed. Picking one emits `selectOutput` and closes the list; the
-    /// route blip then confirms the switch in the ears the same way a
-    /// manual switch would. Each row is `NotchMetrics.outputRowHeight` so
-    /// the island grows by exactly what the list needs.
+    /// One row per output — glyph, name, and a tick on the current one —
+    /// with a real menu's manners (2026-09-29, user's call: clearer,
+    /// minimal, with interaction): a soft highlight under the pointer, a
+    /// dip on press (no shrink: a wide row that shrinks looks broken), and
+    /// on a pick the highlight and the tick GLIDE to the chosen row, the
+    /// list holds for a beat so the landing is seen, then closes. The rows
+    /// cascade in when the list opens. Each row is
+    /// `NotchMetrics.outputRowHeight`, so the island grows by exactly what
+    /// the list needs; the rows live in the `ForEach` so each gets its own
+    /// entrance instead of the list appearing as one block.
     private var outputsList: some View {
         VStack(spacing: 0) {
-            ForEach(outputs) { output in
+            ForEach(Array((outputPickerOpen ? outputs : []).enumerated()), id: \.element.id) { index, output in
                 outputRow(output)
+                    .transition(rowTransition(order: index))
             }
         }
+        .onChange(of: outputs) { _, _ in pendingOutput = nil }   // the real route arrived
+    }
+
+    private func rowTransition(order: Int) -> AnyTransition {
+        let fade = BlurReplaceTransition(configuration: .downUp)
+        guard !reduceMotion else { return AnyTransition(fade) }
+        return .asymmetric(
+            insertion: AnyTransition(
+                OffsetTransition(CGSize(width: 0, height: -6)).combined(with: fade)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8).delay(Double(order) * 0.04))
+            ),
+            removal: AnyTransition(fade)
+        )
     }
 
     private func outputRow(_ output: OutputOption) -> some View {
-        Button {
+        let currentID = pendingOutput ?? outputs.first(where: \.isCurrent)?.id
+        let selected = currentID == output.id
+        let hovered = hoveredOutput == output.id
+        return Button {
+            guard !selected else { toggleOutputs(); return }   // the current one: just close
+            withAnimation(reduceMotion ? NotchAnimation.reduced : .spring(response: 0.35, dampingFraction: 0.8)) {
+                pendingOutput = output.id
+            }
             emit(.selectOutput(id: output.id))
-            toggleOutputs()
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(480))
+                toggleOutputs()
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: output.symbolName)
                     .font(.system(size: 12, weight: .medium))
                     .frame(width: 18)
                 Text(output.name)
-                    .font(.system(size: 12, weight: output.isCurrent ? .semibold : .regular))
+                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                if output.isCurrent {
+                if selected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .semibold))
+                        .matchedGeometryEffect(id: "output-tick", in: pickerNamespace)
+                        .transition(.scale(scale: 0.5).combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 10)
             .frame(height: NotchMetrics.outputRowHeight - 2)
             .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(contentColor.opacity(output.isCurrent ? 0.14 : 0))
-            )
+            .opacity(selected || hovered ? 1 : 0.8)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(contentColor.opacity(0.12))
+                        .matchedGeometryEffect(id: "output-highlight", in: pickerNamespace)
+                } else if hovered {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(contentColor.opacity(0.07))
+                }
+            }
             .contentShape(Rectangle())
         }
-        .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+        .buttonStyle(ListRowButtonStyle(reduceMotion: reduceMotion))
+        .onHover { inside in
+            if inside { hoveredOutput = output.id } else if hoveredOutput == output.id { hoveredOutput = nil }
+        }
+        .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: hovered)
         .frame(height: NotchMetrics.outputRowHeight)
         .accessibilityLabel(output.name)
-        .accessibilityAddTraits(output.isCurrent ? .isSelected : [])
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
 }
