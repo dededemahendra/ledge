@@ -1443,3 +1443,11 @@ User: "remove timer features that you create". Gone: `LiveTimer`, the Timer
 submenu, `ledge://timer/*`. Kept: the Clock app mirror (ring, clock, pause,
 Done, stopwatch), the debug-only `ledge://probe/menubar`. Judge live: the menu
 is Quit (plus problem rows) again; a Clock timer still shows in the island.
+
+## Focus blip (2026-09-29)
+
+Turn a Focus on from Control Center: glyph + "On" + the name under the hole
+for 3 s; off: outline moon + "Off". The log's "focus on/off" line confirms the
+transition (name private). If nothing shows, the extra's identifier or text
+differs from the guess — `ledge://probe/menubar` (debug) writes the tree to
+~/Library/Logs/Ledge/menubar-probe.txt.

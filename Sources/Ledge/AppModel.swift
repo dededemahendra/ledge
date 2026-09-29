@@ -8,6 +8,7 @@ import MediaService
 import DeviceService
 import CalendarService
 import TimerService
+import FocusService
 import OSLog
 
 /// Consumes service streams, maintains the queue, drives the controller.
@@ -22,6 +23,7 @@ final class AppModel {
     private let media = MediaService()
     private let device = DeviceService()
     private let calendar = CalendarService()
+    private let focus = FocusService()
     private let favorites = MusicFavorites()
 
     private var queue = ActivityQueue()
@@ -51,6 +53,7 @@ final class AppModel {
     var mediaStatus: String { media.availability.statusText }
     var deviceStatus: String { device.availability.statusText }
     var calendarStatus: String { calendar.availability.statusText }
+    var focusStatus: String { focus.availability.statusText }
 
     /// What the menu should say — only problems (2026-09-29, minimal menu).
     /// A service that is fine contributes nothing. The Accessibility grant
@@ -75,6 +78,7 @@ final class AppModel {
         note("Media", media.availability)
         note("Devices", device.availability)
         note("Calendar", calendar.availability)
+        note("Focus", focus.availability)
         if let login = LoginItem.issue {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
@@ -158,6 +162,13 @@ final class AppModel {
         tasks.append(Task { [weak self] in
             for await reminder in calendarStream {
                 self?.handle(reminder)
+            }
+        })
+
+        let focusStream = focus.start()
+        tasks.append(Task { [weak self] in
+            for await event in focusStream {
+                self?.handle(event)
             }
         })
 
@@ -324,6 +335,25 @@ final class AppModel {
             )
         )
         showCaption(reminder.captionText(), for: ActivityKind.calendar.defaultTTL ?? NotchController.captionDuration)
+        publish()
+    }
+
+    /// A Focus turning on or off (2026-09-29): its glyph left, On/Off
+    /// right, its name in the caption line for the blip's lifetime — the
+    /// Caps Lock idiom with a name, since which Focus matters.
+    private func handle(_ event: FocusEvent) {
+        queue.insert(
+            ActivityRecord(
+                id: NotchController.focusActivityID,
+                kind: .focus,
+                insertedAt: Date(),
+                ttl: ActivityKind.focus.defaultTTL,
+                title: event.state.name,
+                compactText: event.compactText,
+                symbolName: event.symbolName
+            )
+        )
+        showCaption(event.state.name, for: ActivityKind.focus.defaultTTL ?? NotchController.captionDuration)
         publish()
     }
 
@@ -590,7 +620,7 @@ final class AppModel {
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }
 
-        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus].joined(separator: "|")
+        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus, focusStatus].joined(separator: "|")
         if fingerprint != statusFingerprint {
             statusFingerprint = fingerprint
             onStatusChange?()
@@ -622,6 +652,7 @@ final class AppModel {
             queue.remove(kind: .calendar)
             presenter.setUpcoming(nil)
         }
+        if !focus.availability.isAvailable { queue.remove(kind: .focus) }
         if !media.availability.isAvailable {
             queue.remove(kind: .media)
             // The activity is not the only thing a dead media service leaves

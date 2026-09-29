@@ -9,6 +9,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
     /// starting matters more than a plug going in — but not a HUD, which
     /// is the user's own key press and over in a second and a half.
     case calendar
+    /// A Focus turning on or off (2026-09-29): a deliberate act or a
+    /// schedule, worth a glance; under the device blip, which is a thing
+    /// physically happening.
+    case focus
     case notification
     /// The island's own timer or stopwatch (2026-09-29): sticky while it
     /// runs, above media (a running timer is what the island is for) and
@@ -23,6 +27,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .power:        return 60
         case .device:       return 50
         case .calendar:     return 70
+        case .focus:        return 45
         case .notification: return 40
         case .timer:        return 20
         case .media:        return 10
@@ -36,6 +41,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .power:        return 3
         case .device:       return 3
         case .calendar:     return 8       // a title and a time take longer to read than "42%"
+        case .focus:        return 3
         case .notification: return 5
         case .timer:        return nil
         case .media:        return nil

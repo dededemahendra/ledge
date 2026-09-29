@@ -914,3 +914,22 @@ request: the Clock's are the ones they wanted, and two timers would only
 compete. The island's timer record, ring and non-bumping digits stay for the
 Clock mirror; the `ledge://` scheme stays registered for the debug-only menu
 bar probe.
+
+
+## Focus blip (2026-09-29)
+
+**What.** A Focus turning on or off: its glyph in the leading ear (the moon
+for Do Not Disturb, Apple's names mapped to their symbols, the moon for the
+user's own), "On"/"Off" in the trailing one, the Focus's name in the caption
+line for the blip's 3 s. Switching from one Focus to another reads as the new
+one coming on. A Focus already on at launch is not announced.
+
+**How.** The Focus database (`~/Library/DoNotDisturb/DB`) is behind Full Disk
+Access, which this app will not ask for. Control Center shows a Focus extra in
+the menu bar while one is on (its default, "when active"), so `FocusService`
+reads `MenuBarAgent`'s extras once a second through Accessibility
+(`MenuBarExtrasReader`, shared with the coming iPhone Live Activity mirror),
+and `FocusEventDeriver` turns presence into transitions. `ActivityKind.focus` =
+45: under the device blip, over notifications. If the user hides the Focus item
+from the menu bar, the blip has nothing to read; the menu's Accessibility row
+covers the missing grant.

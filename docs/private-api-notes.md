@@ -195,3 +195,13 @@ The only readable surface is Accessibility: `MenuBarAgent`'s
 `AXDescription`, `AXValue` and `AXFrame`; Control Center itself exposes no
 extras bar (-25212). `ledge://probe/menubar` dumps the tree to the log
 (`MenuBarProbe`) so a live activity's shape can be learned once one shows.
+
+## Focus state (2026-09-29)
+
+`~/Library/DoNotDisturb/DB/{Assertions,ModeConfigurations}.json` are behind
+Full Disk Access ("Operation not permitted" without it). Read the menu bar
+instead: Control Center's Focus extra (`NSStatusItem VisibleCC FocusModes`,
+identifier expected `com.apple.menuextra.focusmodes`) appears in
+`MenuBarAgent`'s `AXExtrasMenuBar` while a Focus is on; its value/description
+carries the mode's name. Exact text not yet observed — `FocusState.name(from:)`
+strips a leading "Focus" and trailing ", on".

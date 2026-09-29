@@ -5,7 +5,7 @@ let package = Package(
     name: "Ledge",
     platforms: [.macOS("27.0")],
     targets: [
-        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService"], path: "Sources/Ledge"),
+        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService", "FocusService"], path: "Sources/Ledge"),
         .target(name: "NotchKit"),
         .target(name: "ActivityKit"),
         .target(name: "PowerService", dependencies: ["ActivityKit"]),
@@ -14,6 +14,7 @@ let package = Package(
         .target(name: "DeviceService", dependencies: ["ActivityKit"]),
         .target(name: "CalendarService", dependencies: ["ActivityKit"]),
         .target(name: "TimerService"),
+        .target(name: "FocusService", dependencies: ["ActivityKit"]),
         .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
         .testTarget(name: "NotchWindowTests", dependencies: ["NotchKit"]),
         .testTarget(name: "NotchRenderTests", dependencies: ["NotchKit"]),
@@ -23,6 +24,7 @@ let package = Package(
         .testTarget(name: "DeviceServiceTests", dependencies: ["DeviceService"]),
         .testTarget(name: "CalendarServiceTests", dependencies: ["CalendarService"]),
         .testTarget(name: "TimerServiceTests", dependencies: ["TimerService"]),
+        .testTarget(name: "FocusServiceTests", dependencies: ["FocusService"]),
         .testTarget(
             name: "MediaServiceTests",
             dependencies: ["MediaService"],
