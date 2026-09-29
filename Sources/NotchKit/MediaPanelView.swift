@@ -465,33 +465,44 @@ struct MediaPanelView: View {
                 toggleOutputs()
             }
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: output.symbolName)
-                    .font(.system(size: 12, weight: .medium))
-                    .frame(width: 18)
+            // Control Center's sound-output idiom (2026-09-29, after "the
+            // list looks ugly"): the glyph in a small circle, the selected
+            // one filled white with a dark glyph, names regular weight
+            // throughout, a tick on the right — and no slab behind the
+            // row. The filled disc is the thing that glides on a pick.
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().fill(contentColor.opacity(0.12))
+                    if selected {
+                        Circle()
+                            .fill(contentColor.opacity(0.92))
+                            .matchedGeometryEffect(id: "output-highlight", in: pickerNamespace)
+                    }
+                    Image(systemName: output.symbolName)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(selected ? Color.black : contentColor.opacity(0.9))
+                }
+                .frame(width: 22, height: 22)
                 Text(output.name)
-                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 12.5))
                     .lineLimit(1)
+                    .opacity(selected ? 1 : 0.85)
                 Spacer(minLength: 8)
                 if selected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .semibold))
+                        .opacity(0.9)
                         .matchedGeometryEffect(id: "output-tick", in: pickerNamespace)
                         .transition(.scale(scale: 0.5).combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 6)
             .frame(height: NotchMetrics.outputRowHeight - 2)
             .frame(maxWidth: .infinity)
-            .opacity(selected || hovered ? 1 : 0.8)
             .background {
-                if selected {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(contentColor.opacity(0.12))
-                        .matchedGeometryEffect(id: "output-highlight", in: pickerNamespace)
-                } else if hovered {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(contentColor.opacity(0.07))
+                if hovered && !selected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(contentColor.opacity(0.06))
                 }
             }
             .contentShape(Rectangle())

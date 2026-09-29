@@ -73,7 +73,7 @@ public struct NotchMetrics: Sendable, Equatable {
     public var expanded: NotchShapeParameters { expanded(outputRows: 0) }
 
     /// One list row of the output picker, and the gap above the list.
-    public static let outputRowHeight: CGFloat = 26
+    public static let outputRowHeight: CGFloat = 30
     public static let outputListInset: CGFloat = 10
 
     /// The panel, grown downward by the output picker's list (2026-09-29,

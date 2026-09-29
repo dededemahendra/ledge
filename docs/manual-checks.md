@@ -1256,3 +1256,9 @@ highlight and tick glide to the picked row (`matchedGeometryEffect`, optimistic
 `pendingOutput` until CoreAudio confirms), the list holds ~0.5 s then closes;
 rows cascade in. The list sits outside the spaced stack so it costs nothing
 while closed (the budget tests caught the 7 pt spacing slot). Judge on the notch.
+
+## Output list, second pass (2026-09-29): Control Center idiom
+
+User: "the list looks ugly". No slab: each glyph in a 22 pt circle, the
+selected one filled white with a dark glyph, names 12.5 pt regular, a tick
+on the right; rows 30 pt. The filled disc is what glides on a pick.
