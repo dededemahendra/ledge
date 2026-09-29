@@ -163,8 +163,14 @@ public final class CalendarService {
     private func fetchTimedReminders(from: Date, to: Date) async -> [MeetingEvent] {
         let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: to, calendars: nil)
         return await withCheckedContinuation { continuation in
-            store.fetchReminders(matching: predicate) { reminders in
-                continuation.resume(returning: (reminders ?? []).flatMap { MeetingEvent.occurrences(of: $0, from: from, to: to) })
+            // `@Sendable`, hence nonisolated: EventKit invokes this on its
+            // own search queue, and a closure formed inside a @MainActor
+            // method is otherwise inferred main-actor-isolated — Swift 6
+            // then traps at the first isolation check inside it (crash
+            // 2026-09-29 20:46, `dispatch_assert_queue_fail`).
+            store.fetchReminders(matching: predicate) { @Sendable reminders in
+                let items = (reminders ?? []).flatMap { MeetingEvent.occurrences(of: $0, from: from, to: to) }
+                continuation.resume(returning: items)
             }
         }
     }

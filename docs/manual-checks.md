@@ -1362,3 +1362,11 @@ Second log read: "1 event(s) and 0 timed reminder(s)" although the day is
 daily reminders — EventKit's single-object model. Rules are now expanded into
 the window. Judge live: the log line's reminder count is non-zero; hover with
 nothing playing shows the next occurrence ("Wake Up!" 06:15 tomorrow, say).
+
+## Crash on reminders fetch (2026-09-29 20:46)
+
+`EXC_BREAKPOINT` on `com.apple.eventkit.reminders.search`: the fetch
+completion, formed inside a `@MainActor` method, was inferred main-actor
+isolated and Swift 6's runtime check trapped off-main. Now `@Sendable`. Any
+EventKit/other-framework callback formed in an actor-isolated method needs
+the same care. Judge: the app stays up after launch and the reload line logs.
