@@ -813,3 +813,30 @@ unworkable.
 | Motion | `0.35 / 0.72` expand, `0.30 / 0.92` collapse | Snappy `0.26/1.0`; bouncy `0.48/0.52`; gentle `0.58/0.88` |
 | Layout | Ears first, grow down when crowded | Ears only; always-a-row-below |
 | Name | Ledge | Alco, Alcova, Perch |
+
+
+## Calendar (2026-09-29)
+
+**What.** A meeting reminder in the island's own idiom: `leadTime` (5 min)
+before an event, and again as it starts, a blip with the calendar glyph in the
+leading ear and the countdown in the trailing one ("5m" — whole minutes,
+rounded up, honest about a late launch — then "Now"), with "Title · 10:00" in
+the caption line under the hole for the blip's 8 s. A click on the blip while it
+shows joins the call — the first Zoom/Meet/Teams/Webex/FaceTime/… link found in
+the event's URL, location or notes (`MeetingLinkDetector`) — or, with no link,
+opens Calendar. Nothing is shown otherwise: no always-on "next event", no card.
+
+**How.** `CalendarService` (EventKit, `NSCalendarsFullAccessUsageDescription`)
+asks for Calendars access once at launch; a refusal is a menu problem row, not a
+crash. It keeps the next 24 h of events (minus all-day, cancelled, declined and
+untitled ones), reloads on `EKEventStoreChanged` and on wake, and hands them to
+`MeetingReminderPolicy` — pure and clock-fed — which fires each occurrence's
+`soon` and `now` at most once, suppresses a stale `soon` when the app launches
+inside the first minute, and says nothing for an event more than a minute
+under way. An exact one-shot timer is armed for the next due time, under a
+60 s safety tick.
+
+**Priority.** `ActivityKind.calendar` = 70: over power (60), under a HUD (100),
+which is the user's own key press and gone in 1.5 s. `ActivityRecord.url` /
+`ActivityDisplay.url` carry the click target; `NotchController.tap()` emits
+`.open(url)` for a leading blip that has one, which wins over pinning the card.

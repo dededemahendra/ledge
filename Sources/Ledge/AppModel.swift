@@ -6,6 +6,7 @@ import PowerService
 import HUDService
 import MediaService
 import DeviceService
+import CalendarService
 import OSLog
 
 /// Consumes service streams, maintains the queue, drives the controller.
@@ -19,6 +20,7 @@ final class AppModel {
     private let hud = HUDService()
     private let media = MediaService()
     private let device = DeviceService()
+    private let calendar = CalendarService()
     private let favorites = MusicFavorites()
 
     private var queue = ActivityQueue()
@@ -47,6 +49,7 @@ final class AppModel {
     var hudStatus: String { hud.availability.statusText }
     var mediaStatus: String { media.availability.statusText }
     var deviceStatus: String { device.availability.statusText }
+    var calendarStatus: String { calendar.availability.statusText }
 
     /// What the menu should say — only problems (2026-09-29, minimal menu).
     /// A service that is fine contributes nothing. The Accessibility grant
@@ -70,6 +73,7 @@ final class AppModel {
         note("HUD", hud.availability)
         note("Media", media.availability)
         note("Devices", device.availability)
+        note("Calendar", calendar.availability)
         if let login = LoginItem.issue {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
@@ -149,6 +153,13 @@ final class AppModel {
         // The other direction: the panel's buttons/scrubber emit `NotchIntent`s
         // through the controller; this is the one place they get turned into
         // outbound `MediaCommand`s.
+        let calendarStream = calendar.start()
+        tasks.append(Task { [weak self] in
+            for await reminder in calendarStream {
+                self?.handle(reminder)
+            }
+        })
+
         presenter.controller.onIntent = { [weak self] intent in
             self?.handle(intent)
         }
@@ -290,8 +301,41 @@ final class AppModel {
         publish()
     }
 
+    /// A meeting reminder (2026-09-29): calendar glyph left, countdown
+    /// right, the title and start time in the caption line for the blip's
+    /// lifetime, and a click that joins the call — or, with no call link,
+    /// opens Calendar (`Self.openCalendarURL`, resolved in `handle(_:)`).
+    private func handle(_ reminder: MeetingReminder) {
+        queue.insert(
+            ActivityRecord(
+                id: ActivityKind.calendar.rawValue,
+                kind: .calendar,
+                insertedAt: Date(),
+                ttl: ActivityKind.calendar.defaultTTL,
+                title: reminder.event.title,
+                compactText: reminder.compactText,
+                symbolName: "calendar",
+                url: reminder.event.joinURL ?? Self.openCalendarURL
+            )
+        )
+        showCaption(reminder.captionText(), for: ActivityKind.calendar.defaultTTL ?? NotchController.captionDuration)
+        publish()
+    }
+
+    /// Stands in for "open the Calendar app" on a reminder without a call
+    /// link; never handed to the system as a URL.
+    private static let openCalendarURL = URL(string: "ledge://calendar")!
+
     private func handle(_ intent: NotchIntent) {
         switch intent {
+        case .open(let url):
+            if url == Self.openCalendarURL {
+                if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
+                    NSWorkspace.shared.openApplication(at: app, configuration: .init())
+                }
+            } else {
+                NSWorkspace.shared.open(url)
+            }
         case .togglePlayPause: media.send(.togglePlayPause)
         case .next:             media.send(.nextTrack)
         case .previous:         media.send(.previousTrack)
@@ -308,11 +352,11 @@ final class AppModel {
         }
     }
 
-    private func showCaption(_ text: String) {
+    private func showCaption(_ text: String, for duration: TimeInterval = NotchController.captionDuration) {
         presenter.setCaption(text)
         captionTask?.cancel()
         captionTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(NotchController.captionDuration))
+            try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
             self?.presenter.setCaption(nil)
         }
@@ -414,7 +458,7 @@ final class AppModel {
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }
 
-        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus].joined(separator: "|")
+        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus].joined(separator: "|")
         if fingerprint != statusFingerprint {
             statusFingerprint = fingerprint
             onStatusChange?()
@@ -442,6 +486,7 @@ final class AppModel {
         if !power.availability.isAvailable { queue.remove(kind: .power) }
         if !hud.availability.isAvailable { queue.remove(kind: .hud) }
         if !device.availability.isAvailable { queue.remove(kind: .device) }
+        if !calendar.availability.isAvailable { queue.remove(kind: .calendar) }
         if !media.availability.isAvailable {
             queue.remove(kind: .media)
             // The activity is not the only thing a dead media service leaves
@@ -466,7 +511,8 @@ final class AppModel {
                 symbolName: record.symbolName,
                 barFill: record.barFill,
                 artwork: record.artwork,
-                tint: record.tint.map { $0 == .positive ? .positive : .warning }
+                tint: record.tint.map { $0 == .positive ? .positive : .warning },
+                url: record.url
             )
         }
         // `setActivities` sets the count itself — do not also call

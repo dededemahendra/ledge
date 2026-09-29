@@ -103,6 +103,9 @@ public enum NotchIntent: Sendable, Equatable {
     /// Make this output (an `OutputOption.id`, CoreAudio's device UID) the
     /// default. `AppModel` hands it to `DeviceService`.
     case selectOutput(id: String)
+    /// A click on a blip that carries a link (`ActivityDisplay.url` — a
+    /// meeting reminder's join URL). `AppModel` opens it.
+    case open(URL)
     /// Bring the app that is playing to the front (a click on the card's
     /// artwork or title — the Dynamic Island's own gesture for "take me
     /// there"). `AppModel` resolves which app from the live payload.
@@ -165,6 +168,9 @@ public final class NotchController {
             case positive, warning
         }
         public let tint: Tint?
+        /// What a click on the blip opens while it shows — see
+        /// `NotchController.tap()`. `nil`: the blip is just a blip.
+        public let url: URL?
 
         public init(
             id: String,
@@ -174,7 +180,8 @@ public final class NotchController {
             symbolName: String? = nil,
             barFill: Double? = nil,
             artwork: Data? = nil,
-            tint: Tint? = nil
+            tint: Tint? = nil,
+            url: URL? = nil
         ) {
             self.id = id
             self.title = title
@@ -184,6 +191,7 @@ public final class NotchController {
             self.barFill = barFill.map { min(1, max(0, $0)) }
             self.artwork = artwork
             self.tint = tint
+            self.url = url
         }
     }
 
@@ -389,6 +397,13 @@ public final class NotchController {
     public func tap() {
         if state == .expanded {
             if isPinnedOpen { dismiss() }
+            return
+        }
+        // A blip that carries a link — a meeting reminder's join URL — is a
+        // button for as long as it shows (2026-09-29): the click opens it,
+        // and wins over pinning the card behind it.
+        if let url = activities.first?.url {
+            emit(.open(url))
             return
         }
         guard media != nil else { return }

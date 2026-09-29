@@ -14,6 +14,7 @@ run anywhere else either.
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
+| A meeting 5 min away, and again as it starts | calendar glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open Calendar |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
 | Charger in/out, low or full battery | battery glyph left (bolt while charging, plug when held on AC; green charging, red low), percentage right, 3 s |
@@ -61,6 +62,7 @@ work through the system as before, overlay included, and the menu shows a row
 that opens the right Settings pane. Nothing else asks for anything: volume,
 brightness, battery, output routes and media are all observed by value. The
 one other prompt, **Automation for Music**, appears only when you first tap the
+- **Calendars** — asked once at launch, for the meeting blip. Declining just turns that blip off (the menu says so).
 card's favourite star.
 
 ## What it deliberately doesn't do

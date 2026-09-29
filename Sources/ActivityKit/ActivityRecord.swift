@@ -32,6 +32,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// Colour for `symbolName`, when the state warrants one — see
     /// `ActivityTint`. `nil` is the island's white.
     public let tint: ActivityTint?
+    /// What a click on the blip opens while it shows (a meeting's join
+    /// link), or `nil` — then the blip is just a blip.
+    public let url: URL?
 
     public init(
         id: String,
@@ -44,7 +47,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         symbolName: String? = nil,
         barFill: Double? = nil,
         artwork: Data? = nil,
-        tint: ActivityTint? = nil
+        tint: ActivityTint? = nil,
+        url: URL? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -57,6 +61,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.barFill = barFill.map { min(1, max(0, $0)) }
         self.artwork = artwork
         self.tint = tint
+        self.url = url
     }
 
     public var isSticky: Bool { ttl == nil }

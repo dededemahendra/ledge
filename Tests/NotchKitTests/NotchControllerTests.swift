@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import CoreGraphics
 @testable import NotchKit
 
@@ -537,4 +538,24 @@ private func someMedia() -> MediaPresentation {
     e.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
     e.setMedia(nil)
     #expect(e.state == .activity && !e.isPinnedOpen)
+}
+
+/// A blip that carries a link — a meeting reminder's join URL — is a
+/// button while it shows (2026-09-29): a tap opens it and never pins.
+@MainActor
+@Test func aBlipWithALinkOpensItOnTap() {
+    let c = makeController()
+    var opened: [NotchIntent] = []
+    c.onIntent = { opened.append($0) }
+    let url = URL(string: "https://meet.google.com/abc-defg-hij")!
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "calendar", title: "Standup", compactText: "5m", symbolName: "calendar", url: url)], overflow: 0)
+    c.tap()
+    #expect(opened == [.open(url)])
+    #expect(c.state == .activity && !c.isPinnedOpen, "the link wins over pinning the card behind it")
+
+    c.setActivities([.init(id: "power", title: "Battery", compactText: "42%", symbolName: "battery.100percent.bolt")], overflow: 0)
+    c.tap()
+    #expect(opened.count == 1, "a blip without a link is just a blip…")
+    #expect(c.isPinnedOpen, "…so the tap pins the card as usual")
 }

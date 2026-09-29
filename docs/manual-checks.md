@@ -1319,3 +1319,14 @@ title-and-bar layout at full card size. The expanded panel is now only ever the
 now-playing card: `click()`/`tap()` need media, the legacy list is deleted.
 Judge live: with nothing playing, press volume and click the blip — nothing
 opens; with music playing, click the blip — the card pins as before.
+
+## Calendar reminders (2026-09-29)
+
+Meeting blip: calendar glyph + "5m"/"Now", "Title · 10:00" in the caption for
+8 s, click joins the call or opens Calendar. Link detection and the reminder
+policy are unit tested; EventKit is not. Judge live: allow Calendars at first
+launch; create an event 6 min out with a Meet link in the location — at 5 min
+the blip appears; click it — the browser opens the link; at the start, "Now".
+With music playing the blip leads the ears and the cover returns after 8 s.
+Decline the permission once to see the menu row "Calendar needs Calendars
+access…".
