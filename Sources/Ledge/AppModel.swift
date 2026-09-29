@@ -362,11 +362,6 @@ final class AppModel {
     /// deep link — the item's app. `ledge://calendar|reminders` are this
     /// model's own stand-ins for "the app", never handed to the system.
     private func open(_ url: URL) {
-        // The running timer's own click (`Self.timerToggleURL`).
-        if url.scheme == "ledge", url.host() == "timer" {
-            openURL(url)
-            return
-        }
         let appFor: [String: String] = [
             "ledge": url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal",
             "ical": "com.apple.iCal",
@@ -379,31 +374,14 @@ final class AppModel {
         }
     }
 
-    // MARK: - Timer live activity (2026-09-29)
+    // MARK: - Clock timers in the island (2026-09-29)
 
-    /// The island's own timer or stopwatch: a sticky `.timer` record —
-    /// ring or glyph left, the clock right — re-derived on the 250 ms tick
-    /// and republished only when its text or ring changes. A click on it
-    /// pauses/resumes (`timerToggleURL` through the same link pipeline as
-    /// a meeting blip). At zero: the alert sound and "Done" for 8 s.
-    private var timer: LiveTimer?
-    private var timerShown: ActivityRecord?
-    private static let timerToggleURL = URL(string: "ledge://timer/toggle")!
-
-    /// What the menu shows: `nil` when idle.
-    var runningTimer: (isPaused: Bool, isStopwatch: Bool)? {
-        timer.map { ($0.isPaused, $0.isStopwatch) }
-    }
-
-    /// `ledge://timer/start?minutes=5`, `/stopwatch`, `/toggle`, `/stop` —
-    /// the island's own click (toggle) and, since the scheme is registered,
-    /// Shortcuts, Raycast or `open` from a shell. Anything else is ignored.
+    /// `ledge://probe/menubar`, debug builds only — see `MenuBarProbe`.
+    /// The app's own timer that once lived behind this scheme was removed
+    /// the same day at the user's request (the Clock's timers are what
+    /// they wanted); the scheme stays registered for the probe alone.
     func openURL(_ url: URL) {
         #if DEBUG
-        // Development only, and never into the shared system log: the
-        // menu bar's contents are the user's own (a live activity's text,
-        // say), so the dump goes to a file under ~/Library/Logs/Ledge that
-        // only this user can read. Release builds ignore the URL.
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/menubar" {
             let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -413,67 +391,16 @@ final class AppModel {
             return
         }
         #endif
-        guard url.scheme == "ledge", url.host() == "timer" else {
-            Self.log.notice("ignored url \(url.absoluteString, privacy: .public)")
-            return
-        }
-        // Any app or page can open this scheme; the worst it can do is start
-        // or stop this app's own timer, and browsers confirm custom schemes
-        // first. The Clock's timers are never touched from here.
-        switch url.path() {
-        case "/start":
-            let minutes = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first { $0.name == "minutes" }?.value.flatMap(Int.init) ?? 5
-            startTimer(minutes: min(24 * 60, max(1, minutes)))
-        case "/stopwatch": startStopwatch()
-        case "/toggle":    toggleTimerPause()
-        case "/stop":      stopTimer()
-        default:           Self.log.notice("ignored timer url \(url.absoluteString, privacy: .public)")
-        }
+        Self.log.notice("ignored url \(url.absoluteString, privacy: .public)")
     }
 
-    func startTimer(minutes: Int) {
-        Self.log.notice("timer: start \(minutes, privacy: .public) min")
-        timer = LiveTimer(kind: .countdown(TimeInterval(minutes * 60)), at: Date())
-        timerShown = nil
-        refreshTimer()
-    }
-
-    func startStopwatch() {
-        Self.log.notice("timer: stopwatch")
-        timer = LiveTimer(kind: .stopwatch, at: Date())
-        timerShown = nil
-        refreshTimer()
-    }
-
-    func toggleTimerPause() {
-        guard timer != nil else { return }
-        timer?.togglePause(at: Date())
-        Self.log.notice("timer: \(self.timer?.isPaused == true ? "paused" : "resumed", privacy: .public)")
-        timerShown = nil
-        refreshTimer()
-    }
-
-    func stopTimer() {
-        Self.log.notice("timer: stop")
-        timer = nil
-        if timerSource == "own" {
-            timerSource = nil
-            timerShown = nil
-            queue.remove(kind: .timer)
-            publish()
-        }
-        onStatusChange?()
-    }
-
-    /// The Clock app's own timers and stopwatches (`ClockTimerObserver`,
-    /// 2026-09-29): whatever it is running takes the island first — a Siri
-    /// "set a timer for ten minutes" lands here without touching this
-    /// app — and the app's own timer shows only when the Clock has
-    /// nothing going. A click opens the Clock on the matching tab.
+    /// The Clock app's own timers and stopwatches (`ClockTimerObserver`):
+    /// whatever it is running takes the island — a Siri "set a timer for
+    /// ten minutes" lands here without touching this app. A click opens
+    /// the Clock on the matching tab.
+    private var timerShown: ActivityRecord?
     private let clock = ClockTimerObserver()
     private var clockOddities: [String] = []
-    private var timerSource: String?
 
     private func refreshTimer() {
         let now = Date()
@@ -485,45 +412,14 @@ final class AppModel {
             }
         }
         if let featured = snapshot.featured(at: now) {
-            show(clockRecord(for: featured, at: now), source: "clock")
-            return
-        }
-        if timerSource == "clock" {
-            // The Clock stopped or dismissed it: clear, then let the app's
-            // own timer (if any) come back below.
-            timerSource = nil
+            show(clockRecord(for: featured, at: now))
+        } else if timerShown != nil {
+            // Stopped or dismissed in the Clock.
             timerShown = nil
             queue.remove(kind: .timer)
             publish()
             Self.log.notice("clock: nothing running")
         }
-
-        guard let timer else { return }
-        if timer.isFinished(at: now) {
-            Self.log.notice("timer: done")
-            self.timer = nil
-            timerShown = nil
-            timerSource = nil
-            NSSound.beep()
-            queue.insert(ActivityRecord(
-                id: NotchController.timerActivityID, kind: .timer, insertedAt: now, ttl: 8,
-                title: "Timer", compactText: "Done", symbolName: "timer"
-            ))
-            publish()
-            onStatusChange?()
-            return
-        }
-        let fill = timer.fraction(at: now).map { ($0 * 200).rounded() / 200 }   // 0.5% steps: smooth, not chatty
-        show(ActivityRecord(
-            id: NotchController.timerActivityID, kind: .timer, insertedAt: timerShown?.insertedAt ?? now, ttl: nil,
-            title: timer.isStopwatch ? "Stopwatch" : "Timer",
-            compactText: timer.displayText(at: now),
-            // Running countdown: the ring (`barFill`). Paused: the pause
-            // glyph. Stopwatch: its own glyph.
-            symbolName: timer.isPaused ? "pause.fill" : "stopwatch",
-            barFill: timer.isPaused ? nil : fill,
-            url: Self.timerToggleURL
-        ), source: "own")
     }
 
     /// The island's record for a Clock item: ring and clock while a timer
@@ -538,7 +434,7 @@ final class AppModel {
             return ActivityRecord(
                 id: NotchController.timerActivityID, kind: .timer, insertedAt: timerShown?.insertedAt ?? now, ttl: nil,
                 title: timer.title ?? "Timer",
-                compactText: fired ? "Done" : LiveTimer.format(seconds: remaining.rounded(.up)),
+                compactText: fired ? "Done" : TimerText.format(seconds: remaining.rounded(.up)),
                 symbolName: fired ? "timer" : (timer.isRunning ? "stopwatch" : "pause.fill"),
                 barFill: timer.isRunning && !fired ? (timer.fraction(at: now) * 200).rounded() / 200 : nil,
                 url: URL(string: "clock-timer://")
@@ -547,7 +443,7 @@ final class AppModel {
             return ActivityRecord(
                 id: NotchController.timerActivityID, kind: .timer, insertedAt: timerShown?.insertedAt ?? now, ttl: nil,
                 title: "Stopwatch",
-                compactText: LiveTimer.format(seconds: watch.elapsed(at: now).rounded(.down)),
+                compactText: TimerText.format(seconds: watch.elapsed(at: now).rounded(.down)),
                 symbolName: "stopwatch",
                 url: URL(string: "clock-stopwatch://")
             )
@@ -555,15 +451,14 @@ final class AppModel {
     }
 
     /// Republishes the timer record only when what the island would draw
-    /// changes — text, ring, glyph or source — so the 250 ms tick costs
-    /// nothing between seconds.
-    private func show(_ record: ActivityRecord, source: String) {
-        guard source != timerSource || record.compactText != timerShown?.compactText
-                || record.barFill != timerShown?.barFill || record.symbolName != timerShown?.symbolName else { return }
-        if source != timerSource || timerShown == nil {
-            Self.log.notice("\(source, privacy: .public) timer in the island as \(record.compactText ?? "", privacy: .public) (\(record.title, privacy: .private))")
+    /// changes — text, ring or glyph — so the 250 ms tick costs nothing
+    /// between seconds.
+    private func show(_ record: ActivityRecord) {
+        guard record.compactText != timerShown?.compactText || record.barFill != timerShown?.barFill
+                || record.symbolName != timerShown?.symbolName else { return }
+        if timerShown == nil {
+            Self.log.notice("clock timer in the island as \(record.compactText ?? "", privacy: .public) (\(record.title, privacy: .private))")
         }
-        timerSource = source
         timerShown = record
         queue.insert(record)
         publish()

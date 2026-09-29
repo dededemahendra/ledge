@@ -29,16 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // otherwise be invisible.
         let refreshMenu: () -> Void = { [weak model, weak item] in
             guard let model, let item else { return }
-            Self.log.notice("menu: \(model.issues.count, privacy: .public) issue(s), timer \(model.runningTimer == nil ? "idle" : "running", privacy: .public)")
             item.setIssues(model.issues.map { StatusItemController.Issue(text: $0.text, fix: $0.fix) })
-            item.setTimerMenu(
-                model.runningTimer.map { .running(paused: $0.isPaused) } ?? .idle,
-                onStart: { [weak model] minutes in
-                    if let minutes { model?.startTimer(minutes: minutes) } else { model?.startStopwatch() }
-                },
-                onToggle: { [weak model] in model?.toggleTimerPause() },
-                onStop: { [weak model] in model?.stopTimer() }
-            )
         }
         refreshMenu()
         item.onMenuWillOpen = refreshMenu
@@ -48,9 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Self.log.info("launched; notch \(String(describing: presenter.controller.metrics.notchRect))")
     }
 
-    /// `ledge://timer/start?minutes=5`, `/stopwatch`, `/toggle`, `/stop`
-    /// (2026-09-29): the scheme is registered in `Info.plist.in`, so
-    /// Shortcuts, Raycast or a plain `open` can drive the timer.
+    /// The `ledge://` scheme (`Info.plist.in`): debug-only probe, see
+    /// `AppModel.openURL`.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls { model?.openURL(url) }
     }

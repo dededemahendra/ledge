@@ -71,3 +71,11 @@ private func intervalFire() -> [String: Any] { ["$MTTimerTimeInterval": ["MTTime
     #expect(snap.oddities.count == 3)
     #expect(ClockTimerSnapshot(domain: [:]) == .empty)
 }
+
+@Test func clockTextFitsTheEar() {
+    #expect(TimerText.format(seconds: 5) == "0:05")
+    #expect(TimerText.format(seconds: 754) == "12:34")
+    #expect(TimerText.format(seconds: 3599) == "59:59")
+    #expect(TimerText.format(seconds: 3720) == "1:02", "hours:minutes from an hour up")
+    #expect(TimerText.format(seconds: -3) == "0:00")
+}

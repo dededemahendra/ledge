@@ -75,6 +75,17 @@ public struct ClockStopwatch: Sendable, Equatable, Identifiable {
     }
 }
 
+/// The trailing ear's clock text: "12:34" under an hour, "1:02"
+/// (hours:minutes) from an hour up — the ear holds five characters, not
+/// seven.
+public enum TimerText {
+    public static func format(seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        if total < 3600 { return String(format: "%d:%02d", total / 60, total % 60) }
+        return String(format: "%d:%02d", total / 3600, (total % 3600) / 60)
+    }
+}
+
 /// One read of the daemon's domain. Pure: built from the dictionary the
 /// observer fetches, so it is testable from a fixture.
 public struct ClockTimerSnapshot: Sendable, Equatable {

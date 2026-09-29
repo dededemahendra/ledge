@@ -907,3 +907,10 @@ exactly like the app's own timer, "Done" once it has rung until the user
 dismisses it in the Clock, a click opening the Clock on that tab. The app's own
 timer shows only when the Clock has nothing going. Siri timers land in the
 same daemon, so "set a timer for ten minutes" appears without touching this app.
+
+**Removed (2026-09-29, later still).** The app's own timer and stopwatch —
+`LiveTimer`, the menu bar's Timer submenu, `ledge://timer/*` — at the user's
+request: the Clock's are the ones they wanted, and two timers would only
+compete. The island's timer record, ring and non-bumping digits stay for the
+Clock mirror; the `ledge://` scheme stays registered for the debug-only menu
+bar probe.

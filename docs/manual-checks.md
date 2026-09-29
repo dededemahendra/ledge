@@ -1436,3 +1436,10 @@ title is logged private; timer minutes are clamped to a day. The scheme itself
 stays open on purpose — the worst it can do is start or stop this app's own
 timer, browsers confirm custom schemes, and the Clock's timers are never
 controlled from it.
+
+## Own timer removed (2026-09-29)
+
+User: "remove timer features that you create". Gone: `LiveTimer`, the Timer
+submenu, `ledge://timer/*`. Kept: the Clock app mirror (ring, clock, pause,
+Done, stopwatch), the debug-only `ledge://probe/menubar`. Judge live: the menu
+is Quit (plus problem rows) again; a Clock timer still shows in the island.
