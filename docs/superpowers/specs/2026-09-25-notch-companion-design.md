@@ -240,6 +240,14 @@ the menu bar's "Toggle Panel") **pins** the panel open so it survives the cursor
 leaving; Escape, click-outside and a second click unpin it. Unpinning while the
 cursor is still over the island lands straight back on the hover-opened panel.
 
+**Changed 2026-09-29: hover needs a dwell.** The cursor has to rest on the
+island for 0.2 s (`NotchPresenter.hoverDwell`) before it counts as hovering, so
+a pass through the notch on the way to the menu bar no longer flashes the card
+open. Leaving still counts at once. The dwell gates only what the controller
+is told (`HoverIntentTracker`); the window accepts mouse events on the raw
+pointer position, so a click on a visible island during the dwell still lands
+and pins the panel immediately.
+
 - Auto-collapse timers are **cancelled while hovered** — never yank the island out
   from under the cursor.
 - `peek` is the notch height + 6 pt with glanceable hints.

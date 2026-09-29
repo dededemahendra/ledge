@@ -12,7 +12,7 @@ run anywhere else either.
 
 | Trigger | Island |
 | --- | --- |
-| Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; hover opens the card |
+| Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
@@ -22,7 +22,7 @@ run anywhere else either.
 Browsers and everything else that MediaRemote reports are ignored on purpose
 (`MediaSourcePolicy`). One blip owns the island at a time; the rest queue.
 
-**The card** (hover with music playing): artwork and titles — click them to
+**The card** (rest the cursor on the island for a beat with music playing — passing through to the menu bar does nothing): artwork and titles — click them to
 bring the app forward — with a favourite star and the output button beside
 them — a scrubber with times, then Apple Music's transport row: shuffle ·
 previous · play/pause · next · repeat. The star works for Apple Music only

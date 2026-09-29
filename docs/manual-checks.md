@@ -1292,3 +1292,13 @@ press the speaker/sun glyph no longer bounces (its waves/rays still light up
 with the level); the percentage still rolls, with a 10% tick instead of 20%.
 The blip's arrival (island pop, ear emerge) and the island pulse on a new
 blip are unchanged. Judge live: hold volume up — one quiet motion per step.
+
+## Hover intent (2026-09-29)
+
+The cursor must rest on the island 0.2 s before the panel opens or the notch
+peeks; leaving closes at once. `HoverIntentTracker` is pure and unit tested;
+the presenter arms a one-shot timer for the exact dwell end so a still cursor
+still opens on time. Mouse acceptance follows the raw pointer position, so a
+click during the dwell still pins. Judge live: sweep the cursor up through the
+notch to the menu bar — nothing should move; rest on it — the card opens after
+a beat; click a blip straight away — it pins.

@@ -15,6 +15,13 @@ public final class NotchPresenter {
     private var escapeMonitor: Any?
     private var scrollMonitor: Any?
     private var swipe = SwipeToSkipTracker()
+    /// How long the cursor must rest on the island before it counts as
+    /// hovering — see `HoverIntentTracker`. A pass-through to the menu bar
+    /// crosses the notch in well under 100 ms; 0.2 s filters it while a
+    /// deliberate stop still feels immediate.
+    public static let hoverDwell: TimeInterval = 0.2
+    private var hover = HoverIntentTracker(dwell: NotchPresenter.hoverDwell)
+    private var dwellTimer: Timer?
     private var skipHintTask: Task<Void, Never>?
     /// Registered on `NSWorkspace.shared.notificationCenter`, NOT
     /// `NotificationCenter.default` like `observers` — a token from one
@@ -153,6 +160,8 @@ public final class NotchPresenter {
         reduceMotionObserver = nil
         if let trackingMonitor { NSEvent.removeMonitor(trackingMonitor) }
         trackingMonitor = nil
+        dwellTimer?.invalidate()
+        dwellTimer = nil
         if let clickOutsideMonitor { NSEvent.removeMonitor(clickOutsideMonitor) }
         clickOutsideMonitor = nil
         if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
@@ -257,6 +266,9 @@ public final class NotchPresenter {
             // safe to call unconditionally. A live activity legitimately
             // reappearing once the window comes back (still within its TTL)
             // is correct, not stale, and recomputeState still allows that.
+            hover.reset()
+            dwellTimer?.invalidate()
+            dwellTimer = nil
             controller.setHovered(false)
             controller.dismiss()
             // Zeroed, not left stale: makes `NotchController.click()`'s
@@ -309,8 +321,10 @@ public final class NotchPresenter {
         // closes. Re-derived here, on the same choke point as everything
         // else, so every path that can change hover or visibility (mouse
         // moved, the 250ms tick, an activity arriving/expiring, a toggle,
-        // a screen change) keeps the flag honest.
-        window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: controller.isHovered))
+        // a screen change) keeps the flag honest. The RAW pointer fact,
+        // not the dwell-promoted `controller.isHovered`: a click on a
+        // visible island during the dwell must still land on it.
+        window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside))
         if controller.isVisible {
             window.orderFrontRegardless()
         } else {
@@ -416,14 +430,43 @@ public final class NotchPresenter {
     /// re-evaluate hover too — see that method's doc comment), and calling
     /// back into it unconditionally here would recurse. `updateHover()`
     /// (the mouse-moved path) calls both, in order, itself.
+    ///
+    /// Hover intent (2026-09-29): the geometric fact goes through
+    /// `HoverIntentTracker`, and the controller hears only the promoted
+    /// value — `true` once the cursor has rested on the island for
+    /// `hoverDwell`, `false` the moment it leaves.
     @discardableResult
     private func reevaluateHover() -> Bool {
         guard let screen = NSScreen.builtIn else { return false }
         let point = Self.localPoint(NSEvent.mouseLocation, on: screen.frame)
-        let hovered = Self.islandPath(for: forgivingParameters()).contains(point)
-        guard hovered != controller.isHovered else { return false }
-        controller.setHovered(hovered)
-        return true
+        let inside = Self.islandPath(for: forgivingParameters()).contains(point)
+        let change = hover.pointer(inside: inside, at: Date())
+        armDwellTimer()
+        switch change {
+        case .none:      return false
+        case .hovered:   controller.setHovered(true);  return true
+        case .unhovered: controller.setHovered(false); return true
+        }
+    }
+
+    /// Checks back exactly when a running dwell elapses, so the island
+    /// opens on time under a perfectly still cursor (no further mouse
+    /// events come, and the 250 ms tick is too coarse). Re-armed only
+    /// when the due time changes, so the flood of mouse-moved events
+    /// during a dwell costs nothing here.
+    private func armDwellTimer() {
+        guard let due = hover.pendingUntil else {
+            dwellTimer?.invalidate()
+            dwellTimer = nil
+            return
+        }
+        if let dwellTimer, dwellTimer.isValid, abs(dwellTimer.fireDate.timeIntervalSince(due)) < 0.001 { return }
+        dwellTimer?.invalidate()
+        let timer = Timer(fire: due, interval: 0, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateHover() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dwellTimer = timer
     }
 }
 
