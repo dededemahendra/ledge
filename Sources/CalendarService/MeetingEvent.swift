@@ -1,25 +1,45 @@
 import Foundation
 
-/// One upcoming calendar event the island might remind about. Pure — no
-/// EventKit here, so the policy and text below are unit-testable; the
-/// service maps `EKEvent`s into these.
+/// One upcoming item the island might remind about: a calendar event, or
+/// a reminder with a time of day (2026-09-29 — the user's day is mostly
+/// timed Reminders, which Calendar shows inline but EventKit keeps behind
+/// its own permission and query). Pure — no EventKit here, so the policy
+/// and text below are unit-testable; the service maps `EKEvent`s and
+/// `EKReminder`s into these.
 public struct MeetingEvent: Sendable, Equatable, Identifiable {
+    public enum Kind: String, Sendable, Equatable {
+        case event, reminder
+    }
+
     /// Stable per OCCURRENCE: a recurring event shares one calendar item
     /// identifier across its instances, so the start is folded in.
     public let id: String
+    public let kind: Kind
     public let title: String
     public let start: Date
+    /// For a reminder, `start + reminderWindow`: how long it counts as
+    /// "Now" before the next item takes over.
     public let end: Date
-    /// A video-call link found in the event (see `MeetingLinkDetector`), or
-    /// `nil` — then a click on the blip opens Calendar instead.
+    /// A video-call link found in the item (see `MeetingLinkDetector`), or
+    /// `nil` — then a click on the blip opens Calendar or Reminders.
     public let joinURL: URL?
 
-    public init(id: String, title: String, start: Date, end: Date, joinURL: URL?) {
+    /// How long a due reminder stays "Now" (it has no duration of its own).
+    public static let reminderWindow: TimeInterval = 15 * 60
+
+    public init(id: String, kind: Kind = .event, title: String, start: Date, end: Date, joinURL: URL?) {
         self.id = id
+        self.kind = kind
         self.title = title
         self.start = start
         self.end = end
         self.joinURL = joinURL
+    }
+
+    /// The leading ear's glyph: the calendar for an event, the checklist
+    /// for a reminder — Reminders' own idiom.
+    public var symbolName: String {
+        kind == .event ? "calendar" : "checklist"
     }
 
     /// Time to the start for an ear: whole minutes rounded up under an

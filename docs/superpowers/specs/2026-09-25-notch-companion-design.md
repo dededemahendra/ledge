@@ -851,3 +851,12 @@ re-render); the presenter resyncs the window when it changes. The card and any
 live blip still win over the preview. Found and fixed alongside: the caption
 line was gated to media leading, so the reminder blip's own "Title · 10:00"
 never showed; `hasCaption` now also accepts the calendar blip leading.
+
+**Reminders too (2026-09-29, same day).** The user's day is mostly timed
+Reminders, which Calendar shows inline but EventKit keeps behind its own
+permission (`NSRemindersFullAccessUsageDescription`) and query. A reminder with
+a time of day is an item like an event — `MeetingEvent.Kind.reminder`, the
+`checklist` glyph, "Now" for `reminderWindow` (15 min) after it is due since it
+has no duration, a click opening Reminders — and one without a time is skipped.
+Completed reminders never load (the query is for incomplete ones). Either
+permission alone is enough; both refused is the menu row.

@@ -608,10 +608,10 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if controller.isPreviewingUpcoming {
-            // The next event on hover (`NotchController.upcoming`): the
-            // meeting blip's glyph, same size and weight as a blip's.
-            Image(systemName: "calendar")
+        if controller.isPreviewingUpcoming, let upcoming = controller.upcoming {
+            // The next event or reminder on hover (`NotchController.
+            // upcoming`): its glyph, same size and weight as a blip's.
+            Image(systemName: upcoming.symbolName)
                 .font(.system(size: 13, weight: .medium))
         } else if let hint = controller.skipHint, controller.media != nil, controller.state != .expanded {
             // Swipe-to-skip feedback (`NotchController.skipHint`): the skip

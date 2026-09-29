@@ -1347,3 +1347,11 @@ and each reload's event count at `.notice`, so this is answerable with
 `/usr/bin/log show --predicate 'subsystem == "com.dedemahendra.ledge" AND
 category == "calendar"'`. Note the full path: zsh's builtin `log` shadows it
 and silently prints nothing.
+
+## Reminders as items (2026-09-29)
+
+User's screenshot: the calendar was full of timed Reminders, not events, so
+"0 event(s)" was correct and useless. Timed, incomplete reminders now load
+beside events (own permission prompt, checklist glyph, click opens Reminders).
+Judge live: allow Reminders; hover with nothing playing — the next timed
+reminder shows with its countdown; the log line now counts both kinds.

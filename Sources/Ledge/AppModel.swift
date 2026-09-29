@@ -317,17 +317,19 @@ final class AppModel {
                 ttl: ActivityKind.calendar.defaultTTL,
                 title: reminder.event.title,
                 compactText: reminder.compactText,
-                symbolName: "calendar",
-                url: reminder.event.joinURL ?? Self.openCalendarURL
+                symbolName: reminder.event.symbolName,
+                url: reminder.event.joinURL ?? Self.openAppURL(for: reminder.event.kind)
             )
         )
         showCaption(reminder.captionText(), for: ActivityKind.calendar.defaultTTL ?? NotchController.captionDuration)
         publish()
     }
 
-    /// Stands in for "open the Calendar app" on a reminder without a call
-    /// link; never handed to the system as a URL.
-    private static let openCalendarURL = URL(string: "ledge://calendar")!
+    /// Stands in for "open the Calendar (or Reminders) app" on an item
+    /// without a call link; never handed to the system as a URL.
+    private static func openAppURL(for kind: MeetingEvent.Kind) -> URL {
+        URL(string: kind == .event ? "ledge://calendar" : "ledge://reminders")!
+    }
 
     /// The next event for the hover preview (`NotchController.upcoming`),
     /// refreshed on the 250 ms tick so the countdown stays honest while the
@@ -344,17 +346,19 @@ final class AppModel {
         }
         presenter.setUpcoming(UpcomingEvent(
             title: event.title,
+            symbolName: event.symbolName,
             compactText: event.countdownText(at: now),
             caption: upcomingCaption?.text ?? event.title,
-            url: event.joinURL ?? Self.openCalendarURL
+            url: event.joinURL ?? Self.openAppURL(for: event.kind)
         ))
     }
 
     private func handle(_ intent: NotchIntent) {
         switch intent {
         case .open(let url):
-            if url == Self.openCalendarURL {
-                if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
+            if url.scheme == "ledge" {
+                let bundle = url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal"
+                if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
                     NSWorkspace.shared.openApplication(at: app, configuration: .init())
                 }
             } else {

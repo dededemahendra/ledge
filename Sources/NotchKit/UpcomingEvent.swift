@@ -7,6 +7,8 @@ import Foundation
 /// joins. `AppModel` keeps it fresh from `CalendarService`.
 public struct UpcomingEvent: Sendable, Equatable {
     public let title: String
+    /// Leading ear: "calendar" for an event, "checklist" for a reminder.
+    public let symbolName: String
     /// Trailing ear: "42m", "2h 10m", "Now".
     public let compactText: String
     /// The caption line: "Title · 14:00".
@@ -15,8 +17,9 @@ public struct UpcomingEvent: Sendable, Equatable {
     /// stand-in.
     public let url: URL?
 
-    public init(title: String, compactText: String, caption: String, url: URL?) {
+    public init(title: String, symbolName: String = "calendar", compactText: String, caption: String, url: URL?) {
         self.title = title
+        self.symbolName = symbolName
         self.compactText = compactText
         self.caption = caption
         self.url = url

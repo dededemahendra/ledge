@@ -22,6 +22,9 @@ public final class CalendarService {
     private let store = EKEventStore()
     private var policy: MeetingReminderPolicy
     private var events: [MeetingEvent] = []
+    private var hasEvents = false
+    private var hasReminders = false
+    private var reloadTask: Task<Void, Never>?
     private var continuation: AsyncStream<MeetingReminder>.Continuation?
     private var accessTask: Task<Void, Never>?
     private var storeObserver: NSObjectProtocol?
@@ -46,6 +49,8 @@ public final class CalendarService {
     public func stop() {
         accessTask?.cancel()
         accessTask = nil
+        reloadTask?.cancel()
+        reloadTask = nil
         dueTimer?.invalidate()
         dueTimer = nil
         safetyTimer?.invalidate()
@@ -59,26 +64,15 @@ public final class CalendarService {
     }
 
     private func requestAccessAndBegin() async {
-        var granted = false
-        let status = EKEventStore.authorizationStatus(for: .event)
-        switch status {
-        case .fullAccess:
-            granted = true
-        case .notDetermined:
-            do {
-                granted = try await store.requestFullAccessToEvents()
-            } catch {
-                Self.log.error("calendar access request failed: \(error.localizedDescription, privacy: .public)")
-            }
-        default:
-            granted = false
-        }
+        hasEvents = await requestAccess(to: .event)
+        guard !Task.isCancelled else { return }
+        hasReminders = await requestAccess(to: .reminder)
         guard !Task.isCancelled else { return }
         // `.notice`, not `.info`: persisted, so a "why no reminders?" can be
         // answered from `log show` after the fact.
-        Self.log.notice("calendar access: status \(status.rawValue, privacy: .public), granted \(granted, privacy: .public)")
-        guard granted else {
-            availability = .needsPermission("Calendars access (System Settings → Privacy & Security → Calendars)")
+        Self.log.notice("calendar access: events \(self.hasEvents, privacy: .public), reminders \(self.hasReminders, privacy: .public)")
+        guard hasEvents || hasReminders else {
+            availability = .needsPermission("Calendars or Reminders access (System Settings → Privacy & Security)")
             return
         }
         availability = .available
@@ -106,25 +100,71 @@ public final class CalendarService {
         reload()
     }
 
+    /// Full access to one entity type: already granted, or asked for now.
+    /// Each has its own prompt and its own Settings toggle.
+    private func requestAccess(to entity: EKEntityType) async -> Bool {
+        switch EKEventStore.authorizationStatus(for: entity) {
+        case .fullAccess:
+            return true
+        case .notDetermined:
+            do {
+                return entity == .event
+                    ? try await store.requestFullAccessToEvents()
+                    : try await store.requestFullAccessToReminders()
+            } catch {
+                Self.log.error("access request failed (\(entity.rawValue, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+                return false
+            }
+        default:
+            return false
+        }
+    }
+
     /// The event under way or next up, for the hover preview
     /// (`NotchController.upcoming`). `nil` with nothing in the next day.
     public func nextEvent(at now: Date) -> MeetingEvent? {
         events.first { $0.end > now }
     }
 
-    /// The next day of events, mapped to `MeetingEvent`s.
+    /// The next day of events and timed reminders, mapped to
+    /// `MeetingEvent`s. Reminders come back asynchronously, so this runs as
+    /// a task; a reload arriving mid-fetch supersedes the one in flight.
     private func reload() {
-        let now = Date()
-        let predicate = store.predicateForEvents(
-            withStart: now.addingTimeInterval(-3600), end: now.addingTimeInterval(24 * 3600), calendars: nil
-        )
-        let all = store.events(matching: predicate)
-        events = all
-            .compactMap(MeetingEvent.init(ekEvent:))
-            .filter { $0.end > now }
-            .sorted { $0.start < $1.start }
-        Self.log.notice("calendar reload: \(all.count, privacy: .public) event(s) in the next day, \(self.events.count, privacy: .public) to remind about; next: \(self.events.first?.title ?? "none", privacy: .private)")
-        evaluate()
+        reloadTask?.cancel()
+        reloadTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let now = Date()
+            let from = now.addingTimeInterval(-3600), to = now.addingTimeInterval(24 * 3600)
+            var items: [MeetingEvent] = []
+            var eventCount = 0
+            if hasEvents {
+                let all = store.events(matching: store.predicateForEvents(withStart: from, end: to, calendars: nil))
+                eventCount = all.count
+                items += all.compactMap(MeetingEvent.init(ekEvent:))
+            }
+            var reminderCount = 0
+            if hasReminders {
+                let reminders = await fetchTimedReminders(from: from, to: to)
+                reminderCount = reminders.count
+                items += reminders
+            }
+            guard !Task.isCancelled else { return }
+            events = items.filter { $0.end > now }.sorted { $0.start < $1.start }
+            Self.log.notice("calendar reload: \(eventCount, privacy: .public) event(s) and \(reminderCount, privacy: .public) timed reminder(s) in the next day, \(self.events.count, privacy: .public) upcoming; next: \(self.events.first?.title ?? "none", privacy: .private)")
+            evaluate()
+        }
+    }
+
+    /// Incomplete reminders due in the window that carry a time of day.
+    /// `fetchReminders` calls back off the main queue; only the mapped,
+    /// `Sendable` values cross back.
+    private func fetchTimedReminders(from: Date, to: Date) async -> [MeetingEvent] {
+        let predicate = store.predicateForIncompleteReminders(withDueDateStarting: from, ending: to, calendars: nil)
+        return await withCheckedContinuation { continuation in
+            store.fetchReminders(matching: predicate) { reminders in
+                continuation.resume(returning: (reminders ?? []).compactMap(MeetingEvent.init(ekReminder:)))
+            }
+        }
     }
 
     private func evaluate() {
@@ -167,6 +207,26 @@ extension MeetingEvent {
             start: start,
             end: end,
             joinURL: MeetingLinkDetector.joinURL(url: event.url, location: event.location, notes: event.notes)
+        )
+    }
+}
+
+extension MeetingEvent {
+    /// `nil` for a reminder with no time of day (nothing to count down to)
+    /// or no title. Completed ones never reach here — the query asks for
+    /// incomplete reminders only.
+    init?(ekReminder reminder: EKReminder) {
+        guard let components = reminder.dueDateComponents, components.hour != nil,
+              let due = (components.calendar ?? Calendar.current).date(from: components),
+              let title = reminder.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty
+        else { return nil }
+        self.init(
+            id: "\(reminder.calendarItemIdentifier)@\(Int(due.timeIntervalSince1970))",
+            kind: .reminder,
+            title: title,
+            start: due,
+            end: due.addingTimeInterval(Self.reminderWindow),
+            joinURL: MeetingLinkDetector.joinURL(url: reminder.url, location: nil, notes: reminder.notes)
         )
     }
 }
