@@ -727,6 +727,13 @@ public struct NotchRootView: View {
             .font(.system(size: 11, weight: .medium))
             .monospacedDigit()
             .lineLimit(1)
+            // Never truncate: the ear (38pt) holds the widest label ("100%",
+            // 32pt), but the numeric transition below re-measures the text
+            // and, at a 3x backing scale, rounds it a third of a point short
+            // — enough for a "100…" ellipsis (seen in headless renders,
+            // 2026-09-29; 2x is unaffected). Sizing to the ideal width
+            // sidesteps the rounding at every scale.
+            .fixedSize(horizontal: true, vertical: false)
             // Digits ROLL between values (Apple's numeric text transition)
             // instead of crossfading — 50% -> 55% reads as a dial turning.
             // No `.id`: the Text must stay the same view for that.
