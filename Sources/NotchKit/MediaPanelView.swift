@@ -4,7 +4,7 @@ import SwiftUI
 /// The expanded media card, laid out to match Alcove's structure (from the
 /// user's screenshot of the real thing):
 ///
-///   row 1 — artwork · title/artist · visualizer, edge to edge
+///   row 1 — artwork (a spinning disc) · title/artist · output glyph
 ///   row 2 — full-width scrubber with the times INLINE at its ends
 ///   row 3 — six controls on their own centred row:
 ///           favourite · shuffle · previous · play/pause · next · output
@@ -174,39 +174,38 @@ struct MediaPanelView: View {
 
             Spacer(minLength: 8)
 
-            // Alcove parks its equalizer glyph top-right of the card. White
-            // like the rest of the card; animated only while actually playing.
-            AudioVisualizerBars(
-                color: contentColor.opacity(0.85),
-                isAnimating: media.isPlaying && !reduceMotion
-            )
-            .opacity(media.isPlaying ? 1 : 0.35)
+            // Top-right: the current output's glyph, where the reference
+            // card parks its equalizer (replaced at the user's request,
+            // 2026-09-29). Bright while playing, dim while paused.
+            Image(systemName: outputs.first(where: \.isCurrent)?.symbolName ?? "speaker.wave.2")
+                .font(.system(size: 13, weight: .medium))
+                .opacity(media.isPlaying ? 0.85 : 0.35)
         }
     }
 
     @ViewBuilder private var artwork: some View {
-        Group {
-            if let image = artworkImage {
-                Image(nsImage: image).resizable().scaledToFill()
-            } else {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(contentColor.opacity(0.18))
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 20))
-                            .foregroundStyle(contentColor.opacity(0.5))
-                    }
+        SpinningArtwork(isPlaying: media.isPlaying, reduceMotion: reduceMotion) {
+            Group {
+                if let image = artworkImage {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } else {
+                    Circle()
+                        .fill(contentColor.opacity(0.18))
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 20))
+                                .foregroundStyle(contentColor.opacity(0.5))
+                        }
+                }
             }
+            .frame(width: 56, height: 56)
         }
-        .frame(width: 56, height: 56)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         // Depth: a soft shadow beneath and a hairline catching light on the
-        // edge, so the sleeve reads as an object sitting on the card rather
+        // edge, so the disc reads as an object sitting on the card rather
         // than a flat texture. The placeholder gets the identical treatment
         // so the two states don't jump when artwork arrives.
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+            Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.45), radius: 6, y: 2)
     }

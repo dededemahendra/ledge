@@ -1206,3 +1206,13 @@ star disabled.
 
 Not verified live: the prompt and the toggle against Music (only a browser
 was playing here); the green/red glyphs on a real plug/unplug.
+
+# Disc artwork and output glyph (2026-09-29)
+
+User: replace the visualizer with the output icon, and make the cover spin
+like a DVD. `SpinningArtwork` (circle clip, 12 s per turn while playing,
+angle frozen on pause, resumed from there; still under Reduce Motion) wraps
+both the ear's and the card's artwork. The equalizer bars are gone
+(`AudioVisualizerBars` deleted with its tests); the compact trailing ear and
+the card's top-right show the current output's glyph, dim when paused.
+Not verified live: the spin and its pause/resume.

@@ -677,16 +677,32 @@ public struct NotchRootView: View {
 
     @ViewBuilder
     private func mediaArtwork(_ media: MediaPresentation) -> some View {
-        Group {
-            if let image = controller.mediaArtworkImage {
-                Image(nsImage: image).resizable().scaledToFill()
-            } else {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(contentColor.opacity(0.25))
+        SpinningArtwork(isPlaying: media.isPlaying, reduceMotion: controller.reduceMotion) {
+            Group {
+                if let image = controller.mediaArtworkImage {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } else {
+                    Circle().fill(contentColor.opacity(0.25))
+                }
             }
+            .frame(width: 20, height: 20)
         }
-        .frame(width: 20, height: 20)
-        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+
+    /// The current output's glyph (headphones, laptop, AirPods…) for the
+    /// trailing ear while music leads — in place of the equalizer bars
+    /// (user's call, 2026-09-29). Bright while playing, dim while paused,
+    /// so the ear still says which. Crossfades when the route changes.
+    private var currentOutputGlyph: some View {
+        let symbol = controller.outputs.first(where: \.isCurrent)?.symbolName ?? "speaker.wave.2"
+        let playing = controller.media?.isPlaying ?? false
+        return Image(systemName: symbol)
+            .font(.system(size: 13, weight: .medium))
+            .opacity(playing ? 0.9 : 0.35)
+            .id(symbol)
+            .transition(.blurReplace)
+            .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: symbol)
+            .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: playing)
     }
 
     /// At one activity the island is notch-height and `detailRow` is gated
@@ -723,26 +739,12 @@ public struct NotchRootView: View {
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {
-                // Compact now-playing, spec §6's original "trailing ear:
-                // waveform": the visualizer bars, breathing while music
-                // plays and held still, dimmed, while paused. ONE element
-                // with two states (2026-09-28): a paused track used to swap
-                // in an accent-coloured progress sliver instead, which read
-                // as a stray dash — position belongs to the panel's
-                // scrubber, where it comes with times. Same paused
-                // treatment the expanded card gives its own bars. The
-                // brief's notch-edge progress ring stays impossible: it
-                // would draw across the cutout. At `.expanded` the panel
-                // takes over and this yields to the fallback below.
-                // White, like the card's own bars — not the artwork accent
-                // (user's call, 2026-09-28): the island is a flat black
-                // slab with white content everywhere else, and a coloured
-                // ear read as a different object. Same 0.85/paused-dim
-                // pair the card uses.
-                AudioVisualizerBars(
-                    color: contentColor.opacity(media.isPlaying ? 0.85 : 0.3),
-                    isAnimating: media.isPlaying && !controller.reduceMotion
-                )
+                // Compact now-playing: the current output's glyph, bright
+                // while playing and dim while paused (2026-09-29 — it
+                // replaced the equalizer bars at the user's request; the
+                // route says more than decorative bars did). At `.expanded`
+                // the panel takes over and this yields to the fallback below.
+                currentOutputGlyph
             } else {
                 // Not decorative — load-bearing. An activity with neither
                 // `barFill` nor `compactText` (exactly media's shape: title +

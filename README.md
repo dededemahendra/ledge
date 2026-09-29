@@ -12,7 +12,7 @@ run anywhere else either.
 
 | Trigger | Island |
 | --- | --- |
-| Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | artwork left, equalizer right; hover opens the card |
+| Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; hover opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
