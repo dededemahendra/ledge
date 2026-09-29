@@ -31,6 +31,12 @@ public final class MediaService {
     private var recoveryTask: Task<Void, Never>?
     private var recoveryAttempts = 0
     private var sawUsableOutput = false
+    /// Bumped by every `launch()` and `stop()`. The adapter's callbacks
+    /// carry the generation they were created under and are ignored if it
+    /// has moved on — a process exiting at the same moment as `stop()` used
+    /// to run `handleExit` afterwards and relaunch an adapter that nothing
+    /// would ever terminate (review, 2026-09-29).
+    private var generation = 0
 
     public init(locator: AdapterLocator? = AdapterLocator.inMainBundle()) {
         self.locator = locator
@@ -63,11 +69,6 @@ public final class MediaService {
                 return
             }
 
-            // Before anything of ours is running: clear what a previous
-            // instance left behind. Done here, not in `launch()`, which also
-            // runs on every restart — by then our own stream would match.
-            MediaRemoteSource.reapOrphans(locator: locator)
-
             // A fresh policy per `start()`: `RestartPolicy.fatal` is a latch
             // by design (the README's "do not reinvoke"), but it must not
             // outlive the process it judged — a second `start()` launches a
@@ -82,6 +83,11 @@ public final class MediaService {
             // comment for the launch stall this used to cause. Until it
             // answers, `availability` stays at its provisional `.available`.
             probeTask = Task { @MainActor [weak self] in
+                // Before anything of ours is running: clear what a previous
+                // instance left behind. Here, not in `launch()`, which also
+                // runs on every restart — by then our own stream would match.
+                await MediaRemoteSource.reapOrphans(locator: locator)
+                guard !Task.isCancelled else { return }
                 let ok = await MediaRemoteSource.probe(locator: locator)
                 guard let self, !Task.isCancelled else { return }
                 self.probeTask = nil
@@ -113,6 +119,7 @@ public final class MediaService {
     }
 
     public func stop() {
+        generation += 1          // orphan every in-flight adapter callback
         probeTask?.cancel()
         probeTask = nil
         recoveryTask?.cancel()
@@ -144,18 +151,21 @@ public final class MediaService {
 
         let source = MediaRemoteSource(locator: locator)
         self.source = source
+        generation += 1
+        let generation = self.generation
 
         source.run(
             onLine: { [weak self] line in
-                Task { @MainActor [weak self] in self?.ingest(line) }
+                Task { @MainActor [weak self] in self?.ingest(line, generation: generation) }
             },
             onExit: { [weak self] reason in
-                Task { @MainActor [weak self] in self?.handleExit(reason) }
+                Task { @MainActor [weak self] in self?.handleExit(reason, generation: generation) }
             }
         )
     }
 
-    private func ingest(_ line: String) {
+    private func ingest(_ line: String, generation: Int) {
+        guard generation == self.generation else { return }
         guard let parsed = MediaStreamLine.parse(line) else { return }
         guard let payload = merger.apply(parsed) else { return }
 
@@ -167,7 +177,8 @@ public final class MediaService {
         continuation?.yield(payload)
     }
 
-    private func handleExit(_ reason: ExitReason) {
+    private func handleExit(_ reason: ExitReason, generation: Int) {
+        guard generation == self.generation else { return }   // stale process, or stopped
         source = nil
         switch policy.decide(reason) {
         case .restart(let delay):

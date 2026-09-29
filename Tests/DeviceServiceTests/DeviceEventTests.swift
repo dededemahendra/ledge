@@ -60,3 +60,14 @@ import CoreAudio
     #expect(!PeripheralBattery.matches(candidate: "magic mouse", wanted: "airpods pro"))
     #expect(!PeripheralBattery.matches(candidate: "", wanted: "airpods pro"), "an empty product would match everything")
 }
+
+/// Best match, not first match (review, 2026-09-29).
+@Test func batteryMatchPrefersExactThenTheLongestProductName() {
+    let plain = PeripheralBattery.Candidate(product: "Dede's AirPods", percent: 40)
+    let pro = PeripheralBattery.Candidate(product: "Dede's AirPods Pro", percent: 87)
+    let mouse = PeripheralBattery.Candidate(product: "Magic Mouse", percent: 60)
+    #expect(PeripheralBattery.best(among: [plain, pro, mouse], wanted: "Dede's AirPods Pro") == pro, "exact wins")
+    #expect(PeripheralBattery.best(among: [plain, pro, mouse], wanted: "Dede's AirPods") == plain, "exact wins even when a longer name also matches")
+    #expect(PeripheralBattery.best(among: [plain, pro], wanted: "Dede's AirPods Pro (2nd gen)") == pro, "no exact: the longest matching product")
+    #expect(PeripheralBattery.best(among: [mouse], wanted: "AirPods Pro") == nil)
+}

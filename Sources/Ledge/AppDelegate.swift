@@ -24,7 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // toggle, and whenever a service reports a change — so a service
         // dying or recovering mid-session never leaves launch-time text
         // behind. `setStatus` updates in place by key.
-        func refreshStatusRows() {
+        // A closure with WEAK captures, not a nested func: `model` stores
+        // this as `onStatusChange`, so a strong capture of `model` would be
+        // a cycle through itself (review, 2026-09-29).
+        let refreshStatusRows: () -> Void = { [weak model, weak item] in
+            guard let model, let item else { return }
             item.setStatus(key: "app", text: "Ledge — running")
             item.setStatus(key: "power", text: "Power — \(model.powerStatus)")
             item.setStatus(key: "hud", text: "HUD — \(model.hudStatus)")

@@ -33,3 +33,10 @@ import CoreGraphics
 @Test func pollIntervalIsCheapEnoughToJustify() {
     #expect(BrightnessObserver.pollInterval == 0.1)
 }
+
+/// On a MacBook the brightness target must be the built-in panel, whatever
+/// display currently holds the menu bar (review, 2026-09-29).
+@Test func brightnessTargetsTheBuiltInDisplay() {
+    let id = DisplayServicesBridge.builtInDisplayID()
+    #expect(CGDisplayIsBuiltin(id) != 0, "this test machine is a MacBook; its built-in panel must be found")
+}

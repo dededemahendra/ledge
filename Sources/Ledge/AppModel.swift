@@ -29,6 +29,10 @@ final class AppModel {
     /// carries (it only ever gets the already-computed `MediaPresentation`).
     private var mediaPayload = MediaPayload()
     private var positionTimer: Timer?
+    /// Every service's status text, joined; compared on each prune tick so
+    /// the menu rows follow ANY availability change — power and devices
+    /// have no change hook of their own (review, 2026-09-29).
+    private var statusFingerprint = ""
 
     init(presenter: NotchPresenter) {
         self.presenter = presenter
@@ -335,6 +339,12 @@ final class AppModel {
         evictUnavailableServices()
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }
+
+        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus].joined(separator: "|")
+        if fingerprint != statusFingerprint {
+            statusFingerprint = fingerprint
+            onStatusChange?()
+        }
     }
 
     /// Spec §9: "Service dies at runtime → its activities are evicted from

@@ -94,3 +94,15 @@ private func line(_ json: String) -> MediaStreamLine {
     // title seen must have been "Second".
     #expect(lastGoodTitle == "Second")
 }
+
+/// An enveloped `null` payload is "nothing playing", not a payload made of
+/// the envelope's own keys (review, 2026-09-29).
+@Test func anEnvelopedNullPayloadClearsStateLikeABareNull() throws {
+    let line = try #require(MediaStreamLine.parse(#"{"type":"data","diff":true,"payload":null}"#))
+    #expect(line.payload == nil)
+    var merger = MediaStateMerger()
+    _ = merger.apply(MediaStreamLine(isDiff: false, payload: ["bundleIdentifier": "com.apple.Music", "playing": true, "title": "Song"]))
+    let cleared = merger.apply(line)
+    #expect(cleared?.hasMedia == false)
+    #expect(cleared?.title == nil)
+}

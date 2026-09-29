@@ -66,3 +66,24 @@ public enum MediaKeyStepper {
         return min(1, max(0, next / steps))
     }
 }
+
+/// Pairs key-ups with the key-downs this app actually consumed. A key-down
+/// that was passed through to the system (no settable volume, a CoreAudio
+/// hiccup) must have its key-up passed through too, or the system sees a
+/// press with no release (review, 2026-09-29).
+public struct MediaKeyUpTracker: Sendable {
+    private var consumedDown: Set<MediaKey> = []
+
+    public init() {}
+
+    /// `apply` runs only for key-downs and says whether the press was
+    /// handled. Returns whether the event should be consumed.
+    public mutating func consume(_ press: MediaKeyPress, apply: () -> Bool) -> Bool {
+        guard press.isDown else {
+            return consumedDown.remove(press.key) != nil
+        }
+        let consumed = apply()
+        if consumed { consumedDown.insert(press.key) } else { consumedDown.remove(press.key) }
+        return consumed
+    }
+}

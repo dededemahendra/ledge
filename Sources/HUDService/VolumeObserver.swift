@@ -70,9 +70,14 @@ public final class VolumeObserver {
     // access to actor state. Without this, `@MainActor` on the class would
     // make them implicitly async from a synchronous test context, which the
     // brief's own tests call them from directly.
+    /// Virtual main volume first (review, 2026-09-29): it is the property
+    /// the system's own keys and `VolumeControl` write, so reading it keeps
+    /// the observer and the key interceptor on one number — on a device
+    /// exposing both, the per-channel scalar need not track it in lockstep.
+    /// Scalar is the fallback for devices without a virtual main.
     nonisolated public static func strategy(hasScalar: Bool, hasVirtualMain: Bool) -> VolumeStrategy {
-        if hasScalar { return .perChannelScalar }
         if hasVirtualMain { return .virtualMainVolume }
+        if hasScalar { return .perChannelScalar }
         return .unavailable
     }
 

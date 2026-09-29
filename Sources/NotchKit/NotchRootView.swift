@@ -627,7 +627,7 @@ public struct NotchRootView: View {
     @ViewBuilder
     private func mediaArtwork(_ media: MediaPresentation) -> some View {
         Group {
-            if let data = media.artwork, let image = NSImage(data: data) {
+            if let image = controller.mediaArtworkImage {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -746,7 +746,8 @@ public struct NotchRootView: View {
                 artworkNamespace: artworkNamespace,
                 emit: { controller.emit($0) },
                 displayOnly: controller.isLocked,
-                outputs: controller.outputs
+                outputs: controller.outputs,
+                artworkImage: controller.mediaArtworkImage
             )
             // `.leading` keeps the panel flush at the island's leading edge
             // like every other piece of island content; `maxHeight: .infinity`

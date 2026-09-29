@@ -48,6 +48,9 @@ struct MediaPanelView: View {
     let displayOnly: Bool
     /// The output picker's entries (`NotchController.outputs`).
     let outputs: [OutputOption]
+    /// `media.artwork` already decoded (`NotchController.mediaArtworkImage`);
+    /// `nil` shows the placeholder.
+    let artworkImage: NSImage?
 
     /// Whether row 3 is showing the output picker instead of the controls.
     /// Same spelled-out `State` as `dragFraction` below.
@@ -81,6 +84,7 @@ struct MediaPanelView: View {
         emit: @escaping (NotchIntent) -> Void,
         displayOnly: Bool = false,
         outputs: [OutputOption] = [],
+        artworkImage: NSImage? = nil,
         /// Test seam: start with the picker open, so `NotchRenderTests` can
         /// measure that row against the card's budget.
         showsOutputsInitially: Bool = false
@@ -92,6 +96,7 @@ struct MediaPanelView: View {
         self.emit = emit
         self.displayOnly = displayOnly
         self.outputs = outputs
+        self.artworkImage = artworkImage
         _showsOutputs = State(initialValue: showsOutputsInitially)
     }
 
@@ -169,6 +174,7 @@ struct MediaPanelView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+            .disabled(displayOnly)   // no controls on the lock screen, this one included
             .accessibilityLabel("Open in the playing app")
 
             Spacer(minLength: 8)
@@ -185,7 +191,7 @@ struct MediaPanelView: View {
 
     @ViewBuilder private var artwork: some View {
         Group {
-            if let data = media.artwork, let image = NSImage(data: data) {
+            if let image = artworkImage {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)

@@ -105,6 +105,12 @@ final class MediaRemoteSource {
     func terminate() {
         guard let process else { return }
         process.terminationHandler = nil
+        // Disarm the readers too (review, 2026-09-29): a dying adapter can
+        // flush one more line while handling SIGTERM, and with the handler
+        // still armed that line would be delivered into whatever stream
+        // came NEXT as if it were live.
+        (process.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
+        (process.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         process.terminate()
         self.process = nil
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
@@ -118,14 +124,18 @@ final class MediaRemoteSource {
     /// SIGKILLed, crashed, or whose SIGTERM the adapter ignored leaves a
     /// perl process streaming to nobody; each one holds a MediaRemote
     /// subscription and they accumulate across relaunches.
-    static func reapOrphans(locator: AdapterLocator) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        process.arguments = ["-f", "^/usr/bin/perl \(locator.scriptPath.path) .* stream$"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()   // pkill returns immediately; nothing to await
+    /// `async` like `probe`: even a fast pkill must not block the main
+    /// actor at launch (review, 2026-09-29).
+    static func reapOrphans(locator: AdapterLocator) async {
+        await withCheckedContinuation { continuation in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            process.arguments = ["-f", "^/usr/bin/perl \(locator.scriptPath.path) .* stream$"]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            process.terminationHandler = { _ in continuation.resume() }
+            do { try process.run() } catch { continuation.resume() }
+        }
     }
 
     /// One-shot invocation for `send` / `seek`. Fire-and-forget: a lost

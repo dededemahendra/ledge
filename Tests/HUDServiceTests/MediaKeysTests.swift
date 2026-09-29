@@ -44,3 +44,19 @@ private func data1(code: UInt32, down: Bool, repeating: Bool = false) -> Int {
     #expect(MediaKeyStepper.step(1.5, up: false, fine: false) == 0.9375, "garbage above 1 is treated as 1")
     #expect(MediaKeyStepper.step(-1, up: true, fine: false) == 0.0625)
 }
+
+/// A key-up is consumed only when its key-down was (review, 2026-09-29).
+@Test func keyUpsFollowTheirKeyDowns() {
+    var tracker = MediaKeyUpTracker()
+    let down = MediaKeyPress(key: .volumeUp, isDown: true, isRepeat: false)
+    let up = MediaKeyPress(key: .volumeUp, isDown: false, isRepeat: false)
+
+    #expect(tracker.consume(down) { true })
+    #expect(tracker.consume(up) { fatalError("apply must not run for key-ups") }, "the down was ours; so is the up")
+
+    #expect(!tracker.consume(down) { false }, "no settable volume: passed through")
+    #expect(!tracker.consume(up) { fatalError() }, "…and so must its release be")
+
+    #expect(!tracker.consume(MediaKeyPress(key: .mute, isDown: false, isRepeat: false)) { fatalError() },
+            "an up with no remembered down passes through")
+}

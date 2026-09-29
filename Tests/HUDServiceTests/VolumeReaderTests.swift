@@ -3,8 +3,9 @@ import CoreAudio
 @testable import HUDService
 
 // Review Focus 2: not every device exposes a per-channel scalar.
-@Test func strategyPrefersPerChannelScalarWhenAvailable() {
-    #expect(VolumeObserver.strategy(hasScalar: true, hasVirtualMain: true) == .perChannelScalar)
+@Test func strategyPrefersVirtualMainVolumeWhenAvailable() {
+    #expect(VolumeObserver.strategy(hasScalar: true, hasVirtualMain: true) == .virtualMainVolume,
+            "the property the keys write — observer and interceptor must agree")
     #expect(VolumeObserver.strategy(hasScalar: true, hasVirtualMain: false) == .perChannelScalar)
 }
 

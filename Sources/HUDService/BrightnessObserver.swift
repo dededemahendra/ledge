@@ -65,6 +65,17 @@ public final class DisplayServicesBridge {
 
     public var canSetBrightness: Bool { setBrightnessSymbol != nil }
 
+    /// The built-in panel — the notch's display — not `CGMainDisplayID()`,
+    /// which is whichever display holds the menu bar and on a docked Mac
+    /// is the external monitor (review, 2026-09-29). Falls back to the
+    /// main display only when no display reports as built-in.
+    nonisolated public static func builtInDisplayID() -> CGDirectDisplayID {
+        var ids = [CGDirectDisplayID](repeating: 0, count: 16)
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(UInt32(ids.count), &ids, &count) == .success else { return CGMainDisplayID() }
+        return ids.prefix(Int(count)).first { CGDisplayIsBuiltin($0) != 0 } ?? CGMainDisplayID()
+    }
+
     /// `false` when the symbol is missing or the call is refused.
     @discardableResult
     public func setBrightness(_ value: Double, for display: CGDirectDisplayID) -> Bool {
@@ -126,7 +137,7 @@ public final class BrightnessObserver {
     // MARK: - lifecycle
 
     public func start() {
-        let canRead = bridge?.brightness(for: CGMainDisplayID()) != nil
+        let canRead = bridge?.brightness(for: DisplayServicesBridge.builtInDisplayID()) != nil
         // Registration is treated as unusable until Step 5 proves the signature.
         backend = Self.backend(canRegister: false, canRead: canRead)
         availability = Self.availability(for: backend)
@@ -160,7 +171,7 @@ public final class BrightnessObserver {
     }
 
     private func tick() {
-        guard let level = bridge?.brightness(for: CGMainDisplayID()) else { return }
+        guard let level = bridge?.brightness(for: DisplayServicesBridge.builtInDisplayID()) else { return }
         guard lastSeen != level else { return }
         lastSeen = level
         onChange(level)

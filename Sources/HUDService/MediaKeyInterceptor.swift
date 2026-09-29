@@ -134,11 +134,27 @@ public final class MediaKeyInterceptor {
 
     private let volume = VolumeControl()
     private let bridge = DisplayServicesBridge()
-    private var tap: CFMachPort?
-    private var source: CFRunLoopSource?
+    // `nonisolated(unsafe)`: reached from `deinit` (always nonisolated);
+    // by then nothing else can touch `self`. Same reasoning and pattern as
+    // `PowerService.runLoopSource`.
+    private nonisolated(unsafe) var tap: CFMachPort?
+    private nonisolated(unsafe) var source: CFRunLoopSource?
     private var retryTimer: Timer?
+    private var keyUps = MediaKeyUpTracker()
 
     public init() {}
+
+    /// The tap's callback dereferences an unretained `self`. Released
+    /// without `stop()` (a future re-creation path, a test), the next media
+    /// key would call into freed memory — so the tap dies with the object,
+    /// exactly as `PowerService.deinit` tears down its run-loop source.
+    deinit {
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+    }
 
     public var isActive: Bool { tap != nil }
 
@@ -238,10 +254,9 @@ public final class MediaKeyInterceptor {
         }
         guard let (press, fine) = decoded else { return false }
 
-        // Key-up of a key whose key-down we consumed must be consumed too,
-        // or the system sees an orphaned release.
-        guard press.isDown else { return true }
-        return apply(press.key, fine: fine)
+        // Key-ups are consumed only when their key-down was — see
+        // `MediaKeyUpTracker`.
+        return keyUps.consume(press) { apply(press.key, fine: fine) }
     }
 
     /// `false` hands the key back to the system (which will then show its
@@ -260,7 +275,7 @@ public final class MediaKeyInterceptor {
             guard let current = volume.read() else { return false }
             return volume.setMuted(!current.muted)
         case .brightnessUp, .brightnessDown:
-            let display = CGMainDisplayID()
+            let display = DisplayServicesBridge.builtInDisplayID()
             guard let bridge, let current = bridge.brightness(for: display) else { return false }
             let next = MediaKeyStepper.step(current, up: key == .brightnessUp, fine: fine)
             guard bridge.setBrightness(next, for: display) else { return false }

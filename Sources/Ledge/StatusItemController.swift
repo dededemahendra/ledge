@@ -5,6 +5,10 @@ import AppKit
 final class StatusItemController {
     private let item: NSStatusItem
     private let menu = NSMenu()
+    /// Status rows occupy the top of the menu in the order they were first
+    /// added — each new one goes AFTER the existing ones, not at index 0,
+    /// which listed them in reverse (review, 2026-09-29).
+    private var statusRowCount = 0
 
     init() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -58,7 +62,8 @@ final class StatusItemController {
         let entry = NSMenuItem(title: text, action: nil, keyEquivalent: "")
         entry.identifier = NSUserInterfaceItemIdentifier(key)
         entry.isEnabled = false
-        menu.insertItem(entry, at: 0)
+        menu.insertItem(entry, at: statusRowCount)
+        statusRowCount += 1
     }
 
     private final class Trampoline: NSObject {

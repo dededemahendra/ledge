@@ -429,9 +429,11 @@ keyboard for volume and brightness keys, which forces an Accessibility prompt an
 only catches key presses. Ledge observes the *values* instead:
 
 - **Volume:** CoreAudio property listener on the default output device —
-  `kAudioDevicePropertyVolumeScalar` plus `kAudioDevicePropertyMute`, falling back
-  to `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` for devices that
-  expose no per-channel scalar (common on aggregate and Bluetooth devices).
+  `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` (the property the
+  system's keys and `VolumeControl` write; preferred since the 2026-09-29
+  review so observer and interceptor read one number) plus
+  `kAudioDevicePropertyMute`, falling back to `kAudioDevicePropertyVolumeScalar`
+  for devices with no virtual main.
 - **Brightness:** `DisplayServices` brightness-change notifications.
 
 This needs **no permission at all** and fires for the menu-bar slider and Control

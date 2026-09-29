@@ -1133,3 +1133,23 @@ visualizer is not part of the button. Not verified live.
 artwork, no panel, no position tick). Tests cover the list, case-insensitivity,
 browsers, QuickTime, Zoom and a missing id. Live check: a browser video should
 no longer appear in the island; Music/Spotify still should.
+
+# Review fixes (2026-09-29)
+
+A medium-depth review of the whole branch (11 finder passes, 15 findings)
+after the day's work. Fixed, each with a test where the scenario could be
+pinned:
+- media: adapter callbacks carry a generation and are ignored after
+  `stop()`/relaunch (no relaunch-after-stop race); `terminate()` disarms the
+  pipe readers; `reapOrphans` is async like `probe`; an enveloped `null`
+  payload clears state.
+- keys: key-ups are consumed only when their key-down was
+  (`MediaKeyUpTracker`); the tap dies with the interceptor (`deinit`).
+- brightness targets the built-in display, not `CGMainDisplayID()`.
+- volume observer and interceptor now both prefer VirtualMainVolume.
+- battery: best (exact, then longest) product match, not first.
+- menu: status rows in the order added; rows follow ANY service's status via a
+  per-tick fingerprint; no retain cycle through the refresh closure.
+- lock screen: the artwork button is disabled in display-only mode.
+- artwork decoded once per change (`NotchController.mediaArtworkImage`).
+Deferred: a shared process-supervisor type (one subprocess exists).

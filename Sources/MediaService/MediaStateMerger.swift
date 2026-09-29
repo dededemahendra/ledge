@@ -32,6 +32,12 @@ public struct MediaStreamLine: Sendable {
             let root = object as? [String: Any]
         else { return nil }
 
+        // An envelope whose payload is `null` means nothing is playing —
+        // same as a bare `null` line (review, 2026-09-29: it used to be
+        // read as a full payload made of the envelope's own keys).
+        if root["payload"] is NSNull {
+            return MediaStreamLine(isDiff: false, payload: nil)
+        }
         // A bare `get` payload has no envelope.
         guard let payload = root["payload"] as? [String: Any] else {
             return MediaStreamLine(isDiff: false, payload: root)

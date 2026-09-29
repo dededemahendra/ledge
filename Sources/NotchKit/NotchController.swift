@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -357,13 +358,23 @@ public final class NotchController {
     /// activity of kind `.media` into the same `ActivityQueue` every other
     /// kind goes through. This just carries the richer presentation data
     /// (artwork, elapsed/duration) that activity's plain title/detail can't.
+    /// `media.artwork` decoded exactly once per change. The views used to
+    /// call `NSImage(data:)` in their bodies, i.e. once a second while
+    /// playing (every position tick rebuilds `media`) and again on every
+    /// scrub update (review, 2026-09-29).
+    public private(set) var mediaArtworkImage: NSImage?
+
     public func setMedia(_ media: MediaPresentation?) {
+        if media?.artwork != self.media?.artwork {
+            mediaArtworkImage = media?.artwork.flatMap(NSImage.init(data:))
+        }
         self.media = media
         // Media is what hover opens (see `recomputeState`), so media
         // arriving under a cursor already parked on the island must open
         // the panel, and media going away must close a hover-opened one.
         recomputeState()
     }
+
 
     /// Forwards a panel-originated command out to `onIntent`. Public so the
     /// view layer (`MediaPanelView`, `NotchRootView`'s ears) can call it
