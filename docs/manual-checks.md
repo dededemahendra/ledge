@@ -1416,3 +1416,12 @@ counting → paused at 4:16: engine, tick, display and click-to-pause all work.
 The `ledge://` scheme is now registered (also handy for Shortcuts/Raycast) and
 the timer logs its transitions at `.notice`; the menu logs each open. Next:
 the user's menu path, read from the log.
+
+## Clock app timers (2026-09-29)
+
+Start a timer in Clock (or ask Siri): the island shows its ring and clock
+within a second; pause it in Clock — pause glyph; let it ring — "Done" until
+dismissed; stop it — the island clears. Start Clock's stopwatch: if the island
+shows it counting, the layout guess held; if not, the log line "clock:
+unparsed records" names the keys to read. Click either — the Clock opens on
+that tab.

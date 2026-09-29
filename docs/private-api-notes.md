@@ -151,3 +151,31 @@ holds the photo-real renders System Settings' headphone panes use, as plain
 Also `IOBluetoothUI.framework/Resources/AirPods.png` (64px, the old menu icon).
 No Beats render was found. `DeviceArtwork` reads these by path; the test
 `theRendersExistOnThisSystem` fails loudly when an OS update moves them.
+
+## Clock timers and stopwatches: `com.apple.mobiletimerd` (2026-09-29, macOS 27)
+
+macOS runs the same `mobiletimerd` as iOS (`/System/Library/PrivateFrameworks/
+MobileTimer.framework/Executables/mobiletimerd`). The Clock app's timers and
+stopwatches live in its preference domain, written through cfprefsd on every
+change (`MTTimerModifiedDate` moves at once). Read with
+`CFPreferencesCopyMultiple(nil, "com.apple.mobiletimerd", CurrentUser, AnyHost)`
+after `CFPreferencesAppSynchronize`; no change notification name was found,
+so the app polls once a second (`ClockTimerObserver`).
+
+Layout observed:
+
+- `MTTimers.MTTimers[]` → `$MTTimer` with `MTTimerID`, `MTTimerTitle`
+  (`""` or `"CURRENT_TIMER"` for the Clock's own placeholders), `MTTimerDuration`
+  (seconds), `MTTimerState` (1 idle preset, 3 running; 2 paused is inferred and
+  logged if it turns out otherwise), `MTTimerFireTime`: `$MTTimerDate` →
+  `MTTimerTimeDate` (absolute fire date) while running, `$MTTimerTimeInterval`
+  → `MTTimerTimeInterval` otherwise. `MTTimerFireTimerClass` names which. A
+  fired timer stays state 3 with its fire date in the past until dismissed.
+- `MTStopwatches.MTStopwatches[]` → `$MTStopwatch` with `MTStopwatchIdentifier`,
+  `MTStopwatchState` (1 stopped), `MTStopwatchOffset`, `MTStopwatchCurrentInterval`,
+  `MTStopwatchLaps`, `MTStopwatchPreviousLapsTotalInterval`. A RUNNING stopwatch
+  has not been observed yet; the parser takes the first `Date` in the record as
+  the run's start and logs the keys of any running record it cannot read.
+- `MTTimerStorageMigratedToCoreData` is true, but the daemon's group container
+  is empty and the plist keeps being updated, so the plist is what there is.
+- URL schemes registered by Clock.app: `clock-timer://`, `clock-stopwatch://`.

@@ -898,3 +898,12 @@ text, ring or glyph changes; the ring eases between ticks. The clock's digits
 roll but do not bump — `compactValue(_:bump:)` — since a bump every second is
 noise. The click goes through the same link pipeline as a meeting blip
 (`ledge://timer/toggle`), so it gets the press dip and link pointer.
+
+**Native first (2026-09-29, later).** The user wants the Clock app's own timers
+and stopwatches, so the island mirrors `mobiletimerd`'s state
+(`ClockTimerObserver`; layout in `docs/private-api-notes.md`): the running
+timer that fires soonest, else a paused one, else a running stopwatch, drawn
+exactly like the app's own timer, "Done" once it has rung until the user
+dismisses it in the Clock, a click opening the Clock on that tab. The app's own
+timer shows only when the Clock has nothing going. Siri timers land in the
+same daemon, so "set a timer for ten minutes" appears without touching this app.

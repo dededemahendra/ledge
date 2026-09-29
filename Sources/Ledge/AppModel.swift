@@ -440,19 +440,53 @@ final class AppModel {
     func stopTimer() {
         Self.log.notice("timer: stop")
         timer = nil
-        timerShown = nil
-        queue.remove(kind: .timer)
-        publish()
+        if timerSource == "own" {
+            timerSource = nil
+            timerShown = nil
+            queue.remove(kind: .timer)
+            publish()
+        }
         onStatusChange?()
     }
 
+    /// The Clock app's own timers and stopwatches (`ClockTimerObserver`,
+    /// 2026-09-29): whatever it is running takes the island first — a Siri
+    /// "set a timer for ten minutes" lands here without touching this
+    /// app — and the app's own timer shows only when the Clock has
+    /// nothing going. A click opens the Clock on the matching tab.
+    private let clock = ClockTimerObserver()
+    private var clockOddities: [String] = []
+    private var timerSource: String?
+
     private func refreshTimer() {
-        guard let timer else { return }
         let now = Date()
+        let snapshot = clock.refresh(at: now)
+        if snapshot.oddities != clockOddities {
+            clockOddities = snapshot.oddities
+            if !clockOddities.isEmpty {
+                Self.log.notice("clock: unparsed records — \(self.clockOddities.joined(separator: "; "), privacy: .public)")
+            }
+        }
+        if let featured = snapshot.featured(at: now) {
+            show(clockRecord(for: featured, at: now), source: "clock")
+            return
+        }
+        if timerSource == "clock" {
+            // The Clock stopped or dismissed it: clear, then let the app's
+            // own timer (if any) come back below.
+            timerSource = nil
+            timerShown = nil
+            queue.remove(kind: .timer)
+            publish()
+            Self.log.notice("clock: nothing running")
+        }
+
+        guard let timer else { return }
         if timer.isFinished(at: now) {
             Self.log.notice("timer: done")
             self.timer = nil
             timerShown = nil
+            timerSource = nil
             NSSound.beep()
             queue.insert(ActivityRecord(
                 id: NotchController.timerActivityID, kind: .timer, insertedAt: now, ttl: 8,
@@ -463,7 +497,7 @@ final class AppModel {
             return
         }
         let fill = timer.fraction(at: now).map { ($0 * 200).rounded() / 200 }   // 0.5% steps: smooth, not chatty
-        let record = ActivityRecord(
+        show(ActivityRecord(
             id: NotchController.timerActivityID, kind: .timer, insertedAt: timerShown?.insertedAt ?? now, ttl: nil,
             title: timer.isStopwatch ? "Stopwatch" : "Timer",
             compactText: timer.displayText(at: now),
@@ -472,12 +506,47 @@ final class AppModel {
             symbolName: timer.isPaused ? "pause.fill" : "stopwatch",
             barFill: timer.isPaused ? nil : fill,
             url: Self.timerToggleURL
-        )
-        guard record.compactText != timerShown?.compactText || record.barFill != timerShown?.barFill
-                || record.symbolName != timerShown?.symbolName else { return }
-        if timerShown == nil {
-            Self.log.notice("timer: in the island as \(record.compactText ?? "", privacy: .public); state \(String(describing: self.presenter.controller.state), privacy: .public) → will publish")
+        ), source: "own")
+    }
+
+    /// The island's record for a Clock item: ring and clock while a timer
+    /// runs, the pause glyph when paused, "Done" once it has rung and
+    /// waits to be dismissed, the stopwatch glyph and a rising clock for a
+    /// stopwatch. The click opens the Clock on that tab.
+    private func clockRecord(for featured: ClockTimerSnapshot.Featured, at now: Date) -> ActivityRecord {
+        switch featured {
+        case .timer(let timer):
+            let remaining = timer.remaining(at: now)
+            let fired = timer.hasFired(at: now)
+            return ActivityRecord(
+                id: NotchController.timerActivityID, kind: .timer, insertedAt: timerShown?.insertedAt ?? now, ttl: nil,
+                title: timer.title ?? "Timer",
+                compactText: fired ? "Done" : LiveTimer.format(seconds: remaining.rounded(.up)),
+                symbolName: fired ? "timer" : (timer.isRunning ? "stopwatch" : "pause.fill"),
+                barFill: timer.isRunning && !fired ? (timer.fraction(at: now) * 200).rounded() / 200 : nil,
+                url: URL(string: "clock-timer://")
+            )
+        case .stopwatch(let watch):
+            return ActivityRecord(
+                id: NotchController.timerActivityID, kind: .timer, insertedAt: timerShown?.insertedAt ?? now, ttl: nil,
+                title: "Stopwatch",
+                compactText: LiveTimer.format(seconds: watch.elapsed(at: now).rounded(.down)),
+                symbolName: "stopwatch",
+                url: URL(string: "clock-stopwatch://")
+            )
         }
+    }
+
+    /// Republishes the timer record only when what the island would draw
+    /// changes — text, ring, glyph or source — so the 250 ms tick costs
+    /// nothing between seconds.
+    private func show(_ record: ActivityRecord, source: String) {
+        guard source != timerSource || record.compactText != timerShown?.compactText
+                || record.barFill != timerShown?.barFill || record.symbolName != timerShown?.symbolName else { return }
+        if source != timerSource || timerShown == nil {
+            Self.log.notice("\(source, privacy: .public) timer in the island as \(record.compactText ?? "", privacy: .public) (\(record.title, privacy: .public))")
+        }
+        timerSource = source
         timerShown = record
         queue.insert(record)
         publish()
