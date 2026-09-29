@@ -1178,3 +1178,17 @@ open (`NotchController.isOutputPickerOpen` → `expanded(outputRows:)`) and
 shrinks back after a pick or when the panel closes. Tests: metrics, controller
 state, and a render test that the list fits the grown budget and adds one row
 per output. Snapshot below the card's controls verified headlessly.
+
+# Song-change caption and swipe to skip (2026-09-29)
+
+From the reference app's demo video. Caption: `AppModel` sets
+`presenter.setCaption("Title · Artist")` on every new title, clears it after
+`NotchController.captionDuration` (3 s); the island is `NotchMetrics.captioned`
+(342 × notch+26) only while media leads at activity size. Swipe:
+`SwipeToSkipTracker` (pure, tested: once per gesture at 50 pt, momentum
+ignored, finger direction wins over the scrolling setting) fed by a local
+scroll-wheel monitor in `NotchPresenter`; on commit an intent, a haptic, and a
+0.7 s skip glyph in the leading ear.
+
+Verified: tests + a headless snapshot of the captioned island. Not verified
+live: the spring down/up on a real track change; the swipe on the trackpad.

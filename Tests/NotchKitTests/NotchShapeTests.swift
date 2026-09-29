@@ -24,6 +24,13 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.expanded.outerFillet == 13)
 }
 
+@Test func captionedIslandIsOneRowTallerThanTheNotch() {
+    let metrics = NotchMetrics(notchRect: measuredNotch)
+    #expect(metrics.captioned.height == 32 + NotchMetrics.captionRowHeight)
+    #expect(metrics.captioned.width > metrics.oneActivity.width, "wider ears for the artwork and bars")
+    #expect(metrics.captioned.width < metrics.expanded.width)
+}
+
 /// The output picker grows the expanded panel by exactly its rows.
 @Test func expandedGrowsByOneRowPerOutputWhenThePickerIsOpen() {
     let metrics = NotchMetrics(notchRect: measuredNotch)

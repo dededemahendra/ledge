@@ -13,6 +13,7 @@ run anywhere else either.
 | Trigger | Island |
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | artwork left, equalizer right; hover opens the card |
+| Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
 | Charger in/out, low or full battery | bolt/plug/battery glyph left, percentage right, 3 s |
@@ -25,7 +26,8 @@ Browsers and everything else that MediaRemote reports are ignored on purpose
 bring the app forward — a scrubber with times, then shuffle · previous ·
 play/pause · next · output. The output button opens a list of every audio
 output below the controls (the card grows to fit); pick one to switch. Click the island to pin the card open; click
-elsewhere, or Escape, to unpin.
+elsewhere, or Escape, to unpin. Two-finger swipe left or right over the island
+to skip tracks.
 
 ## Build and run
 

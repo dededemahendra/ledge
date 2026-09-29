@@ -41,6 +41,21 @@ public struct NotchMetrics: Sendable, Equatable {
         )
     }
 
+    /// The now-playing island with a song-change caption under the hole
+    /// (2026-09-29, from the reference app): wider ears and one text row
+    /// below. Height is the notch plus the row, so the island springs
+    /// down and back rather than swapping shapes.
+    public static let captionRowHeight: CGFloat = 26
+
+    public var captioned: NotchShapeParameters {
+        NotchShapeParameters(
+            width: 342,
+            height: notchRect.height + Self.captionRowHeight,
+            bottomRadius: 18,
+            outerFillet: 9
+        )
+    }
+
     public var oneActivity: NotchShapeParameters {
         // Height tracks the hardware, not a literal: with a single activity the
         // island stays exactly notch-height. Hardcoding 32 would make the island

@@ -220,6 +220,43 @@ private func someMedia() -> MediaPresentation {
     #expect(!c.isOutputPickerOpen, "one output is not a choice")
 }
 
+// MARK: - Song-change caption and swipe feedback (2026-09-29)
+
+@MainActor
+@Test func aCaptionGrowsTheIslandOnlyWhileMediaLeadsAtActivitySize() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.setCaption("Song · Artist")
+    #expect(c.hasCaption)
+    #expect(c.parameters == c.metrics.captioned)
+
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "50%", symbolName: "speaker.wave.3.fill", barFill: 0.5),
+                     .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(!c.hasCaption, "a blip owns the island whole")
+    #expect(c.parameters == c.metrics.oneActivity)
+
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.hasCaption, "…and the caption is back once the blip expires, if still set")
+
+    c.setHovered(true)
+    #expect(c.state == .expanded && !c.hasCaption, "the panel already says it")
+    c.setHovered(false)
+    c.setCaption(nil)
+    #expect(!c.hasCaption && c.parameters == c.metrics.oneActivity)
+}
+
+@MainActor
+@Test func skipHintIsPlainStateTheEarReads() {
+    let c = makeController()
+    #expect(c.skipHint == nil)
+    c.setSkipHint(.next)
+    #expect(c.skipHint == .next)
+    c.setSkipHint(nil)
+    #expect(c.skipHint == nil)
+    #expect(NotchController.skipHintDuration < NotchController.captionDuration, "a hint is a beat, a caption is a moment")
+}
+
 // MARK: - Lock screen (spec §7)
 
 @MainActor

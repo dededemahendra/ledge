@@ -398,7 +398,16 @@ public struct NotchRootView: View {
             // sharpens it over the spring (the root's `.animation(value:
             // parameters)` is the transaction). Before this the card was
             // simply sliced by the moving clip mask on the way out.
-            if parameters.height > notch.height + 8 {
+            if controller.hasCaption, let caption = controller.caption {
+                // Song-change caption (see `NotchController.caption`): one
+                // line under the hole, fading in over the island's spring
+                // and out again when it goes. Keyed on the text so a second
+                // change inside the window crossfades in place.
+                captionRow(caption)
+                    .frame(width: parameters.width, height: parameters.height - notch.height)
+                    .id(caption)
+                    .transition(.blurReplace)
+            } else if parameters.height > notch.height + 8 {
                 detailRow
                     .frame(maxWidth: .infinity)
                     // `alignment: .top`, not the default `.center`: content
@@ -416,6 +425,26 @@ public struct NotchRootView: View {
         .foregroundStyle(contentColor)
     }
 
+    /// "Title · Artist": the title carries the weight, the artist sits back.
+    /// Left-aligned like the reference, under the artwork's ear. One line,
+    /// tail-truncated; the caption row is 26pt, the text 11pt.
+    private func captionRow(_ caption: String) -> some View {
+        let parts = caption.components(separatedBy: " · ")
+        let title = parts.first ?? caption
+        let artist = parts.dropFirst().joined(separator: " · ")
+        return HStack(spacing: 0) {
+            (Text(title).font(.system(size: 11, weight: .semibold))
+             + Text(artist.isEmpty ? "" : " · \(artist)")
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(contentColor.opacity(0.6)))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 3)
+    }
+
     /// What the ears are currently ABOUT — the leading activity and whether
     /// media sits behind it — not what they show pixel for pixel (a value
     /// ticking 87% -> 86% keeps its own inner `.id`). Changing this is what
@@ -426,7 +455,8 @@ public struct NotchRootView: View {
     /// flying copy.
     private var earContentKey: String {
         let first = controller.activities.first
-        return "\(first?.id ?? "-")|\(controller.media == nil ? 0 : 1)"
+        let hint = controller.skipHint.map { $0 == .next ? "n" : "p" } ?? "-"
+        return "\(first?.id ?? "-")|\(controller.media == nil ? 0 : 1)|\(hint)"
     }
 
     /// Spec §6/§10: content must stay inside the island's own rect and clear
@@ -471,7 +501,13 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if controller.isDeviceLeading, let media = controller.media, controller.state != .expanded {
+        if let hint = controller.skipHint, controller.media != nil, controller.state != .expanded {
+            // Swipe-to-skip feedback (`NotchController.skipHint`): the skip
+            // glyph takes the artwork's place for a beat. The ear key
+            // includes it, so this is a crossfade in and back out.
+            Image(systemName: hint == .next ? "forward.fill" : "backward.fill")
+                .font(.system(size: 13, weight: .semibold))
+        } else if controller.isDeviceLeading, let media = controller.media, controller.state != .expanded {
             // Device blip over music: the artwork stays put and the device
             // goes to the trailing ear (see `NotchController.isDeviceLeading`
             // and `deviceIcon` below). Not at `.expanded`, where the panel

@@ -185,6 +185,44 @@ public final class NotchController {
     /// `DeviceService`. Empty until the device service reports.
     public private(set) var outputs: [OutputOption] = []
 
+    /// `AppModel` inserts the sticky media record with this id.
+    public static let mediaActivityID = "media"
+
+    public var isMediaLeading: Bool {
+        activities.first?.id == Self.mediaActivityID
+    }
+
+    /// One line under the hole for a few seconds after a song changes —
+    /// "Title · Artist" (2026-09-29, from the reference app). `AppModel`
+    /// sets it on every title change and clears it after
+    /// `captionDuration`; the presenter resyncs the window because the
+    /// island grows to `NotchMetrics.captioned` while it shows. Only
+    /// drawn while media LEADS at activity size: a blip pre-empting the
+    /// island takes it whole, and at `.expanded` the panel already says it.
+    public private(set) var caption: String?
+    public static let captionDuration: TimeInterval = 3
+
+    public func setCaption(_ caption: String?) {
+        self.caption = caption
+    }
+
+    public var hasCaption: Bool {
+        state == .activity && isMediaLeading && caption != nil
+    }
+
+    /// Feedback for a swipe-to-skip: the skip glyph takes the leading ear
+    /// for a beat (`skipHintDuration`), then the artwork comes back.
+    public enum SkipHint: Sendable, Equatable {
+        case next, previous
+    }
+
+    public private(set) var skipHint: SkipHint?
+    public static let skipHintDuration: TimeInterval = 0.7
+
+    public func setSkipHint(_ hint: SkipHint?) {
+        skipHint = hint
+    }
+
     public func setOutputs(_ outputs: [OutputOption]) {
         self.outputs = outputs
         if outputs.count < 2 { isOutputPickerOpen = false }   // nothing to choose from
@@ -274,8 +312,10 @@ public final class NotchController {
             // One size for every activity, however many are queued
             // (2026-09-29): the "grow down when crowded" two-slot layout
             // was retired once HUD, power and device blips each learned to
-            // own the island alone — nothing was left to reach it.
-            return metrics.oneActivity
+            // own the island alone. The one thing that still grows the
+            // compact island is a song-change caption, and only while
+            // media itself leads.
+            return hasCaption ? metrics.captioned : metrics.oneActivity
         case .expanded:
             return metrics.expanded(outputRows: isOutputPickerOpen ? outputs.count : 0)
         }

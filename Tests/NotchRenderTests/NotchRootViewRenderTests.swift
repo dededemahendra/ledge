@@ -649,3 +649,21 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(open - closed >= CGFloat(outputs.count) * NotchMetrics.outputRowHeight - 1,
             "the list must add one row per output (\(open - closed)pt for \(outputs.count) rows)")
 }
+
+/// The song-change caption: artwork and bars in the (wider) ears, one text
+/// line under the hole — inside the island, clear of the notch.
+@MainActor
+@Test func captionRowRendersUnderTheHoleInsideTheIsland() {
+    let controller = makeController()
+    controller.setMedia(MediaPresentation(title: "Tangerine Rays", artist: "Zedd, Bea Miller & Grey", artwork: nil, isPlaying: true, elapsed: 3, duration: 200))
+    controller.setActivities([.init(id: "media", title: "Tangerine Rays", detail: "Zedd")], overflow: 0)
+    controller.setCaption("Tangerine Rays · Zedd, Bea Miller & Grey")
+    #expect(controller.parameters == controller.metrics.captioned)
+
+    let result = renderAndClassify(controller)
+    #expect(result.hasContentInsideIsland, "the caption did not render")
+    #expect(result.contentInsideNotchCount == 0,
+            "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect \(result.holeRect)")
+    #expect(result.contentOutsideIslandCount == 0,
+            "\(result.contentOutsideIslandCount) content pixel(s) outside the island bounds \(result.islandBounds)")
+}

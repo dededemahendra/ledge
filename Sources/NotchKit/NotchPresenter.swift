@@ -13,6 +13,9 @@ public final class NotchPresenter {
     private var trackingMonitor: Any?
     private var clickOutsideMonitor: Any?
     private var escapeMonitor: Any?
+    private var scrollMonitor: Any?
+    private var swipe = SwipeToSkipTracker()
+    private var skipHintTask: Task<Void, Never>?
     /// Registered on `NSWorkspace.shared.notificationCenter`, NOT
     /// `NotificationCenter.default` like `observers` — a token from one
     /// center cannot be removed via the other, so this is tracked and torn
@@ -51,6 +54,32 @@ public final class NotchPresenter {
             MainActor.assumeIsolated {
                 self?.controller.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
             }
+        }
+
+        // Swipe to skip (2026-09-29): a two-finger horizontal swipe over the
+        // island skips a track. A LOCAL monitor is enough — scroll events
+        // go to the window under the cursor, and ours takes mouse events
+        // exactly while the cursor is on the island (`setAcceptsMouse`).
+        // Only the scalar facts cross onto the actor; `NSEvent` is not
+        // `Sendable`.
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            let deltaX = event.scrollingDeltaX
+            let inverted = event.isDirectionInvertedFromDevice
+            let phase: SwipeToSkipTracker.Phase
+            if event.momentumPhase != [] {
+                phase = .momentum
+            } else {
+                switch event.phase {
+                case .began:            phase = .began
+                case .changed:          phase = .changed
+                case .ended, .cancelled: phase = .ended
+                default:                phase = .none
+                }
+            }
+            MainActor.assumeIsolated {
+                self?.handleSwipe(deltaX: deltaX, phase: phase, invertedFromDevice: inverted)
+            }
+            return event
         }
 
         // Lock screen, spec §7: raise the window above the lock shield and
@@ -126,6 +155,10 @@ public final class NotchPresenter {
         trackingMonitor = nil
         if let clickOutsideMonitor { NSEvent.removeMonitor(clickOutsideMonitor) }
         clickOutsideMonitor = nil
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = nil
+        skipHintTask?.cancel()
+        skipHintTask = nil
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
         escapeMonitor = nil
         lockObserver?.stop()
@@ -290,6 +323,29 @@ public final class NotchPresenter {
     /// cursor is on it. Everything else must fall through.
     nonisolated static func shouldAcceptMouse(visible: Bool, hovered: Bool) -> Bool {
         visible && hovered
+    }
+
+    /// A song-change caption (`NotchController.caption`) grows the island,
+    /// so it goes through the presenter for the window resync.
+    public func setCaption(_ caption: String?) {
+        controller.setCaption(caption)
+        syncWindowToVisibility()
+    }
+
+    private func handleSwipe(deltaX: CGFloat, phase: SwipeToSkipTracker.Phase, invertedFromDevice: Bool) {
+        guard controller.isVisible, controller.media != nil else { return }
+        guard let direction = swipe.track(deltaX: deltaX, phase: phase, invertedFromDevice: invertedFromDevice) else { return }
+        controller.emit(direction == .next ? .next : .previous)
+        // Feedback on the commit, like the scrubber's: the glyph in the
+        // ear and one haptic. Then the artwork comes back.
+        controller.setSkipHint(direction == .next ? .next : .previous)
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        skipHintTask?.cancel()
+        skipHintTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(NotchController.skipHintDuration))
+            guard !Task.isCancelled else { return }
+            self?.controller.setSkipHint(nil)
+        }
     }
 
     /// A tap on the island itself (`NotchRootView.onTap`). Routed through

@@ -29,6 +29,10 @@ final class AppModel {
     /// carries (it only ever gets the already-computed `MediaPresentation`).
     private var mediaPayload = MediaPayload()
     private var positionTimer: Timer?
+    /// The title the caption last announced, so a resumed or paused track
+    /// is not re-announced; only a NEW title is.
+    private var captionedTitle: String?
+    private var captionTask: Task<Void, Never>?
     /// Every service's status text, joined; compared on each prune tick so
     /// the menu rows follow ANY availability change — power and devices
     /// have no change hook of their own (review, 2026-09-29).
@@ -253,8 +257,16 @@ final class AppModel {
             queue.remove(kind: .media)
             presenter.controller.setMedia(nil)
             stopPositionTicking()
+            clearCaption()
             publish()
             return
+        }
+
+        // A new song announces itself for a few seconds (the reference
+        // app's caption row); pause/resume of the same song does not.
+        if title != captionedTitle {
+            captionedTitle = title
+            showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
         }
 
         queue.insert(
@@ -287,6 +299,23 @@ final class AppModel {
             guard let duration = mediaPayload.duration, duration > 0 else { return }
             media.send(.seek(seconds: duration * fraction))
         }
+    }
+
+    private func showCaption(_ text: String) {
+        presenter.setCaption(text)
+        captionTask?.cancel()
+        captionTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(NotchController.captionDuration))
+            guard !Task.isCancelled else { return }
+            self?.presenter.setCaption(nil)
+        }
+    }
+
+    private func clearCaption() {
+        captionTask?.cancel()
+        captionTask = nil
+        captionedTitle = nil
+        presenter.setCaption(nil)
     }
 
     /// Brings the app that is playing to the front. LaunchServices first
