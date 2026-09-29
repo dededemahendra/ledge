@@ -21,6 +21,20 @@ public enum NotchAnimation {
     )
     public static let reduced = Animation.easeInOut(duration: reducedDuration)
 
+    /// How long after a collapse to `.hidden` begins the island is gone —
+    /// the collapse spring within a pixel of the notch and the root's late
+    /// fade (`hideAnimation`) done. The presenter keeps the window up this
+    /// long; ordering it out on the first frame cut every retract short
+    /// (user report 2026-09-29: "unhover is not smooth").
+    public static let hideSettle: Double = 0.5
+
+    /// The root's opacity on the way to `.hidden`: full while the shape
+    /// retracts into the notch, then a short fade over the last few
+    /// points. Nothing on the way in — the island arrives by growing.
+    public static func hideAnimation(reduceMotion: Bool) -> Animation {
+        reduceMotion ? reduced : .easeOut(duration: 0.2).delay(0.15)
+    }
+
     public static func animation(expanding: Bool, reduceMotion: Bool) -> Animation {
         if reduceMotion { return reduced }
         return expanding ? expand : collapse
@@ -475,7 +489,12 @@ public struct NotchRootView: View {
             NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
             value: parameters
         )
+        // Animated on the way OUT only (see `NotchAnimation.hideAnimation`):
+        // this sits after the shape's `.animation(value: parameters)`, so
+        // without its own it snapped to 0 on the first frame of a collapse.
         .opacity(controller.isVisible ? 1 : 0)
+        .animation(controller.isVisible ? nil : NotchAnimation.hideAnimation(reduceMotion: controller.reduceMotion),
+                   value: controller.isVisible)
         .allowsHitTesting(controller.isVisible)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ledge notch island")

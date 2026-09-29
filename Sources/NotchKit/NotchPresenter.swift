@@ -22,6 +22,9 @@ public final class NotchPresenter {
     public static let hoverDwell: TimeInterval = 0.2
     private var hover = HoverIntentTracker(dwell: NotchPresenter.hoverDwell)
     private var dwellTimer: Timer?
+    /// Pending order-out after a collapse to `.hidden` — see
+    /// `syncWindowToVisibility`.
+    private var hideTask: Task<Void, Never>?
     private var skipHintTask: Task<Void, Never>?
     /// Registered on `NSWorkspace.shared.notificationCenter`, NOT
     /// `NotificationCenter.default` like `observers` — a token from one
@@ -162,6 +165,8 @@ public final class NotchPresenter {
         trackingMonitor = nil
         dwellTimer?.invalidate()
         dwellTimer = nil
+        hideTask?.cancel()
+        hideTask = nil
         if let clickOutsideMonitor { NSEvent.removeMonitor(clickOutsideMonitor) }
         clickOutsideMonitor = nil
         if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
@@ -326,9 +331,21 @@ public final class NotchPresenter {
         // visible island during the dwell must still land on it.
         window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside))
         if controller.isVisible {
+            hideTask?.cancel()
+            hideTask = nil
             window.orderFrontRegardless()
-        } else {
-            window.orderOut(nil)
+        } else if hideTask == nil {
+            // Keep the window up while the island retracts into the notch
+            // (`NotchAnimation.hideSettle`); ordering it out here, on the
+            // first frame of the collapse, cut every unhover and blip expiry
+            // to a hard cut. Mouse acceptance is already off (above), so
+            // clicks fall through meanwhile; a hover returning cancels this.
+            hideTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(NotchAnimation.hideSettle))
+                guard !Task.isCancelled, let self, !self.controller.isVisible else { return }
+                self.window?.orderOut(nil)
+                self.hideTask = nil
+            }
         }
     }
 

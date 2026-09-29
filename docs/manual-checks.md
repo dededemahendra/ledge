@@ -1387,3 +1387,14 @@ event. Now `ical://ekevent/<id>` / `x-apple-reminderkit://REMCDReminder/<id>`,
 falling back to the app if refused. Event captions show start–end. Judge live:
 click the preview of an event — Calendar opens ON that event; of a reminder —
 Reminders opens on it. Still unverified live: the link pointer and press dip.
+
+## Unhover smoothness (2026-09-29)
+
+User: "unhover is not smooth". On the first frame of a collapse to `.hidden`
+the presenter ordered the window out and the root's opacity (placed after the
+shape's animation modifier) snapped to 0 — the retract never played, for the
+preview, the hover-opened card with nothing playing, and every blip expiry.
+Now the window stays up `hideSettle` (0.5 s) while the shape retracts, with a
+late 0.2 s fade; a returning hover cancels the order-out. Judge live: leave the
+preview — it slides back into the notch; a volume blip melts away rather than
+blinking off.
