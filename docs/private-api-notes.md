@@ -172,7 +172,7 @@ Layout observed:
   → `MTTimerTimeInterval` otherwise. `MTTimerFireTimerClass` names which. A
   fired timer stays state 3 with its fire date in the past until dismissed.
 - `MTStopwatches.MTStopwatches[]` → `$MTStopwatch` with `MTStopwatchIdentifier`,
-  `MTStopwatchState` (1 stopped), `MTStopwatchOffset`, `MTStopwatchCurrentInterval`,
+  `MTStopwatchState` (0 reset, 1 stopped), `MTStopwatchOffset`, `MTStopwatchCurrentInterval`,
   `MTStopwatchLaps`, `MTStopwatchPreviousLapsTotalInterval`. A RUNNING stopwatch
   has not been observed yet; the parser takes the first `Date` in the record as
   the run's start and logs the keys of any running record it cannot read.

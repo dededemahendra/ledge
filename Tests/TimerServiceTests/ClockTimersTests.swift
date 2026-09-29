@@ -25,6 +25,10 @@ private func intervalFire() -> [String: Any] { ["$MTTimerTimeInterval": ["MTTime
     let snap = ClockTimerSnapshot(domain: domain)
     #expect(snap.timers == [ClockTimer(id: "run", title: "Tea", duration: 900, state: .running(fireDate: fire))])
     #expect(snap.stopwatches.isEmpty, "a stopped stopwatch is nothing to show")
+    let reset = ClockTimerSnapshot(domain: ["MTStopwatches": ["MTStopwatches": [
+        ["$MTStopwatch": ["MTStopwatchIdentifier": "sw", "MTStopwatchState": 0, "MTStopwatchOffset": 0.0] as [String: Any]],
+    ]]])
+    #expect(reset.stopwatches.isEmpty && reset.oddities.isEmpty, "reset (state 0, seen after the user reset it) is silent too")
     #expect(snap.oddities.isEmpty)
     let now = fire - 300
     #expect(snap.featured(at: now) == .timer(snap.timers[0]))

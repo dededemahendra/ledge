@@ -52,7 +52,8 @@ public struct ClockTimer: Sendable, Equatable, Identifiable {
     }
 }
 
-/// `$MTStopwatch`: `MTStopwatchState` (1 stopped), `MTStopwatchOffset`
+/// `$MTStopwatch`: `MTStopwatchState` (0 reset, 1 stopped — both observed),
+/// `MTStopwatchOffset`
 /// (time banked before the current run) and, while running, a date the
 /// run started from — read as the first `Date` value in the record, since
 /// the key has not been observed yet. See `ClockTimerSnapshot.oddities`.
@@ -135,8 +136,8 @@ public struct ClockTimerSnapshot: Sendable, Equatable {
             let banked = (record["MTStopwatchOffset"] as? NSNumber)?.doubleValue ?? 0
             let date = record.values.compactMap { $0 as? Date }.first
             switch state {
-            case 1:
-                continue   // stopped
+            case 0, 1:
+                continue   // reset, stopped: nothing to show
             default:
                 if let date {
                     stopwatches.append(ClockStopwatch(id: id, banked: banked, runningSince: date))
