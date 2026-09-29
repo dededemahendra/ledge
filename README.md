@@ -60,10 +60,10 @@ bar — and consuming the key is the only way to keep it off screen
 (`docs/private-api-notes.md` has the measurements). Without the grant the keys
 work through the system as before, overlay included, and the menu shows a row
 that opens the right Settings pane. Nothing else asks for anything: volume,
-brightness, battery, output routes and media are all observed by value. The
-one other prompt, **Automation for Music**, appears only when you first tap the
-- **Calendars** — asked once at launch, for the meeting blip. Declining just turns that blip off (the menu says so).
-card's favourite star.
+brightness, battery, output routes and media are all observed by value. Two
+other prompts: **Automation for Music** appears only when you first tap the
+card's favourite star, and **Calendars** is asked once at launch for the meeting
+blip — declining just turns that blip off, and the menu says so.
 
 ## What it deliberately doesn't do
 
