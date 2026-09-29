@@ -1225,3 +1225,11 @@ Row: shuffle · previous · play/pause (28pt heavy) · next · repeat (cycles vi
 the adapter's toggle; `repeat.1` when one). Star beside the title; the output
 glyph top-right is the picker's button (filled while the list is open).
 Verified headlessly (snapshot); hover highlights need the pointer.
+
+# Pop on blips (2026-09-29)
+
+`NotchAnimation.pop` for growth from hidden (tests pin overshoot 5–12 % and
+that only that case gets it); ear content inserts with scale 0.6 + blurReplace
+on the pop spring; `ValueBump` keyframes (1 → 1.2 → 1) on the compact value
+and the HUD glyph per change. Not observable headlessly — judge on the
+notch: plug the charger, tap volume repeatedly.

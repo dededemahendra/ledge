@@ -68,3 +68,23 @@ import SwiftUI
     #expect(!NotchAnimation.isExpanding(from: expanded, to: collapsed))
     #expect(!NotchAnimation.isExpanding(from: activity, to: activity), "no change is not growth")
 }
+
+/// The blip spring: a visible pop, ~8% overshoot, more than expand's ~1.5%
+/// and well under anything that reads as a toy.
+@Test func popOvershootsMoreThanExpandButStaysModest() {
+    func overshoot(_ zeta: Double) -> Double {
+        guard zeta < 1 else { return 0 }
+        return exp(-zeta * .pi / (1 - zeta * zeta).squareRoot())
+    }
+    let pop = overshoot(NotchAnimation.popDamping)
+    let expand = overshoot(NotchAnimation.expandDamping)
+    #expect(pop > 0.05 && pop < 0.12, "pop overshoot \(pop)")
+    #expect(pop > expand)
+}
+
+@Test func onlyGrowthFromTheBareNotchGetsThePopSpring() {
+    #expect(NotchAnimation.animation(expanding: true, fromHidden: true, reduceMotion: false) == NotchAnimation.pop)
+    #expect(NotchAnimation.animation(expanding: true, fromHidden: false, reduceMotion: false) == NotchAnimation.expand, "opening the panel is not a throw")
+    #expect(NotchAnimation.animation(expanding: false, fromHidden: false, reduceMotion: false) == NotchAnimation.collapse)
+    #expect(NotchAnimation.animation(expanding: true, fromHidden: true, reduceMotion: true) == NotchAnimation.reduced)
+}

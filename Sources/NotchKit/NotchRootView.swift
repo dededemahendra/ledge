@@ -26,6 +26,25 @@ public enum NotchAnimation {
         return expanding ? expand : collapse
     }
 
+    /// The blip spring (2026-09-29, user's call: "magnification when
+    /// interactions"): a blip is something thrown INTO the island — a
+    /// volume press, the charger going in — and that is exactly where
+    /// Apple's guidance allows overshoot. ~8% in width; height cannot
+    /// overshoot, every blip is notch-height. The panel's calm `expand`
+    /// stays as tuned: opening a card is not a throw.
+    public static let popResponse: Double = 0.42
+    public static let popDamping: Double = 0.62
+    public static let pop = Animation.spring(response: popResponse, dampingFraction: popDamping)
+
+    /// `fromHidden`: the island was the bare notch a moment ago — the case
+    /// that gets `pop`. Every other growth gets `expand`, every shrink
+    /// `collapse`.
+    public static func animation(expanding: Bool, fromHidden: Bool, reduceMotion: Bool) -> Animation {
+        if reduceMotion { return reduced }
+        if expanding && fromHidden { return pop }
+        return expanding ? expand : collapse
+    }
+
     /// For in-place text swaps (the trailing ear's `compactText`, a detail
     /// row's `title`) — spec §5's "`.blurReplace` transition for text
     /// swaps." A spring reads wrong here: a spring is for something moving
@@ -87,6 +106,25 @@ struct AnimatedIslandParameters: ViewModifier, Animatable {
     }
 }
 
+/// A bump on every value change (2026-09-29): the view scales to 120% and
+/// springs back — iOS's volume HUD does this on each press, and it is
+/// what makes a held key feel like a stream of presses rather than a
+/// number quietly ticking. Keyed on `trigger`; nothing happens at rest.
+/// Reduce Motion: no scaling at all.
+struct ValueBump<Trigger: Equatable>: ViewModifier {
+    let trigger: Trigger
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        content.keyframeAnimator(initialValue: 1.0, trigger: trigger) { view, scale in
+            view.scaleEffect(enabled ? scale : 1)
+        } keyframes: { _ in
+            SpringKeyframe(1.2, duration: 0.12, spring: .snappy)
+            SpringKeyframe(1.0, duration: 0.3, spring: .bouncy)
+        }
+    }
+}
+
 /// The ears row, laid out from the LIVE island width (see
 /// `AnimatedIslandParameters`), with both ears keyed on the identity of
 /// what they show: when one blip replaces another at the same island size
@@ -105,19 +143,36 @@ private struct IslandEarsRow<Leading: View, Trailing: View>: View {
     let notch: CGRect
     let key: String
     let animation: Animation
+    let reduceMotion: Bool
     let leading: Leading
     let trailing: Trailing
 
     init(
-        target: NotchShapeParameters, notch: CGRect, key: String, animation: Animation,
+        target: NotchShapeParameters, notch: CGRect, key: String, animation: Animation, reduceMotion: Bool,
         @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing
     ) {
         self.target = target
         self.notch = notch
         self.key = key
         self.animation = animation
+        self.reduceMotion = reduceMotion
         self.leading = leading()
         self.trailing = trailing()
+    }
+
+    /// New ear content POPS in — scaling up from 60% on the blip spring
+    /// while it sharpens — and merely dissolves on the way out. The
+    /// insertion carries its own spring so the pop happens even when the
+    /// surrounding transaction is a crossfade (one blip replacing another
+    /// at the same size). Reduce Motion: a plain crossfade.
+    private var earTransition: AnyTransition {
+        guard !reduceMotion else { return AnyTransition(BlurReplaceTransition(configuration: .downUp)) }
+        return .asymmetric(
+            insertion: AnyTransition(
+                ScaleTransition(0.6).combined(with: BlurReplaceTransition(configuration: .downUp)).animation(NotchAnimation.pop)
+            ),
+            removal: AnyTransition(BlurReplaceTransition(configuration: .downUp))
+        )
     }
 
     var body: some View {
@@ -126,12 +181,12 @@ private struct IslandEarsRow<Leading: View, Trailing: View>: View {
         HStack(spacing: 0) {
             ZStack { leading }
                 .id(key)
-                .transition(.blurReplace)
+                .transition(earTransition)
                 .frame(width: ear, height: notch.height)
             Color.clear.frame(width: notch.width, height: notch.height)   // the hole
             ZStack { trailing }
                 .id(key)
-                .transition(.blurReplace)
+                .transition(earTransition)
                 .frame(width: ear, height: notch.height)
         }
         .animation(animation, value: key)
@@ -281,6 +336,8 @@ public struct NotchRootView: View {
             from: CGSize(width: previousWidth, height: previousHeight),
             to: CGSize(width: parameters.width, height: parameters.height)
         )
+        let collapsed = controller.metrics.collapsed
+        let fromHidden = previousWidth <= collapsed.width && previousHeight <= collapsed.height
 
         let expanded = controller.state == .expanded
         let showEffects = expanded && !visualEffectsSuppressed
@@ -356,7 +413,7 @@ public struct NotchRootView: View {
         // view, so no extra region check is needed here.
         .onTapGesture { onTap() }
         .animation(
-            NotchAnimation.animation(expanding: expanding, reduceMotion: controller.reduceMotion),
+            NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
             value: parameters
         )
         .opacity(controller.isVisible ? 1 : 0)
@@ -389,6 +446,7 @@ public struct NotchRootView: View {
                 notch: notch,
                 key: earContentKey,
                 animation: NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
+                reduceMotion: controller.reduceMotion,
                 leading: { leadingEar },
                 trailing: { trailingEar }
             )
@@ -568,6 +626,9 @@ public struct NotchRootView: View {
             // `parameters` — state/activityCount/metrics — stays equal).
             let glyph = Image(systemName: symbol, variableValue: activity.barFill)
                 .font(.system(size: 13, weight: .medium))
+                // Every press bumps the glyph too — the waves lighting up
+                // and the whole speaker nudging together is the press.
+                .modifier(ValueBump(trigger: activity.compactText ?? "", enabled: !controller.reduceMotion))
                 // Colour only where the system's own indicator colours
                 // itself (green charging, red low). Never under the render
                 // test hook, whose classifier expects one content colour.
@@ -636,6 +697,9 @@ public struct NotchRootView: View {
                 NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                 value: compact
             )
+            // Not keyed by `.id` (that would crossfade); the bump rides on
+            // the swap.
+            .modifier(ValueBump(trigger: compact, enabled: !controller.reduceMotion))
     }
 
     /// A device's icon for an ear: the system's product render when there

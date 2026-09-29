@@ -307,6 +307,15 @@ Collapse is deliberately duller — closing should not draw attention.
 `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion` is true, replace the
 entire spring system with a 0.15 s crossfade and an instant size change.
 
+**Pop, 2026-09-29 (user's call: "magnification when interactions").** A blip
+arriving from the bare notch uses its own spring (`NotchAnimation.pop`,
+0.42/0.62, ~8 % overshoot in width; height cannot overshoot at notch height),
+its ear content scales in from 60 % on that spring while it sharpens, and
+every value change — each volume/brightness step, each percentage tick —
+bumps glyph and number to 120 % and back (`ValueBump`, keyframes). The panel's
+calm `expand` spring is untouched: opening a card is not a throw. Reduce
+Motion gets crossfades only.
+
 **Motion polish, 2026-09-29.** Three things the island's content used to do
 badly while the shape sprang: (1) it was laid out for the *target* size from
 the first frame, so the ears jumped to their final x and were then revealed by
