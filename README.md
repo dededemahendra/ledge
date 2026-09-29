@@ -14,6 +14,7 @@ run anywhere else either.
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | artwork left, equalizer right; hover opens the card |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
+| Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
 | Charger in/out, low or full battery | bolt/plug/battery glyph left, percentage right, 3 s |
 | Audio output changes | the device's render or glyph, battery when known, 3 s |
 

@@ -171,3 +171,31 @@ import Testing
     #expect(!HUDEventDeriver.isOnKeyGrid(0.71), "auto-brightness drift")
     #expect(!HUDEventDeriver.isOnKeyGrid(0.03))
 }
+
+@Test func capsLockBaselinesThenFiresOnEveryToggle() {
+    var d = HUDEventDeriver()
+    #expect(d.capsLockChanged(on: true) == nil, "already on at launch is not news")
+    #expect(d.capsLockChanged(on: true) == nil, "polls that see no change are silent")
+    #expect(d.capsLockChanged(on: false) == .capsLock(on: false))
+    #expect(d.capsLockChanged(on: true) == .capsLock(on: true))
+    d.reset()
+    #expect(d.capsLockChanged(on: false) == nil, "reset re-baselines")
+}
+
+@Test func capsLockPresentsAsGlyphPlusOnOff() {
+    #expect(HUDEvent.capsLock(on: true).symbolName == "capslock.fill")
+    #expect(HUDEvent.capsLock(on: false).symbolName == "capslock")
+    #expect(HUDEvent.capsLock(on: true).compactText == "On")
+    #expect(HUDEvent.capsLock(on: false).compactText == "Off")
+    #expect(HUDEvent.capsLock(on: true).activityTitle == "Caps Lock")
+    #expect(HUDEvent.capsLock(on: true).barFill == nil, "no level to light the glyph by")
+    #expect(HUDEvent.volume(level: 0.5, muted: false).barFill == 0.5, "volume still carries its level")
+}
+
+/// The observer reads the same session state the system does; on a test
+/// box this simply must not crash and must agree with itself.
+@Test func capsLockStateIsReadableWithoutPermission() {
+    let a = CapsLockObserver.isCapsLockOn()
+    let b = CapsLockObserver.isCapsLockOn()
+    #expect(a == b)
+}

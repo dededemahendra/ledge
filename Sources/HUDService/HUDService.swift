@@ -17,6 +17,7 @@ public final class HUDService {
     private var deriver = HUDEventDeriver()
     private var volume: VolumeObserver?
     private var brightness: BrightnessObserver?
+    private var capsLock: CapsLockObserver?
     private let suppressor = OSDSuppressor()
     /// The mechanism that actually keeps the stock overlay off screen on
     /// this macOS — see its doc comment. `OSDSuppressor` above is kept for
@@ -95,6 +96,10 @@ public final class HUDService {
             let brightness = BrightnessObserver { [weak self] level in
                 self?.handleObservedBrightness(level)
             }
+            let capsLock = CapsLockObserver { [weak self] on in
+                guard let self, let event = self.deriver.capsLockChanged(on: on) else { return }
+                self.continuation?.yield(event)
+            }
 
             volume.onRebind = { [weak self] in self?.deriver.resetVolume() }
             interceptor.onBrightnessApplied = { [weak self] level in
@@ -104,8 +109,10 @@ public final class HUDService {
 
             volume.start()
             brightness.start()
+            capsLock.start()
             self.volume = volume
             self.brightness = brightness
+            self.capsLock = capsLock
 
             availability = Self.composedAvailability(
                 volume: volume.availability, brightness: brightness.availability
@@ -184,8 +191,10 @@ public final class HUDService {
         suppressor.shutdown()
         volume?.stop()
         brightness?.stop()
+        capsLock?.stop()
         volume = nil
         brightness = nil
+        capsLock = nil
         // Cleared before `finish()`, same fix as `PowerService.teardown()`:
         // `finish()` invokes `onTermination` SYNCHRONOUSLY on whichever thread
         // calls `stop()`, and that handler schedules `Task { self?.stop() }`.

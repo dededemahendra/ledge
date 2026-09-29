@@ -1161,3 +1161,11 @@ launch; a menu row with a fix appears if approval is pending or the app moved.
 Verified: build + tests; the registration itself and the system notice need
 the real launch (`make dev` did it — check System Settings › General › Login
 Items for "Ledge").
+
+# Caps Lock blip (2026-09-29)
+
+`CapsLockObserver` polls `CGEventSource.flagsState(.combinedSessionState)` at
+10 Hz (no permission); `HUDEventDeriver.capsLockChanged` baselines then fires;
+`HUDEvent.capsLock` presents as `capslock`/`capslock.fill` + "On"/"Off".
+Tests cover the deriver and presentation. Live: press Caps Lock — a 1.5 s
+blip, at most 100 ms after the key.

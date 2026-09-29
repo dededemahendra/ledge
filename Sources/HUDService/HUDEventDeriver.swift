@@ -23,6 +23,7 @@ public struct HUDEventDeriver: Sendable {
     private var lastVolume: Double?
     private var lastMuted: Bool?
     private var lastBrightness: Double?
+    private var lastCapsLock: Bool?
 
     public init() {}
 
@@ -32,6 +33,15 @@ public struct HUDEventDeriver: Sendable {
         lastVolume = nil
         lastMuted = nil
         lastBrightness = nil
+        lastCapsLock = nil
+    }
+
+    /// First reading is a baseline (Caps Lock already on at launch is not
+    /// news); every change after that fires.
+    public mutating func capsLockChanged(on: Bool) -> HUDEvent? {
+        defer { lastCapsLock = on }
+        guard let lastCapsLock, lastCapsLock != on else { return nil }
+        return .capsLock(on: on)
     }
 
     /// Volume-only variant for an output-device switch: the new device's

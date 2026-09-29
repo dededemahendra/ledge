@@ -3,12 +3,16 @@ import Foundation
 public enum HUDEvent: Sendable, Equatable {
     case volume(level: Double, muted: Bool)
     case brightness(level: Double)
+    /// Caps Lock toggled (2026-09-29). A blip like the others: glyph left,
+    /// "On"/"Off" right.
+    case capsLock(on: Bool)
 
     /// Proportion of the bar to fill. Muted reads as empty regardless of level.
-    public var barFill: Double {
+    public var barFill: Double? {
         switch self {
         case .volume(let level, let muted): return muted ? 0 : level
         case .brightness(let level):        return level
+        case .capsLock:                     return nil   // nothing to light up by level
         }
     }
 
@@ -23,6 +27,8 @@ public enum HUDEvent: Sendable, Equatable {
         case .volume(_, true):  return "speaker.slash.fill"
         case .volume(_, false): return "speaker.wave.3.fill"
         case .brightness:       return "sun.max.fill"
+        case .capsLock(true):   return "capslock.fill"
+        case .capsLock(false):  return "capslock"
         }
     }
 
@@ -33,6 +39,7 @@ public enum HUDEvent: Sendable, Equatable {
         switch self {
         case .volume:     return "Sound"
         case .brightness: return "Display"
+        case .capsLock:   return "Caps Lock"
         }
     }
 
@@ -48,6 +55,7 @@ public enum HUDEvent: Sendable, Equatable {
         case .volume(_, true):            return "0%"
         case .volume(let level, false):   return "\(Int((level * 100).rounded()))%"
         case .brightness(let level):      return "\(Int((level * 100).rounded()))%"
+        case .capsLock(let on):           return on ? "On" : "Off"
         }
     }
 }
