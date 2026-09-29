@@ -54,7 +54,11 @@ struct MusicControlButton: View {
                     .font(.system(size: size, weight: weight))
                     .foregroundStyle(glyphColor)
                     .id(symbol)
-                    .transition(.blurReplace)
+                    // A plain crossfade for play <-> pause, not a blur: the
+                    // press dip already moves the control, and blurring the
+                    // glyph on top of it was one effect too many (user's
+                    // call, 2026-09-29).
+                    .transition(.opacity)
             }
             .frame(width: width, height: 30)
             .contentShape(Rectangle())

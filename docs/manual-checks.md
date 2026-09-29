@@ -1275,3 +1275,12 @@ left, percentage on the right.
 The same renders showed "100…" in the trailing ear; that was the 3x render
 scale rounding the numeric-text label a third of a point short (2x displays
 were fine). The label is now sized to its ideal width, so no scale can clip it.
+
+## Control interactions, toned down (2026-09-29)
+
+User: "animation interactions for control is too much, less it a little bit".
+Press dip 0.88/0.65 -> 0.93/0.80 on a 0.2 s critically damped spring (every
+`PressableButtonStyle` control: transport row, star, output glyph, title);
+play <-> pause swaps on a plain 0.2 s crossfade instead of a blur. Hover
+highlight and the one-time row cascade unchanged. Judge live: click play and
+next a few times — the control should dip, not flinch.
