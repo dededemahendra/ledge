@@ -42,6 +42,40 @@ final class AppModel {
     var hudStatus: String { hud.availability.statusText }
     var mediaStatus: String { media.availability.statusText }
     var deviceStatus: String { device.availability.statusText }
+
+    /// What the menu should say — only problems (2026-09-29, minimal menu).
+    /// A service that is fine contributes nothing. The Accessibility grant
+    /// is the one problem the user can fix from here, so its row opens the
+    /// right Settings pane.
+    struct Issue {
+        let text: String
+        let fix: (() -> Void)?
+    }
+
+    var issues: [Issue] {
+        var issues: [Issue] = []
+        func note(_ name: String, _ availability: ServiceAvailability) {
+            switch availability {
+            case .available: break
+            case .needsPermission(let what): issues.append(Issue(text: "\(name) needs \(what)", fix: nil))
+            case .unavailable(let reason): issues.append(Issue(text: "\(name) unavailable — \(reason)", fix: nil))
+            }
+        }
+        note("Power", power.availability)
+        note("HUD", hud.availability)
+        note("Media", media.availability)
+        note("Devices", device.availability)
+        if case .needsPermission = hud.systemHUDReplacement {
+            issues.append(Issue(text: "System HUD needs Accessibility…", fix: {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
+            }))
+        }
+        return issues
+    }
+
+    var isPanelOpen: Bool { presenter.controller.state == .expanded }
     var isSuppressingStockOSD: Bool { hud.isSuppressingStockOSD }
     var systemHUDStatus: String {
         switch hud.systemHUDReplacement {
