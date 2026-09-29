@@ -1262,3 +1262,16 @@ while closed (the budget tests caught the 7 pt spacing slot). Judge on the notch
 User: "the list looks ugly". No slab: each glyph in a 22 pt circle, the
 selected one filled white with a dark glyph, names 12.5 pt regular, a tick
 on the right; rows 30 pt. The filled disc is what glides on a pick.
+
+## Charging glyph (2026-09-29)
+
+User: swap the plug-in icon. Charging now shows the menu bar's own charging
+glyph (battery with a bolt, green), held on AC the plug, fully charged the
+plain full battery (green), low the empty battery (red). Headless renders of
+all four states checked; a test pins that every power glyph resolves in SF
+Symbols. Judge live: plug in below 100% — green battery with a bolt on the
+left, percentage on the right.
+
+The same renders showed "100…" in the trailing ear; that was the 3x render
+scale rounding the numeric-text label a third of a point short (2x displays
+were fine). The label is now sized to its ideal width, so no scale can clip it.
