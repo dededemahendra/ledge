@@ -1,4 +1,5 @@
 import Testing
+import AppKit
 import Foundation
 @testable import PowerService
 
@@ -166,9 +167,10 @@ private func snapshot(
 
 /// The ear glyph follows the state (2026-09-28); the ear shows no words.
 @Test func glyphsFollowTheState() {
-    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20).symbolName == "bolt.fill")
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20).symbolName == "battery.100percent.bolt",
+            "the menu bar's own charging glyph")
     #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).symbolName == "powerplug.fill")
-    #expect(PowerEvent.fullyCharged.symbolName == "battery.100percent.bolt")
+    #expect(PowerEvent.fullyCharged.symbolName == "battery.100percent")
     #expect(PowerEvent.unplugged(percent: 87).symbolName == "battery.75percent")
     #expect(PowerEvent.unplugged(percent: 95).symbolName == "battery.100percent")
     #expect(PowerEvent.lowBattery(percent: 9).symbolName == "battery.0percent")
@@ -182,4 +184,20 @@ private func snapshot(
     #expect(PowerEvent.lowBattery(percent: 9).tint == .warning, "red when low")
     #expect(PowerEvent.unplugged(percent: 80).tint == nil, "plain on battery")
     #expect(PowerEvent.pluggedIn(percent: 80, isCharging: false, timeToFullMinutes: nil).tint == nil, "held on AC is not charging")
+}
+
+/// Every glyph the power blip can show must exist in SF Symbols on this
+/// system, or the ear would be empty for that state.
+@Test func everyPowerGlyphResolvesOnThisSystem() {
+    let events: [PowerEvent] = [
+        .pluggedIn(percent: 40, isCharging: true, timeToFullMinutes: 30),
+        .pluggedIn(percent: 40, isCharging: false, timeToFullMinutes: nil),
+        .fullyCharged,
+        .unplugged(percent: 5), .unplugged(percent: 20), .unplugged(percent: 50), .unplugged(percent: 75), .unplugged(percent: 100),
+        .lowBattery(percent: 9),
+    ]
+    for event in events {
+        #expect(NSImage(systemSymbolName: event.symbolName, accessibilityDescription: nil) != nil,
+                "\(event.symbolName) is not an SF Symbol here")
+    }
 }

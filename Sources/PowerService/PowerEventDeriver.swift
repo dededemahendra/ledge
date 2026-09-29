@@ -59,13 +59,16 @@ public enum PowerEvent: Sendable, Equatable {
         }
     }
 
-    /// Glyph for the leading ear. A bolt while charging, a plug while held
-    /// on AC, a battery whose fill tracks the level otherwise.
+    /// Glyph for the leading ear. The battery with a bolt while charging —
+    /// the menu bar's own charging glyph (user's call, 2026-09-29: the bare
+    /// bolt read as "power", not "battery") — a plug while held on AC, the
+    /// full battery when charged, a battery whose fill tracks the level
+    /// otherwise.
     public var symbolName: String {
         switch self {
-        case .pluggedIn(_, true, _):   return "bolt.fill"
+        case .pluggedIn(_, true, _):   return "battery.100percent.bolt"
         case .pluggedIn(_, false, _):  return "powerplug.fill"
-        case .fullyCharged:            return "battery.100percent.bolt"
+        case .fullyCharged:            return "battery.100percent"
         case .unplugged(let percent), .lowBattery(let percent):
             return Self.batterySymbol(percent: percent)
         }

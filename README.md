@@ -16,7 +16,7 @@ run anywhere else either.
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
-| Charger in/out, low or full battery | bolt/plug/battery glyph left (green charging, red low), percentage right, 3 s |
+| Charger in/out, low or full battery | battery glyph left (bolt while charging, plug when held on AC; green charging, red low), percentage right, 3 s |
 | Audio output changes | the device's render or glyph, battery when known, 3 s |
 
 Browsers and everything else that MediaRemote reports are ignored on purpose
