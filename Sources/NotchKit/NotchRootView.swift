@@ -393,6 +393,16 @@ public struct NotchRootView: View {
                     )
                 }
         }
+        // The blip pulse (`NotchController.blipPulse`): the whole island
+        // swells ~5% from its top edge — the notch stays welded — and
+        // springs back, for a blip that lands with no shape change to
+        // announce it. Keyframed, so the resting frame is exactly 1.0.
+        .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { view, scale in
+            view.scaleEffect(controller.reduceMotion ? 1 : scale, anchor: .top)
+        } keyframes: { _ in
+            SpringKeyframe(1.05, duration: 0.14, spring: .snappy)
+            SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+        }
         // Flatten before shadowing so the island casts ONE silhouette shadow
         // rather than every layer casting its own.
         .compositingGroup()

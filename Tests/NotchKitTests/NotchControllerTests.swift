@@ -222,6 +222,40 @@ private func someMedia() -> MediaPresentation {
     #expect(!c.isOutputPickerOpen, "one output is not a choice")
 }
 
+// MARK: - Blip pulse (2026-09-29)
+
+/// The island pulses for a blip that lands WITHOUT a shape change (the
+/// growth spring covers the other case), and again when a new blip
+/// replaces it — plug then unplug, or a different kind.
+@MainActor
+@Test func aBlipLandingOnAnUnchangedIslandPulsesAndAShapeChangeDoesNot() {
+    let c = makeController()
+    let power = NotchController.ActivityDisplay(id: "power", title: "Charging · 95%", compactText: "95%", symbolName: "bolt.fill")
+    c.setActivities([power], overflow: 0)
+    #expect(c.blipPulse == 0, "from the bare notch the island grows — the spring announces it")
+
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.blipPulse == 0, "media is not a blip")
+
+    c.setActivities([power, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.blipPulse == 1, "the charger over music: same island size, so pulse")
+
+    c.setActivities([power, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.blipPulse == 1, "the same blip re-published (TTL refresh) is not a new arrival")
+
+    let unplugged = NotchController.ActivityDisplay(id: "power", title: "On battery · 95%", compactText: "95%", symbolName: "battery.100percent")
+    c.setActivities([unplugged, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.blipPulse == 2, "unplug replaces plug: a new blip, same id")
+
+    let hud = NotchController.ActivityDisplay(id: "hud", title: "Sound", compactText: "50%", symbolName: "speaker.wave.3.fill", barFill: 0.5)
+    c.setActivities([hud, .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.blipPulse == 3)
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "55%", symbolName: "speaker.wave.3.fill", barFill: 0.55),
+                     .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.blipPulse == 3, "a volume step is the same blip; the value bump handles presses")
+}
+
 // MARK: - Song-change caption and swipe feedback (2026-09-29)
 
 @MainActor

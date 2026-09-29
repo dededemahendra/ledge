@@ -1233,3 +1233,11 @@ that only that case gets it); ear content inserts with scale 0.6 + blurReplace
 on the pop spring; `ValueBump` keyframes (1 → 1.2 → 1) on the compact value
 and the HUD glyph per change. Not observable headlessly — judge on the
 notch: plug the charger, tap volume repeatedly.
+
+# Blip pulse (2026-09-29)
+
+User: "not working on plug" — with music showing, the island was already at
+the blip's size, so the pop spring never ran. `NotchController.blipPulse`
+counts blips that land without a shape change (and blip-to-blip
+replacements); the view keyframes the whole island 1 → 1.05 → 1 from its top
+edge on each change. Tested; judge on the notch with music playing.

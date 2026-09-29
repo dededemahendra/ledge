@@ -421,9 +421,33 @@ public final class NotchController {
     }
 
     public func setActivities(_ activities: [ActivityDisplay], overflow: Int) {
+        let shapeBefore = parameters
+        let blipBefore = leadingBlipKey
         self.activities = activities
         self.overflowCount = max(0, overflow)
         setActivityCount(activities.count + max(0, overflow))
+        // A blip landing on an island that does not change shape — the
+        // charger going in while music shows, say — gets no growth spring
+        // to announce it. Count it, and the view pulses the whole island.
+        if let key = leadingBlipKey, key != blipBefore, parameters == shapeBefore {
+            blipPulse += 1
+        }
+    }
+
+    /// Bumped each time a blip (HUD, power, device) arrives WITHOUT the
+    /// island changing shape (2026-09-29, user's report: "not working on
+    /// plug" — with music playing the island was already there at the same
+    /// size, so nothing moved). `NotchRootView` scales the island up ~5%
+    /// from its top edge and springs back on every change of this.
+    public private(set) var blipPulse = 0
+
+    /// Identity of the leading blip, if the leading activity is one.
+    /// Title included so plug → unplug (same id, new title) pulses again.
+    private var leadingBlipKey: String? {
+        guard let first = activities.first,
+              [Self.hudActivityID, Self.powerActivityID, Self.deviceActivityID].contains(first.id)
+        else { return nil }
+        return "\(first.id)|\(first.title)"
     }
 
     /// Does NOT touch `state`/`activityCount` itself — `AppModel` drives
