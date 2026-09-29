@@ -24,6 +24,15 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.expanded.outerFillet == 13)
 }
 
+/// The output picker grows the expanded panel by exactly its rows.
+@Test func expandedGrowsByOneRowPerOutputWhenThePickerIsOpen() {
+    let metrics = NotchMetrics(notchRect: measuredNotch)
+    #expect(metrics.expanded(outputRows: 0) == metrics.expanded)
+    #expect(metrics.expanded(outputRows: 3).height == 168 + NotchMetrics.outputListInset + 3 * NotchMetrics.outputRowHeight)
+    #expect(metrics.expanded(outputRows: 3).width == metrics.expanded.width, "only the height changes")
+    #expect(metrics.expanded(outputRows: 3).bottomRadius == metrics.expanded.bottomRadius)
+}
+
 @Test func earWidthLeavesRoomBesideTheHole() {
     let metrics = NotchMetrics(notchRect: measuredNotch)
     // Exercise the public function later tasks consume, not the arithmetic inline.

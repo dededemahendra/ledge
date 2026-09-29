@@ -55,8 +55,19 @@ public struct NotchMetrics: Sendable, Equatable {
         )
     }
 
-    public var expanded: NotchShapeParameters {
-        NotchShapeParameters(
+    public var expanded: NotchShapeParameters { expanded(outputRows: 0) }
+
+    /// One list row of the output picker, and the gap above the list.
+    public static let outputRowHeight: CGFloat = 26
+    public static let outputListInset: CGFloat = 10
+
+    /// The panel, grown downward by the output picker's list (2026-09-29,
+    /// user's call: "expand bottom" rather than swap the control row for
+    /// chips). Width and corners unchanged; only the height follows the
+    /// number of rows, so the spring morphs the card taller in place.
+    public func expanded(outputRows: Int) -> NotchShapeParameters {
+        let list = outputRows > 0 ? Self.outputListInset + CGFloat(outputRows) * Self.outputRowHeight : 0
+        return NotchShapeParameters(
             width: 390,
             // 118 -> 140 during the media-player redesign: the richer card
             // (15pt rounded title, focal 26pt play button, scrub block with
@@ -66,7 +77,7 @@ public struct NotchMetrics: Sendable, Equatable {
             // expanded — the deliberate full-panel state exists to fit its
             // panel. Pinned by NotchRenderTests'
             // mediaPanelIdealHeightFitsTheExpandedBudget.
-            height: atLeastNotchHeight(168),
+            height: atLeastNotchHeight(168 + list),
             bottomRadius: 26,
             outerFillet: 13
         )

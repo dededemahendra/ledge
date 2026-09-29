@@ -187,6 +187,18 @@ public final class NotchController {
 
     public func setOutputs(_ outputs: [OutputOption]) {
         self.outputs = outputs
+        if outputs.count < 2 { isOutputPickerOpen = false }   // nothing to choose from
+    }
+
+    /// The output picker's list is open below the controls. Lives here,
+    /// not in the view, because it changes the island's SIZE
+    /// (`NotchMetrics.expanded(outputRows:)`). Closes itself whenever the
+    /// panel closes (`recomputeState`), after a pick, and when there is
+    /// nothing to pick from.
+    public private(set) var isOutputPickerOpen = false
+
+    public func setOutputPicker(open: Bool) {
+        isOutputPickerOpen = open && state == .expanded && outputs.count >= 2
     }
 
     /// Set by whoever owns this controller (`AppModel`) to receive playback
@@ -265,7 +277,7 @@ public final class NotchController {
             // own the island alone — nothing was left to reach it.
             return metrics.oneActivity
         case .expanded:
-            return metrics.expanded
+            return metrics.expanded(outputRows: isOutputPickerOpen ? outputs.count : 0)
         }
     }
 
@@ -414,5 +426,6 @@ public final class NotchController {
         } else {
             state = .hidden
         }
+        if state != .expanded { isOutputPickerOpen = false }
     }
 }

@@ -190,6 +190,36 @@ private func someMedia() -> MediaPresentation {
     #expect(received == .openSource)
 }
 
+/// The picker's open state sizes the island, so it lives in the controller:
+/// only openable at `.expanded` with two or more outputs, and it closes
+/// itself when the panel closes.
+@MainActor
+@Test func outputPickerOpensOnlyOnAnOpenPanelAndClosesWithIt() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setOutputs([
+        OutputOption(id: "builtin", name: "MacBook Air Speakers", symbolName: "laptopcomputer", isCurrent: true),
+        OutputOption(id: "bt-1", name: "AirPods Pro", symbolName: "airpods.pro", isCurrent: false),
+    ])
+    c.setOutputPicker(open: true)
+    #expect(!c.isOutputPickerOpen, "no panel, no picker")
+
+    c.setHovered(true)
+    #expect(c.state == .expanded)
+    c.setOutputPicker(open: true)
+    #expect(c.isOutputPickerOpen)
+    #expect(c.parameters == c.metrics.expanded(outputRows: 2), "the island grows by two rows")
+
+    c.setHovered(false)
+    #expect(c.state != .expanded && !c.isOutputPickerOpen, "closing the panel closes the picker")
+    #expect(c.parameters != c.metrics.expanded(outputRows: 2))
+
+    c.setHovered(true)
+    c.setOutputPicker(open: true)
+    c.setOutputs([OutputOption(id: "builtin", name: "MacBook Air Speakers", symbolName: "laptopcomputer", isCurrent: true)])
+    #expect(!c.isOutputPickerOpen, "one output is not a choice")
+}
+
 // MARK: - Lock screen (spec §7)
 
 @MainActor

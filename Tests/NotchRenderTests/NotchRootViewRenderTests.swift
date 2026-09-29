@@ -613,13 +613,12 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     }
 }
 
-/// The output picker replaces the control row in the SAME 30pt slot, so the
-/// card with the picker open must measure no taller than with the controls
-/// — and still inside the expanded budget — or opening it would clip.
+/// The output picker's list must fit the budget the island grows to for it
+/// — exactly one row per output — and must actually be taller than the
+/// closed card, proving the rows rendered.
 @MainActor
-@Test func outputPickerRowKeepsTheCardWithinItsBudget() {
+@Test func outputPickerListFitsTheGrownBudgetAndAddsRows() {
     let metrics = NotchMetrics(notchRect: testNotchRect)
-    let budget = metrics.expanded.height - metrics.notchRect.height
     let media = MediaPresentation(title: "A Fairly Long Now-Playing Song Title", artist: "An Artist Name", artwork: nil, isPlaying: true, elapsed: 30, duration: 200)
     let outputs = [
         OutputOption(id: "builtin", name: "MacBook Air Speakers", symbolName: "laptopcomputer", isCurrent: true),
@@ -632,7 +631,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     func idealHeight(pickerOpen: Bool) -> CGFloat {
         let panel = MediaPanelView(
             media: media, reduceMotion: true, contentColor: .red,
-            artworkNamespace: namespace, emit: { _ in }, outputs: outputs, showsOutputsInitially: pickerOpen
+            artworkNamespace: namespace, emit: { _ in }, outputs: outputs, outputPickerOpen: pickerOpen
         )
         let renderer = ImageRenderer(content: panel.frame(width: metrics.expanded.width))
         renderer.scale = 2
@@ -641,8 +640,12 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
         return CGFloat(image.height) / renderer.scale
     }
 
-    let controls = idealHeight(pickerOpen: false)
-    let picker = idealHeight(pickerOpen: true)
-    #expect(picker <= budget, "picker row: \(picker)pt exceeds the \(budget)pt budget")
-    #expect(abs(picker - controls) < 1, "the picker (\(picker)pt) must occupy the controls' slot (\(controls)pt), not add a row")
+    let closed = idealHeight(pickerOpen: false)
+    let open = idealHeight(pickerOpen: true)
+    let closedBudget = metrics.expanded.height - metrics.notchRect.height
+    let openBudget = metrics.expanded(outputRows: outputs.count).height - metrics.notchRect.height
+    #expect(closed <= closedBudget)
+    #expect(open <= openBudget, "open list: \(open)pt exceeds the grown \(openBudget)pt budget")
+    #expect(open - closed >= CGFloat(outputs.count) * NotchMetrics.outputRowHeight - 1,
+            "the list must add one row per output (\(open - closed)pt for \(outputs.count) rows)")
 }

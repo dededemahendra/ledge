@@ -23,8 +23,8 @@ Browsers and everything else that MediaRemote reports are ignored on purpose
 
 **The card** (hover with music playing): artwork and titles — click them to
 bring the app forward — a scrubber with times, then shuffle · previous ·
-play/pause · next · output. The output button opens a row of every audio
-output; pick one to switch. Click the island to pin the card open; click
+play/pause · next · output. The output button opens a list of every audio
+output below the controls (the card grows to fit); pick one to switch. Click the island to pin the card open; click
 elsewhere, or Escape, to unpin.
 
 ## Build and run

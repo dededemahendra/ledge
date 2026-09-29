@@ -747,7 +747,9 @@ public struct NotchRootView: View {
                 emit: { controller.emit($0) },
                 displayOnly: controller.isLocked,
                 outputs: controller.outputs,
-                artworkImage: controller.mediaArtworkImage
+                artworkImage: controller.mediaArtworkImage,
+                outputPickerOpen: controller.isOutputPickerOpen,
+                toggleOutputs: { controller.setOutputPicker(open: !controller.isOutputPickerOpen) }
             )
             // `.leading` keeps the panel flush at the island's leading edge
             // like every other piece of island content; `maxHeight: .infinity`

@@ -546,11 +546,15 @@ the Bluetooth link observer was dropped:
   default output. Both need `IOBluetooth` and its prompt.
 - Output switching in the expanded panel via `AudioObjectSetPropertyData` —
   **built 2026-09-29**: the card's fifth control (where repeat sat) shows the
-  current output's glyph; tapping it swaps the control row for a row of
-  output chips in the same 30 pt slot (`OutputDeviceCatalog` enumerates every
-  device with an output stream and follows device-list/default changes);
-  picking one sets the default output and the route blip confirms it. Dimmed
-  with fewer than two outputs.
+  current output's glyph; tapping it opens a list of every audio output
+  BELOW the controls, and the island grows by one row per output
+  (`NotchMetrics.expanded(outputRows:)`; the picker's open state lives in
+  `NotchController` because it sizes the island). `OutputDeviceCatalog`
+  enumerates every device with an output stream and follows device-list/
+  default changes; picking one sets the default output, closes the list, and
+  the route blip confirms it. Dimmed with fewer than two outputs. (A first
+  cut swapped the control row for chips; replaced the same day at the user's
+  request — chips truncated long names.)
 
 ### NotificationService — fragile, isolated, opt-in
 

@@ -1169,3 +1169,12 @@ Items for "Ledge").
 `HUDEvent.capsLock` presents as `capslock`/`capslock.fill` + "On"/"Off".
 Tests cover the deriver and presentation. Live: press Caps Lock — a 1.5 s
 blip, at most 100 ms after the key.
+
+# Output picker as a list (2026-09-29)
+
+User: "can make this expand bottom?" The chips row is replaced by a list
+below the controls; the island grows by `outputRowHeight` per output while
+open (`NotchController.isOutputPickerOpen` → `expanded(outputRows:)`) and
+shrinks back after a pick or when the panel closes. Tests: metrics, controller
+state, and a render test that the list fits the grown budget and adds one row
+per output. Snapshot below the card's controls verified headlessly.

@@ -8,9 +8,9 @@ import SwiftUI
 ///   row 2 — full-width scrubber with the times INLINE at its ends
 ///   row 3 — five controls on their own centred row:
 ///           shuffle · previous · play/pause · next · output
-///           (tapping output swaps this row for the output picker — a row
-///           of device chips; picking one switches the default output and
-///           swaps the controls back, so the card never changes height)
+///   row 4 — (while the output picker is open) one row per audio output,
+///           below the controls; the card grows downward to hold them and
+///           shrinks back after a pick
 ///
 /// Flat black card — Alcove's is, and anything else beside the real notch
 /// reads as a different object. The play glyph is simply LARGER than its
@@ -52,13 +52,11 @@ struct MediaPanelView: View {
     /// `nil` shows the placeholder.
     let artworkImage: NSImage?
 
-    /// Whether row 3 is showing the output picker instead of the controls.
-    /// Same spelled-out `State` as `dragFraction` below.
-    private var _showsOutputs: State<Bool>
-    private var showsOutputs: Bool {
-        get { _showsOutputs.wrappedValue }
-        nonmutating set { _showsOutputs.wrappedValue = newValue }
-    }
+    /// Whether the output list is open below the controls
+    /// (`NotchController.isOutputPickerOpen` — the controller owns it, since
+    /// it sizes the island). `toggleOutputs` flips it.
+    let outputPickerOpen: Bool
+    let toggleOutputs: () -> Void
 
     /// In-progress scrub position, `nil` when not dragging. While non-nil the
     /// filled bar renders from THIS, 1:1 with the pointer — feedback must be
@@ -85,9 +83,8 @@ struct MediaPanelView: View {
         displayOnly: Bool = false,
         outputs: [OutputOption] = [],
         artworkImage: NSImage? = nil,
-        /// Test seam: start with the picker open, so `NotchRenderTests` can
-        /// measure that row against the card's budget.
-        showsOutputsInitially: Bool = false
+        outputPickerOpen: Bool = false,
+        toggleOutputs: @escaping () -> Void = {}
     ) {
         self.media = media
         self.reduceMotion = reduceMotion
@@ -97,7 +94,8 @@ struct MediaPanelView: View {
         self.displayOnly = displayOnly
         self.outputs = outputs
         self.artworkImage = artworkImage
-        _showsOutputs = State(initialValue: showsOutputsInitially)
+        self.outputPickerOpen = outputPickerOpen
+        self.toggleOutputs = toggleOutputs
     }
 
     var body: some View {
@@ -105,18 +103,15 @@ struct MediaPanelView: View {
             headerRow
             scrubRow
             if !displayOnly {
-                // The two rows share one 30pt slot and swap in place; a
-                // crossfade, not a spring — nothing moves, the row's
-                // meaning changes.
-                ZStack {
-                    if showsOutputs {
-                        outputsRow.transition(.blurReplace)
-                    } else {
-                        controlsRow.transition(.blurReplace)
-                    }
+                controlsRow
+                // The output list grows the card downward (the island's
+                // height follows via `NotchMetrics.expanded(outputRows:)`);
+                // the rows fade in over that spring.
+                if outputPickerOpen {
+                    outputsList
+                        .padding(.top, NotchMetrics.outputListInset - 7)   // net of the VStack spacing
+                        .transition(.blurReplace)
                 }
-                .frame(height: 30)
-                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: showsOutputs)
             }
         }
         .padding(.horizontal, 16)
@@ -325,20 +320,20 @@ struct MediaPanelView: View {
         .frame(height: 30)
     }
 
-    // MARK: - Output picker (row 3, alternate)
+    // MARK: - Output picker (list below the controls)
 
-    /// The fifth control: the current output's glyph. Tapping shows the
-    /// picker. Disabled (dimmed) with nothing to pick from — a single
-    /// output is not a choice.
+    /// The fifth control: the current output's glyph. Tapping opens or
+    /// closes the list; lit while open. Disabled (dimmed) with nothing to
+    /// pick from — a single output is not a choice.
     private var outputButton: some View {
         let current = outputs.first(where: \.isCurrent)
         let symbol = current?.symbolName ?? "speaker.wave.2"
         return Button {
-            showsOutputs = true
+            toggleOutputs()
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .semibold))
-                .opacity(0.6)
+                .opacity(outputPickerOpen ? 1 : 0.6)
                 .frame(width: 30, height: 30)
                 .contentShape(Rectangle())
                 .id(symbol)
@@ -350,54 +345,48 @@ struct MediaPanelView: View {
         .accessibilityLabel("Output: \(current?.name ?? "unknown")")
     }
 
-    /// One chip per output, the current one filled. A plain row that
-    /// shares the width between chips and truncates names — not a
-    /// `ScrollView`: every device stays reachable without scrolling, and
-    /// `ImageRenderer` cannot rasterize a scroll view (platform-backed),
-    /// which would leave this row unverifiable by `NotchRenderTests`.
-    /// Picking one emits `selectOutput` and returns to the controls; the
+    /// One row per output, full name, the current one ticked and lightly
+    /// backed. Picking one emits `selectOutput` and closes the list; the
     /// route blip then confirms the switch in the ears the same way a
-    /// manual switch would.
-    private var outputsRow: some View {
-        HStack(spacing: 6) {
+    /// manual switch would. Each row is `NotchMetrics.outputRowHeight` so
+    /// the island grows by exactly what the list needs.
+    private var outputsList: some View {
+        VStack(spacing: 0) {
             ForEach(outputs) { output in
-                outputChip(output)
-                    .frame(maxWidth: .infinity)
+                outputRow(output)
             }
-            Button {
-                showsOutputs = false
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .opacity(0.6)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
-            .accessibilityLabel("Close output picker")
         }
-        .frame(height: 30)
     }
 
-    private func outputChip(_ output: OutputOption) -> some View {
+    private func outputRow(_ output: OutputOption) -> some View {
         Button {
             emit(.selectOutput(id: output.id))
-            showsOutputs = false
+            toggleOutputs()
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 8) {
                 Image(systemName: output.symbolName)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: 18)
                 Text(output.name)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: output.isCurrent ? .semibold : .regular))
                     .lineLimit(1)
+                Spacer(minLength: 8)
+                if output.isCurrent {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .semibold))
+                }
             }
-            .padding(.horizontal, 9)
-            .frame(height: 24)
-            .background(Capsule().fill(output.isCurrent ? contentColor : contentColor.opacity(0.14)))
-            .foregroundStyle(output.isCurrent ? Color.black : contentColor)
-            .contentShape(Capsule())
+            .padding(.horizontal, 10)
+            .frame(height: NotchMetrics.outputRowHeight - 2)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(contentColor.opacity(output.isCurrent ? 0.14 : 0))
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle(reduceMotion: reduceMotion))
+        .frame(height: NotchMetrics.outputRowHeight)
         .accessibilityLabel(output.name)
         .accessibilityAddTraits(output.isCurrent ? .isSelected : [])
     }
