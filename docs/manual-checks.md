@@ -1398,3 +1398,12 @@ Now the window stays up `hideSettle` (0.5 s) while the shape retracts, with a
 late 0.2 s fade; a returning hover cancels the order-out. Judge live: leave the
 preview — it slides back into the notch; a volume blip melts away rather than
 blinking off.
+
+## Timer live activity (2026-09-29)
+
+Menu → Timer → 5 minutes: the island shows a ring and "5:00" counting down;
+click it — the pause glyph and a frozen clock; click again — it resumes; menu
+→ Stop clears it. Stopwatch: its glyph and a rising clock. Let a 1-minute…
+(use 5) run out: the alert sound, "Done" for 8 s, then idle. With music
+playing the timer leads; hover still opens the card. Headless renders of the
+four states checked.

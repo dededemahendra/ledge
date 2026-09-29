@@ -9,6 +9,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private var issueItems: [NSMenuItem] = []
     private var issueSeparator: NSMenuItem?
+    private var timerItem: NSMenuItem?
 
     /// Called just before the menu drops down, so dynamic titles and
     /// checkmarks are read from live state, not launch-time state.
@@ -70,6 +71,35 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let separator = NSMenuItem.separator()
         menu.insertItem(separator, at: issues.count)
         issueSeparator = separator
+    }
+
+    /// The island's timer (2026-09-29): a "Timer" submenu above Quit.
+    /// Idle, it offers presets and a stopwatch; running, Pause/Resume and
+    /// Stop. Rebuilt on every menu open, so it always reads live state.
+    enum TimerMenuState {
+        case idle
+        case running(paused: Bool)
+    }
+
+    func setTimerMenu(
+        _ state: TimerMenuState, onStart: @escaping (Int?) -> Void,
+        onToggle: @escaping () -> Void, onStop: @escaping () -> Void
+    ) {
+        let parent = timerItem ?? addItem(title: "Timer") {}
+        timerItem = parent
+        let submenu = NSMenu()
+        switch state {
+        case .idle:
+            for minutes in [5, 10, 15, 25, 60] {
+                submenu.addItem(makeItem(title: minutes == 60 ? "1 hour" : "\(minutes) minutes") { onStart(minutes) })
+            }
+            submenu.addItem(.separator())
+            submenu.addItem(makeItem(title: "Stopwatch") { onStart(nil) })
+        case .running(let paused):
+            submenu.addItem(makeItem(title: paused ? "Resume" : "Pause", action: onToggle))
+            submenu.addItem(makeItem(title: "Stop", action: onStop))
+        }
+        parent.submenu = submenu
     }
 
     private func makeItem(title: String, action: @escaping () -> Void) -> NSMenuItem {

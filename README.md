@@ -15,6 +15,7 @@ run anywhere else either.
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00–22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
+| A timer or stopwatch (menu bar icon → Timer) | live in the island while it runs: a draining ring left and the clock right for a countdown, the stopwatch glyph for a stopwatch; click to pause or resume, the menu to stop; at zero the alert sound and "Done" for 8 s. Blips still pre-empt it for their few seconds; hover still opens the music card |
 | An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |

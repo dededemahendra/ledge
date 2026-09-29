@@ -7,6 +7,7 @@ import HUDService
 import MediaService
 import DeviceService
 import CalendarService
+import TimerService
 import OSLog
 
 /// Consumes service streams, maintains the queue, drives the controller.
@@ -173,6 +174,7 @@ final class AppModel {
             MainActor.assumeIsolated {
                 self?.prune()
                 self?.refreshUpcoming()
+                self?.refreshTimer()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -360,6 +362,11 @@ final class AppModel {
     /// deep link — the item's app. `ledge://calendar|reminders` are this
     /// model's own stand-ins for "the app", never handed to the system.
     private func open(_ url: URL) {
+        // The running timer's own click (`Self.timerToggleURL`): pause/resume.
+        if url == Self.timerToggleURL {
+            toggleTimerPause()
+            return
+        }
         let appFor: [String: String] = [
             "ledge": url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal",
             "ical": "com.apple.iCal",
@@ -370,6 +377,82 @@ final class AppModel {
            let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
             NSWorkspace.shared.openApplication(at: app, configuration: .init())
         }
+    }
+
+    // MARK: - Timer live activity (2026-09-29)
+
+    /// The island's own timer or stopwatch: a sticky `.timer` record —
+    /// ring or glyph left, the clock right — re-derived on the 250 ms tick
+    /// and republished only when its text or ring changes. A click on it
+    /// pauses/resumes (`timerToggleURL` through the same link pipeline as
+    /// a meeting blip). At zero: the alert sound and "Done" for 8 s.
+    private var timer: LiveTimer?
+    private var timerShown: ActivityRecord?
+    private static let timerToggleURL = URL(string: "ledge://timer/toggle")!
+
+    /// What the menu shows: `nil` when idle.
+    var runningTimer: (isPaused: Bool, isStopwatch: Bool)? {
+        timer.map { ($0.isPaused, $0.isStopwatch) }
+    }
+
+    func startTimer(minutes: Int) {
+        timer = LiveTimer(kind: .countdown(TimeInterval(minutes * 60)), at: Date())
+        timerShown = nil
+        refreshTimer()
+    }
+
+    func startStopwatch() {
+        timer = LiveTimer(kind: .stopwatch, at: Date())
+        timerShown = nil
+        refreshTimer()
+    }
+
+    func toggleTimerPause() {
+        guard timer != nil else { return }
+        timer?.togglePause(at: Date())
+        timerShown = nil
+        refreshTimer()
+    }
+
+    func stopTimer() {
+        timer = nil
+        timerShown = nil
+        queue.remove(kind: .timer)
+        publish()
+        onStatusChange?()
+    }
+
+    private func refreshTimer() {
+        guard let timer else { return }
+        let now = Date()
+        if timer.isFinished(at: now) {
+            self.timer = nil
+            timerShown = nil
+            NSSound.beep()
+            queue.insert(ActivityRecord(
+                id: NotchController.timerActivityID, kind: .timer, insertedAt: now, ttl: 8,
+                title: "Timer", compactText: "Done", symbolName: "timer"
+            ))
+            publish()
+            onStatusChange?()
+            return
+        }
+        let fill = timer.fraction(at: now).map { ($0 * 200).rounded() / 200 }   // 0.5% steps: smooth, not chatty
+        let record = ActivityRecord(
+            id: NotchController.timerActivityID, kind: .timer, insertedAt: timerShown?.insertedAt ?? now, ttl: nil,
+            title: timer.isStopwatch ? "Stopwatch" : "Timer",
+            compactText: timer.displayText(at: now),
+            // Running countdown: the ring (`barFill`). Paused: the pause
+            // glyph. Stopwatch: its own glyph.
+            symbolName: timer.isPaused ? "pause.fill" : "stopwatch",
+            barFill: timer.isPaused ? nil : fill,
+            url: Self.timerToggleURL
+        )
+        guard record.compactText != timerShown?.compactText || record.barFill != timerShown?.barFill
+                || record.symbolName != timerShown?.symbolName else { return }
+        timerShown = record
+        queue.insert(record)
+        publish()
     }
 
     private func handle(_ intent: NotchIntent) {

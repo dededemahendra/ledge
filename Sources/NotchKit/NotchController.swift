@@ -245,6 +245,11 @@ public final class NotchController {
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"
 
+    /// `AppModel` inserts the running timer/stopwatch with this id. The
+    /// view draws its countdown as a ring (`barFill`) and keeps its digits
+    /// from bumping every second.
+    public static let timerActivityID = "timer"
+
     public var isCalendarLeading: Bool {
         activities.first?.id == Self.calendarActivityID
     }

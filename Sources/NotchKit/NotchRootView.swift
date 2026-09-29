@@ -693,6 +693,24 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: activity.title
                 )
+        } else if let activity = controller.activities.first, activity.id == NotchController.timerActivityID,
+                  let fill = activity.barFill {
+            // A running countdown (2026-09-29): a ring emptying clockwise
+            // from the top, the Dynamic Island's own timer glyph. Paused
+            // and stopwatch records carry no `barFill` and fall through to
+            // their symbols below.
+            ZStack {
+                Circle()
+                    .stroke(contentColor.opacity(0.25), lineWidth: 2)
+                Circle()
+                    .trim(from: 0, to: fill)
+                    .stroke(contentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    // Ticks arrive every quarter second; ease between them
+                    // so the ring drains, not steps.
+                    .animation(controller.reduceMotion ? nil : .linear(duration: 0.25), value: fill)
+            }
+            .frame(width: 14, height: 14)
         } else if let activity = controller.activities.first, let symbol = activity.symbolName {
             // `variableValue` lights the symbol's own level layers (speaker
             // waves, sun rays) from `barFill` — the macOS-OSD way to show a
@@ -773,7 +791,7 @@ public struct NotchRootView: View {
     /// insertion/removal, so it needs the value-keyed `.id` to register as
     /// one, and its own animated transaction: the root's `.animation(value:
     /// parameters)` never attaches for a value tick alone.
-    private func compactValue(_ compact: String) -> some View {
+    private func compactValue(_ compact: String, bump: Bool = true) -> some View {
         Text(compact)
             .font(.system(size: 11, weight: .medium))
             .monospacedDigit()
@@ -793,7 +811,7 @@ public struct NotchRootView: View {
                 NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                 value: compact
             )
-            .modifier(ValueBump(trigger: compact, enabled: !controller.reduceMotion))
+            .modifier(ValueBump(trigger: compact, enabled: bump && !controller.reduceMotion))
     }
 
     /// A device's icon for an ear: the system's product render when there
@@ -897,7 +915,9 @@ public struct NotchRootView: View {
                 .monospacedDigit()
         } else if let activity = controller.activities.first {
             if let compact = activity.compactText {
-                compactValue(compact)
+                // A ticking clock must not bump every second; its digits
+                // still roll.
+                compactValue(compact, bump: activity.id != NotchController.timerActivityID)
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {

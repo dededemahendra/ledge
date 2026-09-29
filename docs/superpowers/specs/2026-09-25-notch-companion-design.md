@@ -878,3 +878,23 @@ handlers on this macOS (checked without opening anything) — with the app as th
 fallback when the system refuses the link. An event's caption shows its span
 ("Test · 21:00–22:00", "Tomorrow 09:00–10:00"), a reminder its time
 ("Tomorrow at 06:15"), so an item under way says when it ends.
+
+
+## Timer live activity (2026-09-29)
+
+**What.** The island's own live activity, in the Dynamic Island's idiom: a
+countdown shows a ring draining clockwise from the top in the leading ear and
+the clock ("12:34"; "1:02" as hours:minutes from an hour up — the ear holds five
+characters) in the trailing one; a stopwatch shows its glyph and counts up.
+A click on the island pauses/resumes (the pause glyph replaces the ring); the
+menu bar's "Timer" submenu offers 5/10/15/25 minutes, 1 hour and Stopwatch when
+idle, Pause/Resume and Stop while running. At zero: the system alert sound and
+"Done" for 8 s.
+
+**How.** `LiveTimer` (`TimerService`, pure, date-fed, unit tested) is
+re-derived on `AppModel`'s 250 ms tick into a sticky `ActivityKind.timer`
+record (priority 20: above media, below every blip), republished only when its
+text, ring or glyph changes; the ring eases between ticks. The clock's digits
+roll but do not bump — `compactValue(_:bump:)` — since a bump every second is
+noise. The click goes through the same link pipeline as a meeting blip
+(`ledge://timer/toggle`), so it gets the press dip and link pointer.

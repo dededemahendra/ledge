@@ -10,6 +10,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
     /// is the user's own key press and over in a second and a half.
     case calendar
     case notification
+    /// The island's own timer or stopwatch (2026-09-29): sticky while it
+    /// runs, above media (a running timer is what the island is for) and
+    /// below every blip, which pre-empts it for its few seconds.
+    case timer
     case media
 
     /// Higher wins a visible slot. Values fixed by spec §7.
@@ -20,6 +24,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .device:       return 50
         case .calendar:     return 70
         case .notification: return 40
+        case .timer:        return 20
         case .media:        return 10
         }
     }
@@ -32,6 +37,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .device:       return 3
         case .calendar:     return 8       // a title and a time take longer to read than "42%"
         case .notification: return 5
+        case .timer:        return nil
         case .media:        return nil
         }
     }
