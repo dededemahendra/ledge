@@ -14,6 +14,25 @@ struct CalendarPanelView: View {
     private let cell = CGSize(width: 22, height: 15)
     private var accent: Color { Color(nsColor: .systemRed) }
 
+    /// The reveal (2026-09-30): the date first, then the chips one by one,
+    /// then the grid row by row — each rising 6 pt as it fades in, on the
+    /// mode's own spring. Spelled-out `State`, as elsewhere here.
+    private var _revealed: State<Bool> = State(initialValue: false)
+    private var revealed: Bool {
+        get { _revealed.wrappedValue }
+        nonmutating set { _revealed.wrappedValue = newValue }
+    }
+
+    private func reveal<V: View>(_ view: V, order: Int) -> some View {
+        view
+            .opacity(revealed ? 1 : 0)
+            .offset(y: revealed ? 0 : 6)
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8).delay(0.05 + Double(order) * 0.04),
+                value: revealed
+            )
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             todayColumn
@@ -25,20 +44,21 @@ struct CalendarPanelView: View {
                 .padding(.top, 6)
         }
         .foregroundStyle(contentColor)
+        .onAppear { revealed = true }
     }
 
     private var todayColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(data.weekdayTitle)
+            reveal(Text(data.weekdayTitle)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(accent)
-            Text("\(data.dayNumber)")
+                .foregroundStyle(accent), order: 0)
+            reveal(Text("\(data.dayNumber)")
                 .font(.system(size: 30, weight: .regular, design: .rounded))
                 .monospacedDigit()
-                .frame(height: 32)
+                .frame(height: 32), order: 0)
             VStack(alignment: .leading, spacing: 3) {
-                ForEach(Array(data.items.prefix(3).enumerated()), id: \.offset) { _, item in
-                    chip(item)
+                ForEach(Array(data.items.prefix(3).enumerated()), id: \.offset) { index, item in
+                    reveal(chip(item), order: 1 + index)
                 }
             }
             .padding(.top, 4)
@@ -70,24 +90,24 @@ struct CalendarPanelView: View {
 
     private var grid: some View {
         VStack(alignment: .trailing, spacing: 1) {
-            Text(data.monthShort)
+            reveal(Text(data.monthShort)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(accent)
-                .frame(height: 14)
-            HStack(spacing: 0) {
+                .frame(height: 14), order: 0)
+            reveal(HStack(spacing: 0) {
                 ForEach(Array(data.weekdaySymbols.enumerated()), id: \.offset) { index, symbol in
                     Text(symbol)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(contentColor.opacity(data.weekendColumns[index] ? 0.35 : 0.9))
                         .frame(width: cell.width, height: 12)
                 }
-            }
-            ForEach(Array(data.weeks.enumerated()), id: \.offset) { _, week in
-                HStack(spacing: 0) {
+            }, order: 1)
+            ForEach(Array(data.weeks.enumerated()), id: \.offset) { row, week in
+                reveal(HStack(spacing: 0) {
                     ForEach(Array(week.enumerated()), id: \.offset) { column, day in
                         dayCell(day, weekend: data.weekendColumns[column])
                     }
-                }
+                }, order: 2 + row)
             }
         }
     }

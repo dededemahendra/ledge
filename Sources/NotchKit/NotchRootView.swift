@@ -547,10 +547,13 @@ public struct NotchRootView: View {
                     .transition(BlurReplaceTransition(configuration: .downUp).combined(with: OffsetTransition(CGSize(width: 0, height: 6))))
             } else if parameters.height > notch.height + 8 {
                 detailRow
-                    // Mode changes crossfade (2026-09-30); the dots say
-                    // which mode this is when there is more than one.
-                    .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: controller.panel)
-                    .overlay(alignment: .bottom) { panelDots }
+                    // Mode changes slide the way the swipe went, on the
+                    // expand spring (2026-09-30, user's call); the island's
+                    // clip keeps the outgoing panel inside.
+                    .animation(
+                        controller.reduceMotion ? NotchAnimation.reduced : .spring(response: 0.38, dampingFraction: 0.82),
+                        value: controller.panel
+                    )
                     .frame(maxWidth: .infinity)
                     // `alignment: .top`, not the default `.center`: content
                     // taller than its budget must overflow DOWNWARD, where
@@ -999,21 +1002,19 @@ public struct NotchRootView: View {
     /// fighting it: `leadingEar` now yields its artwork slot entirely at
     /// `.expanded` (see its media branch), so the pair really is a transient
     /// insert/remove hand-off, which is the case hero semantics are for.
-    /// Two 4 pt dots at the card's foot when both modes exist, the current
-    /// one lit — the phone's page control, at island scale.
-    @ViewBuilder private var panelDots: some View {
-        let panels = controller.availablePanels
-        if panels.count > 1 {
-            HStack(spacing: 5) {
-                ForEach(Array(panels.enumerated()), id: \.offset) { _, panel in
-                    Circle()
-                        .fill(contentColor.opacity(panel == controller.panel ? 0.9 : 0.3))
-                        .frame(width: 4, height: 4)
-                }
-            }
-            .padding(.bottom, 5)
-            .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: controller.panel)
-        }
+    /// The panels slide the way the swipe went: the new mode comes in from
+    /// the side the finger moved toward, the old one leaves the other way,
+    /// both softening as they go. Reduce Motion: a plain crossfade.
+    private var panelTransition: AnyTransition {
+        guard !controller.reduceMotion else { return .opacity }
+        let sign: CGFloat = controller.lastSwipe == .next ? 1 : -1
+        let slide: CGFloat = 60
+        return .asymmetric(
+            insertion: AnyTransition(OffsetTransition(CGSize(width: slide * sign, height: 0))
+                .combined(with: BlurReplaceTransition(configuration: .downUp))),
+            removal: AnyTransition(OffsetTransition(CGSize(width: -slide * sign, height: 0))
+                .combined(with: BlurReplaceTransition(configuration: .downUp)))
+        )
     }
 
     @ViewBuilder private var detailRow: some View {
@@ -1025,7 +1026,7 @@ public struct NotchRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .id("calendar")
-            .transition(.blurReplace)
+            .transition(panelTransition)
         } else if controller.state == .expanded, let media = controller.media {
             MediaPanelView(
                 media: media,
@@ -1048,7 +1049,7 @@ public struct NotchRootView: View {
             // so anything past the budget clips downward, never into the ears.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .id("media")
-            .transition(.blurReplace)
+            .transition(panelTransition)
         } else {
             // Unreachable in practice since 2026-09-29: `.expanded` is only
             // ever the now-playing card (`NotchController.click()` needs

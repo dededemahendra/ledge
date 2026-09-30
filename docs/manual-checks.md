@@ -1528,3 +1528,9 @@ Big date + tinted chips left, red-titled month grid right (weekends dimmed,
 busy days red, today on a disc). Rendered headlessly and matched against the
 user's screenshot. Judge live: chip colours match Calendar's; a chip click
 opens the item.
+
+## Mode swap animation (2026-09-30)
+
+Swipe: the old panel slides out the way the finger went and softens, the new
+one slides in from the other side on the expand spring; the calendar reveals
+date → chips → grid rows with a 40 ms stagger. Dots removed. Judge live.

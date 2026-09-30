@@ -328,6 +328,9 @@ public final class NotchController {
     }
 
     public private(set) var panel: Panel = .media
+    /// The way the last mode change went, so the view slides the panels
+    /// that way: `.next` brings the new mode in from the right.
+    public private(set) var lastSwipe: SwipeToSkipTracker.Direction = .next
 
     /// What the calendar mode draws; `nil` means no calendar mode (no
     /// calendar access).
@@ -358,12 +361,14 @@ public final class NotchController {
         if state == .expanded, panels.count > 1, let index = panels.firstIndex(of: panel) {
             let target = direction == .next ? index + 1 : index - 1
             if panels.indices.contains(target) {
+                lastSwipe = direction
                 panel = panels[target]
                 recomputeState()
             }
             return true
         }
         if isPreviewingUpcoming, calendarMode != nil {
+            lastSwipe = direction
             panel = .calendar
             recomputeState()
             return true
