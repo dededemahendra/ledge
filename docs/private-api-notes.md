@@ -238,3 +238,12 @@ and `device_minorType` ("Headphones", "Headset", "Speaker"). Observed on this
 Mac with no buds connected; the per-component keys are as documented
 elsewhere and parsed defensively. The AirPods renders in
 `HeadphoneAssets.framework` are no longer used.
+
+## Lock screen: closed (2026-10-01, final)
+
+Tried live on macOS 27, all invisible under the lock screen: window levels
+1000 / 2005 / 3000 / `CGShieldingWindowLevel() + 1`, and
+`canBecomeVisibleWithoutLogin = true` with the shield level. loginwindow's
+lock UI is composited above every window of the user session. The island is
+hidden while locked and restored on unlock; do not try again without a new
+API.
