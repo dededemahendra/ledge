@@ -241,16 +241,11 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". Any other blip
     /// pre-empting the island takes it whole.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isFocusLeading)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading)
     }
 
-    /// `AppModel` inserts the Focus blip with this id; with the Focus
-    /// database readable, its caption names the Focus.
+    /// `AppModel` inserts the Focus blip with this id.
     public static let focusActivityID = "focus"
-
-    public var isFocusLeading: Bool {
-        activities.first?.id == Self.focusActivityID
-    }
 
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"
@@ -334,6 +329,16 @@ public final class NotchController {
 
     public var isVisible: Bool { state != .hidden }
 
+    /// The ear the leading activity's trailing text needs (2026-09-30: a
+    /// Focus's name stands where "On" was): measured at the 11 pt medium
+    /// `compactValue` draws it, plus breathing room. Four characters or
+    /// fewer — every percentage, "Now", "Off" — leave the default.
+    public var leadingEarWidth: CGFloat {
+        guard let text = activities.first?.compactText, text.count > 4 else { return NotchMetrics.activityEarWidth }
+        let width = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium)]).size().width
+        return ceil(width) + 16
+    }
+
     /// `AppModel` inserts every volume/brightness record with this id
     /// (`ActivityKind.hud.rawValue` — a string, not the enum, since `NotchKit`
     /// has no dependency on `ActivityKit`; the same cross-module convention
@@ -391,7 +396,7 @@ public final class NotchController {
             // own the island alone. The one thing that still grows the
             // compact island is a song-change caption, and only while
             // media itself leads.
-            return hasCaption ? metrics.captioned : metrics.oneActivity
+            return hasCaption ? metrics.captioned : metrics.oneActivity(earWidth: leadingEarWidth)
         case .expanded:
             return metrics.expanded(outputRows: isOutputPickerOpen ? outputs.count : 0)
         }

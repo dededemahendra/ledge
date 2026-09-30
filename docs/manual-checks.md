@@ -1467,3 +1467,10 @@ relaunch. Judge live: toggle Do Not Disturb — indigo moon + "On" + "Do Not
 Disturb" under the hole; a custom Focus — its symbol in its colour and its
 name; switch Focuses — the new one blips on. Without the grant: the menu row
 and the plain moon.
+
+## Focus name in the ear (2026-09-30)
+
+"On" → the Focus's name; the island widens to fit ("Reduce Interruptions"
+needs ~110 pt ears). Judge live: Do Not Disturb — indigo moon + "Do Not
+Disturb" in a wider island; Work — its symbol + "Work" at the usual width;
+off — "Off". Render test covers the wide blip.

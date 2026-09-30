@@ -606,3 +606,24 @@ private func someMedia() -> MediaPresentation {
     c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"), meeting], overflow: 0)
     #expect(!c.hasCaption && c.parameters == c.metrics.oneActivity)
 }
+
+/// A long trailing text — a Focus's name where "On" was (2026-09-30) —
+/// stretches the island to fit; the usual few characters leave it alone,
+/// and a runaway text is capped rather than growing without end.
+@MainActor
+@Test func aLongTrailingTextWidensTheIslandAndAShortOneDoesNot() {
+    let c = makeController()
+    c.setActivities([.init(id: "focus", title: "Reduce Interruptions", compactText: "Reduce Interruptions", symbolName: "moon.fill")], overflow: 0)
+    #expect(c.state == .activity)
+    #expect(c.parameters.width > c.metrics.oneActivity.width, "wider than the 255 pt island")
+    #expect(c.parameters.height == c.metrics.oneActivity.height, "…but no taller")
+    #expect(c.parameters.width <= c.metrics.oneActivity(earWidth: NotchMetrics.activityEarMaximum).width)
+
+    c.setActivities([.init(id: "focus", title: "Work", compactText: "Work", symbolName: "moon.fill")], overflow: 0)
+    #expect(c.parameters == c.metrics.oneActivity, "four characters fit the default ear")
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "100%", symbolName: "speaker.wave.3.fill")], overflow: 0)
+    #expect(c.parameters == c.metrics.oneActivity)
+
+    c.setActivities([.init(id: "focus", title: "x", compactText: String(repeating: "Interruptions ", count: 6), symbolName: "moon.fill")], overflow: 0)
+    #expect(c.parameters.width == c.metrics.oneActivity(earWidth: NotchMetrics.activityEarMaximum).width, "capped")
+}

@@ -346,10 +346,10 @@ final class AppModel {
     }
 
     /// A Focus turning on or off (2026-09-30): its own symbol in its own
-    /// colour with its name under the hole when the Focus database is
-    /// readable (Full Disk Access), the moon and On/Off otherwise — the
-    /// Caps Lock idiom either way. A symbol this macOS lacks falls back
-    /// to the moon.
+    /// colour left and its NAME right, where "On" would be (user's call),
+    /// the island stretching to fit it; "Off" with the symbol uncoloured.
+    /// Without the Focus database (Full Disk Access) it is the moon and
+    /// On/Off. A symbol this macOS lacks falls back to the moon.
     private func handle(_ event: FocusEvent) {
         let symbol = NSImage(systemSymbolName: event.symbolName, accessibilityDescription: nil) == nil
             ? (event.isOn ? "moon.fill" : "moon") : event.symbolName
@@ -360,14 +360,11 @@ final class AppModel {
                 insertedAt: Date(),
                 ttl: ActivityKind.focus.defaultTTL,
                 title: event.mode?.name ?? "Focus",
-                compactText: event.compactText,
+                compactText: event.isOn ? (event.mode?.name ?? "On") : "Off",
                 symbolName: symbol,
                 tint: event.isOn ? event.mode?.tintColorName.map { .system($0) } : nil
             )
         )
-        if let name = event.mode?.name {
-            showCaption(name, for: ActivityKind.focus.defaultTTL ?? NotchController.captionDuration)
-        }
         publish()
     }
 

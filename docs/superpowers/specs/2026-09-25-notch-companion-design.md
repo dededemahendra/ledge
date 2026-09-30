@@ -944,3 +944,11 @@ colour (`ActivityTint.system(name)` → `SystemTint`), the name in the caption,
 and a switch between Focuses reads as the new one coming on. Until the grant
 the size-based moon/On-Off stays, and the menu offers "Focus needs Full Disk
 Access…" opening the pane. The app never asks for the grant itself.
+
+**Name in the ear (2026-09-30, user's call).** The Focus's name replaces
+"On" in the trailing ear and the caption goes; "Off" stays "Off". Names run
+long, so the one-activity shape gained `oneActivity(earWidth:)`: the
+controller measures the leading activity's trailing text (11 pt medium, the
+`compactValue` font) and widens both ears to fit, from the 38 pt default up
+to 130 pt — the island stretches for content, as the Dynamic Island does.
+Texts of four characters or fewer never trigger it.

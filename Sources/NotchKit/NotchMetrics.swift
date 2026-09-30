@@ -56,14 +56,28 @@ public struct NotchMetrics: Sendable, Equatable {
         )
     }
 
-    public var oneActivity: NotchShapeParameters {
+    /// The ear beside the hole at one-activity size: 38 pt, room for a
+    /// 24 pt glyph or "100%" (32 pt).
+    public static let activityEarWidth: CGFloat = 38
+    /// How far an ear may stretch for a long trailing text before the
+    /// text is cut instead — about "Reduce Interruptions".
+    public static let activityEarMaximum: CGFloat = 130
+
+    public var oneActivity: NotchShapeParameters { oneActivity(earWidth: Self.activityEarWidth) }
+
+    /// One activity with ears at least `earWidth` wide (2026-09-30): a
+    /// Focus's name in the trailing ear stretches the island to fit, the
+    /// way the Dynamic Island stretches for content; everything else
+    /// leaves the default and the shape is the 255 pt island it was.
+    public func oneActivity(earWidth: CGFloat) -> NotchShapeParameters {
+        let ear = min(Self.activityEarMaximum, max(Self.activityEarWidth, earWidth))
         // Height tracks the hardware, not a literal: with a single activity the
         // island stays exactly notch-height. Hardcoding 32 would make the island
         // SHORTER than the cutout on a scaling mode with a taller notch, so it
         // would shrink at the moment it is supposed to grow and would stop
         // covering the hole.
-        NotchShapeParameters(
-            width: 255,
+        return NotchShapeParameters(
+            width: 255 + 2 * (ear - Self.activityEarWidth),
             height: notchRect.height,
             bottomRadius: 12,
             outerFillet: 6

@@ -682,3 +682,21 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
     #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
 }
+
+/// A Focus blip with a long name (2026-09-30): the island stretched to
+/// fit the trailing text — everything still inside it, nothing in the
+/// notch, the text not spilling past the ear.
+@MainActor
+@Test func aWideFocusBlipRendersInsideTheIslandAndClearOfTheNotch() {
+    let controller = makeController()
+    controller.setActivities(
+        [.init(id: "focus", title: "Reduce Interruptions", compactText: "Reduce Interruptions", symbolName: "moon.fill")],
+        overflow: 0
+    )
+    #expect(controller.parameters.width > controller.metrics.oneActivity.width)
+
+    let result = renderAndClassify(controller)
+    #expect(result.hasContentInsideIsland, "no content pixel inside \(result.islandBounds)")
+    #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
+    #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
+}
