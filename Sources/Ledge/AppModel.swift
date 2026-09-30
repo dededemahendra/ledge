@@ -9,6 +9,7 @@ import DeviceService
 import CalendarService
 import TimerService
 import FocusService
+import LedgeSettings
 import OSLog
 
 /// Consumes service streams, maintains the queue, drives the controller.
@@ -18,6 +19,7 @@ final class AppModel {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "model")
 
     private let presenter: NotchPresenter
+    let settings: AppSettings
     private let power = PowerService()
     private let hud = HUDService()
     private let media = MediaService()
@@ -44,7 +46,8 @@ final class AppModel {
     /// have no change hook of their own (review, 2026-09-29).
     private var statusFingerprint = ""
 
-    init(presenter: NotchPresenter) {
+    init(presenter: NotchPresenter, settings: AppSettings = AppSettings()) {
+        self.settings = settings
         self.presenter = presenter
     }
 
@@ -183,6 +186,9 @@ final class AppModel {
             self?.handle(intent)
         }
 
+        settings.onChange = { [weak self] in self?.applySettings() }
+        applySettings()
+
         // Expiry is driven here, not inside the queue, so the queue stays pure.
         // Built with `Timer(...)` + `RunLoop.main.add(forMode: .common)`,
         // not `Timer.scheduledTimer`, which only schedules on `.default` --
@@ -215,7 +221,43 @@ final class AppModel {
     /// the detail row, a glyph for the leading ear, an optional battery
     /// percentage for the trailing ear. Same id for every device event, so
     /// AirPods connecting right after a keyboard coalesces into one slot.
+    /// What cannot be checked at event time: the system HUD replacement,
+    /// the hover dwell, the calendar lead time, the login item. Everything
+    /// else is a `guard` where the event lands.
+    private func applySettings() {
+        hud.setSuppressStockOSD(settings.showsVolumeBrightness)
+        presenter.setHoverDwell(settings.hoverDwell)
+        calendar.setLeadTime(TimeInterval(settings.calendarLeadMinutes * 60))
+        LoginItem.setEnabled(settings.launchAtLogin)
+        onStatusChange?()
+    }
+
+    /// The Permissions pane's rows.
+    struct PermissionRow: Identifiable {
+        let id: String
+        let name: String
+        let detail: String
+        let isGranted: Bool
+        let settingsURL: URL?
+    }
+
+    var permissionRows: [PermissionRow] {
+        func pane(_ anchor: String) -> URL? { URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") }
+        return [
+            PermissionRow(id: "ax", name: "Accessibility",
+                          detail: "Replaces the system's volume and brightness overlay with the island.",
+                          isGranted: hud.systemHUDReplacement.isAvailable, settingsURL: pane("Privacy_Accessibility")),
+            PermissionRow(id: "cal", name: "Calendars and Reminders",
+                          detail: "Meeting and reminder blips, and the next item on hover.",
+                          isGranted: calendar.availability.isAvailable, settingsURL: pane("Privacy_Calendars")),
+            PermissionRow(id: "fda", name: "Full Disk Access",
+                          detail: "A Focus's own icon, colour and name. Without it: the moon and On/Off.",
+                          isGranted: focus.detail.isAvailable, settingsURL: pane("Privacy_AllFiles")),
+        ]
+    }
+
     private func handle(_ event: DeviceEvent) {
+        guard settings.showsDevices else { return }
         // The system's own product render for AirPods (`DeviceArtwork`),
         // read from disk here — one small file, once per route change —
         // rather than on the service's CoreAudio callback. Only Bluetooth
@@ -243,6 +285,7 @@ final class AppModel {
         // The display dims on battery and brightens on AC by itself; the
         // HUD service must not read that as a brightness key.
         hud.notePowerSourceChanged()
+        guard settings.showsBattery else { return }
         queue.insert(
             ActivityRecord(
                 id: ActivityKind.power.rawValue,
@@ -264,6 +307,11 @@ final class AppModel {
     /// presentational, and a side-table would need hand-maintained
     /// synchronisation with `insert`/coalesce/`prune` that no test covers.
     private func handle(_ event: HUDEvent) {
+        if case .capsLock = event {
+            guard settings.showsCapsLock else { return }
+        } else {
+            guard settings.showsVolumeBrightness else { return }
+        }
         queue.insert(
             ActivityRecord(
                 id: ActivityKind.hud.rawValue,
@@ -291,7 +339,7 @@ final class AppModel {
         // MediaRemote reports it. Falls into the nothing-playing branch so
         // the artwork, the panel and the position tick all go away too.
         guard payload.hasMedia, let title = payload.title,
-              MediaSourcePolicy.isAllowed(bundleIdentifier: payload.bundleIdentifier) else {
+              MediaSourcePolicy.isAllowed(bundleIdentifier: payload.bundleIdentifier, enabled: settings.mediaSources) else {
             queue.remove(kind: .media)
             presenter.controller.setMedia(nil)
             stopPositionTicking()
@@ -305,7 +353,9 @@ final class AppModel {
         // favourite star follows the track the same way.
         if title != captionedTitle {
             captionedTitle = title
-            showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
+            if settings.showsSongCaption {
+                showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
+            }
             favorites.trackChanged(bundleIdentifier: payload.bundleIdentifier)
         }
 
@@ -329,6 +379,7 @@ final class AppModel {
     /// lifetime, and a click that joins the call — or, with no call link,
     /// opens Calendar (`Self.openCalendarURL`, resolved in `handle(_:)`).
     private func handle(_ reminder: MeetingReminder) {
+        guard allowedCalendarKinds.contains(reminder.event.kind) else { return }
         queue.insert(
             ActivityRecord(
                 id: NotchController.calendarActivityID,   // == ActivityKind.calendar.rawValue
@@ -351,6 +402,7 @@ final class AppModel {
     /// Without the Focus database (Full Disk Access) it is the moon and
     /// On/Off. A symbol this macOS lacks falls back to the moon.
     private func handle(_ event: FocusEvent) {
+        guard settings.showsFocus else { return }
         let symbol = NSImage(systemSymbolName: event.symbolName, accessibilityDescription: nil) == nil
             ? (event.isOn ? "moon.fill" : "moon") : event.symbolName
         queue.insert(
@@ -374,13 +426,20 @@ final class AppModel {
         URL(string: kind == .event ? "ledge://calendar" : "ledge://reminders")!
     }
 
+    private var allowedCalendarKinds: Set<MeetingEvent.Kind> {
+        var kinds: Set<MeetingEvent.Kind> = []
+        if settings.showsCalendarEvents { kinds.insert(.event) }
+        if settings.showsReminders { kinds.insert(.reminder) }
+        return kinds
+    }
+
     /// The next event for the hover preview (`NotchController.upcoming`),
     /// refreshed on the 250 ms tick so the countdown stays honest while the
     /// cursor rests. The caption's time formatting is cached per event.
     private var upcomingCaption: (id: String, day: Date, text: String)?
     private func refreshUpcoming() {
         let now = Date()
-        guard let event = calendar.nextEvent(at: now) else {
+        guard let event = calendar.nextEvent(at: now, allowing: allowedCalendarKinds) else {
             presenter.setUpcoming(nil)
             return
         }
@@ -421,8 +480,24 @@ final class AppModel {
     /// The app's own timer that once lived behind this scheme was removed
     /// the same day at the user's request (the Clock's timers are what
     /// they wanted); the scheme stays registered for the probe alone.
+    /// The Settings window, opened by `ledge://settings` (Shortcuts, Raycast).
+    var onOpenSettings: (() -> Void)?
+    #if DEBUG
+    var onSnapshotSettings: ((URL) -> Void)?
+    #endif
+
     func openURL(_ url: URL) {
+        if url.scheme == "ledge", url.host() == "settings" {
+            onOpenSettings?()
+            return
+        }
         #if DEBUG
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/settings" {
+            let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
+            onSnapshotSettings?(dir)
+            Self.log.notice("probe: settings panes to \(dir.path, privacy: .public)")
+            return
+        }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/menubar" {
             let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -452,7 +527,7 @@ final class AppModel {
                 Self.log.notice("clock: unparsed records — \(self.clockOddities.joined(separator: "; "), privacy: .public)")
             }
         }
-        if let featured = snapshot.featured(at: now) {
+        if settings.showsClockTimers, let featured = snapshot.featured(at: now) {
             show(clockRecord(for: featured, at: now))
         } else if timerShown != nil {
             // Stopped or dismissed in the Clock.

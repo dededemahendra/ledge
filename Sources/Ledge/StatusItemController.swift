@@ -33,8 +33,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// returns it, so the caller can retitle it or set its checkmark as
     /// state changes.
     @discardableResult
-    func addItem(title: String, action: @escaping () -> Void) -> NSMenuItem {
-        let entry = makeItem(title: title, action: action)
+    func addItem(title: String, keyEquivalent: String = "", action: @escaping () -> Void) -> NSMenuItem {
+        let entry = makeItem(title: title, keyEquivalent: keyEquivalent, action: action)
         // The separator and Quit are always the last two items by
         // construction (`init` above), so "above them" is always here.
         menu.insertItem(entry, at: max(0, menu.items.count - 2))
@@ -72,8 +72,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         issueSeparator = separator
     }
 
-    private func makeItem(title: String, action: @escaping () -> Void) -> NSMenuItem {
-        let entry = NSMenuItem(title: title, action: #selector(Trampoline.fire), keyEquivalent: "")
+    private func makeItem(title: String, keyEquivalent: String = "", action: @escaping () -> Void) -> NSMenuItem {
+        let entry = NSMenuItem(title: title, action: #selector(Trampoline.fire), keyEquivalent: keyEquivalent)
         let trampoline = Trampoline(action)
         entry.target = trampoline
         // `target` is weak in AppKit's target-action pattern, so this strong

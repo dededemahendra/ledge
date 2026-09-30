@@ -21,6 +21,13 @@ public final class NotchPresenter {
     /// deliberate stop still feels immediate.
     public static let hoverDwell: TimeInterval = 0.2
     private var hover = HoverIntentTracker(dwell: NotchPresenter.hoverDwell)
+
+    /// Settings (2026-09-30): a new dwell starts a fresh tracker; a hover
+    /// in progress simply begins again.
+    public func setHoverDwell(_ seconds: TimeInterval) {
+        guard seconds != hover.dwell else { return }
+        hover = HoverIntentTracker(dwell: seconds)
+    }
     private var dwellTimer: Timer?
     /// Pending order-out after a collapse to `.hidden` — see
     /// `syncWindowToVisibility`.

@@ -23,3 +23,13 @@ public enum MediaSourcePolicy {
         return allowedBundleIdentifiers.contains(bundleIdentifier.lowercased())
     }
 }
+
+extension MediaSourcePolicy {
+    /// The allow-list narrowed to what the user switched on in Settings
+    /// (2026-09-30). "Music before Catalina" rides along with Music.
+    public static func isAllowed(bundleIdentifier: String?, enabled: Set<String>) -> Bool {
+        guard isAllowed(bundleIdentifier: bundleIdentifier), let id = bundleIdentifier?.lowercased() else { return false }
+        let key = id == "com.apple.itunes" ? "com.apple.music" : id
+        return enabled.contains(key)
+    }
+}

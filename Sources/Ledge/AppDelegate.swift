@@ -1,5 +1,6 @@
 import AppKit
 import NotchKit
+import LedgeSettings
 import OSLog
 
 @MainActor
@@ -9,19 +10,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
     private var presenter: NotchPresenter?
     private var model: AppModel?
+    private var settingsWindow: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        LoginItem.ensureRegistered()
+        let settings = AppSettings()
+        if settings.launchAtLogin { LoginItem.ensureRegistered() }
 
         let presenter = NotchPresenter()
         presenter.start()
         self.presenter = presenter
 
-        let model = AppModel(presenter: presenter)
+        let model = AppModel(presenter: presenter, settings: settings)
         model.start()
         self.model = model
 
+        let settingsWindow = SettingsWindowController(settings: settings, model: model)
+        self.settingsWindow = settingsWindow
+        model.onOpenSettings = { [weak settingsWindow] in settingsWindow?.show() }
+        #if DEBUG
+        model.onSnapshotSettings = { [weak settingsWindow] dir in
+            Task { @MainActor in await settingsWindow?.snapshotAll(to: dir) }
+        }
+        #endif
+
         let item = StatusItemController()
+        // Settings… above Quit (2026-09-30): the one other row the menu has.
+        item.addItem(title: "Settings…", keyEquivalent: ",") { [weak settingsWindow] in settingsWindow?.show() }
         // Just Quit (user's call, 2026-09-29). The panel opens on hover and
         // the system HUD replacement is simply on; neither needs a menu
         // item. Problem rows still appear above Quit when — and only when —

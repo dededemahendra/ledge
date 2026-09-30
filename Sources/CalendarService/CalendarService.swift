@@ -17,7 +17,7 @@ public final class CalendarService {
     public private(set) var availability: ServiceAvailability = .available
 
     /// How far ahead the first reminder fires.
-    public let leadTime: TimeInterval
+    public private(set) var leadTime: TimeInterval
 
     private let store = EKEventStore()
     private var policy: MeetingReminderPolicy
@@ -122,8 +122,17 @@ public final class CalendarService {
 
     /// The event under way or next up, for the hover preview
     /// (`NotchController.upcoming`). `nil` with nothing in the next day.
-    public func nextEvent(at now: Date) -> MeetingEvent? {
-        events.first { $0.end > now }
+    public func nextEvent(at now: Date, allowing kinds: Set<MeetingEvent.Kind> = [.event, .reminder]) -> MeetingEvent? {
+        events.first { $0.end > now && kinds.contains($0.kind) }
+    }
+
+    /// Settings (2026-09-30): a new lead time starts a fresh policy, so a
+    /// reminder already announced at five minutes may come again at ten.
+    public func setLeadTime(_ seconds: TimeInterval) {
+        guard seconds != leadTime else { return }
+        leadTime = seconds
+        policy = MeetingReminderPolicy(leadTime: seconds)
+        evaluate()
     }
 
     /// The next day of events and timed reminders, mapped to

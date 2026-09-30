@@ -952,3 +952,23 @@ controller measures the leading activity's trailing text (11 pt medium, the
 `compactValue` font) and widens both ears to fit, from the 38 pt default up
 to 130 pt — the island stretches for content, as the Dynamic Island does.
 Texts of four characters or fewer never trigger it.
+
+
+## Settings window (2026-09-30)
+
+**What.** "Settings…" (⌘, in the menu; `ledge://settings`) opens one window in
+System Settings' idiom: `NavigationSplitView`, a sidebar `List` of sections with
+white symbols on coloured rounded tiles, `Form` panes in `.grouped` style with
+headers and footers. Sections: General, Island, Media, Calendar, Permissions,
+About. Permissions lists each grant with what it unlocks and an "Open
+Settings…" button to the right pane, re-read every two seconds while showing.
+
+**How.** `LedgeSettings.AppSettings` — `@Observable`, `UserDefaults`-backed,
+every default "on" — is injected into `AppModel`. Blips are gated where their
+events land; what cannot be checked at event time (the system HUD replacement,
+the hover dwell, the calendar lead time, the login item) is re-applied on every
+change through `onChange`. Media sources narrow `MediaSourcePolicy`'s allow-list
+(`isAllowed(bundleIdentifier:enabled:)`). Debug builds answer
+`ledge://probe/settings` by writing each pane's display cache to
+`~/Library/Logs/Ledge` — the forms capture exactly; the sidebar's material does
+not (it needs the screen), so the sidebar is judged live.

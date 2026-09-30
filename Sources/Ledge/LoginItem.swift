@@ -33,6 +33,21 @@ enum LoginItem {
         }
     }
 
+    /// The Settings switch (2026-09-30): register or unregister.
+    static func setEnabled(_ enabled: Bool) {
+        let service = SMAppService.mainApp
+        if enabled {
+            ensureRegistered()
+        } else if service.status == .enabled || service.status == .requiresApproval {
+            do {
+                try service.unregister()
+                log.info("unregistered as a login item")
+            } catch {
+                log.error("login item unregistration failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
     /// A problem row for the menu, or `nil` when there is nothing to say.
     static var issue: (text: String, fix: () -> Void)? {
         switch SMAppService.mainApp.status {

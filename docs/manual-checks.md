@@ -1474,3 +1474,12 @@ and the plain moon.
 needs ~110 pt ears). Judge live: Do Not Disturb — indigo moon + "Do Not
 Disturb" in a wider island; Work — its symbol + "Work" at the usual width;
 off — "Off". Render test covers the wide blip.
+
+## Settings window (2026-09-30)
+
+Menu → Settings…: sidebar tiles (grey General, blue Island, pink Media, red
+Calendar, green Permissions, grey About), grouped forms. Captured every pane via
+`ledge://probe/settings` (display cache): forms correct in dark mode; the
+sidebar cannot be captured that way — judge live. Try: turn Battery off and
+plug in — no blip; set hover to "Immediately" — the island opens on contact;
+turn Volume and brightness off — the system's own overlay is back.

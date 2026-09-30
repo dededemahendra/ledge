@@ -69,6 +69,17 @@ card's favourite star, and **Calendars** and **Reminders** are asked once at
 launch for the meeting blip — declining either just leaves those items out, and
 the menu says so when both are refused.
 
+## Settings
+
+The menu bar icon's "Settings…" (or `open ledge://settings`) opens a window in
+System Settings' idiom: a sidebar of sections, grouped forms. General (launch at
+login, how long the cursor rests before the island opens, the song-change
+caption), Island (which blips show: keys, battery, devices, Focus, Clock timers,
+calendar events, reminders), Media (which music apps the island follows),
+Calendar (how many minutes before an event), Permissions (each grant, what it
+unlocks, a button to the right pane), About. Everything is on by default, as
+the app behaved before it had settings; changes apply at once.
+
 ## What it deliberately doesn't do
 
 - **Lock screen.** Wired and parked: on this macOS the lock screen is composited
