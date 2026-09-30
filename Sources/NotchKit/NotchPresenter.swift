@@ -200,8 +200,24 @@ public final class NotchPresenter {
     public func setLocked(_ locked: Bool) {
         isLocked = locked
         controller.setLocked(locked)
-        if !locked, window == nil { rebuildForCurrentScreen() }
+        if locked {
+            // Tuck into the notch; the window goes after the retract
+            // settles. Rarely seen under the lock screen's fade, but free.
+            controller.setTucked(true)
+            syncWindowToVisibility()
+            return
+        }
+        if window == nil { rebuildForCurrentScreen() }
+        // Unlock (user's call, 2026-10-01): come in tucked — the bare
+        // notch, invisible — then grow out on the next turn, so the island
+        // arrives with its pop instead of simply being there.
+        controller.setTucked(true)
         syncWindowToVisibility()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.isLocked else { return }
+            self.controller.setTucked(false)
+            self.syncWindowToVisibility()
+        }
     }
 
     /// Opens or collapses the panel on demand (e.g. the menu bar's "Toggle
@@ -342,15 +358,11 @@ public final class NotchPresenter {
         // not the dwell-promoted `controller.isHovered`: a click on a
         // visible island during the dwell must still land on it.
         window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside))
-        if isLocked {
-            // Hidden outright while the screen is locked (final, 2026-10-01:
-            // the shield level and `canBecomeVisibleWithoutLogin` were both
-            // tried live and macOS 27 covers them). Unlocking re-syncs and
-            // orders it straight in, state untouched.
-            hideTask?.cancel()
-            hideTask = nil
-            window.orderOut(nil)
-        } else if controller.isVisible {
+        // Nothing shows while locked (final, 2026-10-01: the shield level and
+        // `canBecomeVisibleWithoutLogin` were both tried live and macOS 27
+        // covers them); the window goes after the tuck's retract settles.
+        let shouldShow = controller.isVisible && !isLocked
+        if shouldShow {
             hideTask?.cancel()
             hideTask = nil
             window.orderFrontRegardless()
@@ -362,7 +374,7 @@ public final class NotchPresenter {
             // clicks fall through meanwhile; a hover returning cancels this.
             hideTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(NotchAnimation.hideSettle))
-                guard !Task.isCancelled, let self, !self.controller.isVisible else { return }
+                guard !Task.isCancelled, let self, !(self.controller.isVisible && !self.isLocked) else { return }
                 self.window?.orderOut(nil)
                 self.hideTask = nil
             }

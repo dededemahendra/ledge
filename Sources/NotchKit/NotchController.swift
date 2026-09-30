@@ -508,7 +508,18 @@ public final class NotchController {
         activities.first?.id == Self.deviceActivityID
     }
 
+    /// Tucked into the notch (2026-10-01): the shape is the bare notch
+    /// whatever the state, without the state changing. The presenter tucks
+    /// on lock and untucks on unlock, so the island grows back out of the
+    /// notch with the arrival pop instead of just being there.
+    public private(set) var isTucked = false
+
+    public func setTucked(_ tucked: Bool) {
+        isTucked = tucked
+    }
+
     public var parameters: NotchShapeParameters {
+        if isTucked { return metrics.collapsed }
         switch state {
         case .hidden:
             return metrics.collapsed

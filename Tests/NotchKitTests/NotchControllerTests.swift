@@ -704,3 +704,17 @@ private func someMedia() -> MediaPresentation {
     c.setCaption(String(repeating: "Supercalifragilistic ", count: 4) + "· Someone")
     #expect(c.parameters.width == NotchMetrics.captionedMaximumWidth, "capped at the card's width; the row truncates")
 }
+
+/// Tucked (2026-10-01): the bare notch whatever the state, the state
+/// itself untouched — the lock tucks, the unlock untucks into the pop.
+@MainActor
+@Test func tuckingDrawsTheBareNotchWithoutChangingState() {
+    let c = makeController()
+    c.setActivityCount(1)
+    #expect(c.parameters == c.metrics.oneActivity)
+    c.setTucked(true)
+    #expect(c.state == .activity && c.isVisible)
+    #expect(c.parameters == c.metrics.collapsed)
+    c.setTucked(false)
+    #expect(c.parameters == c.metrics.oneActivity)
+}
