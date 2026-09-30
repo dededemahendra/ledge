@@ -24,6 +24,9 @@ public final class CalendarService {
     private var events: [MeetingEvent] = []
     private var hasEvents = false
     private var hasReminders = false
+    /// Calendars and lists the user switched off in Settings (2026-09-30);
+    /// anything new is on until switched off.
+    private var disabledCalendarIDs: Set<String> = []
     private var reloadTask: Task<Void, Never>?
     private var continuation: AsyncStream<MeetingReminder>.Continuation?
     private var accessTask: Task<Void, Never>?
@@ -120,6 +123,45 @@ public final class CalendarService {
         }
     }
 
+    /// Every calendar and reminder list the store has, for the Settings
+    /// window. Empty until access is granted.
+    public func availableCalendars() -> [CalendarInfo] {
+        var list: [CalendarInfo] = []
+        if hasEvents {
+            list += store.calendars(for: .event).map { Self.info($0, kind: .event) }
+        }
+        if hasReminders {
+            list += store.calendars(for: .reminder).map { Self.info($0, kind: .reminder) }
+        }
+        return list
+    }
+
+    /// Settings: which calendars to leave out. Reloads at once.
+    public func setDisabledCalendars(_ ids: Set<String>) {
+        guard ids != disabledCalendarIDs else { return }
+        disabledCalendarIDs = ids
+        if hasEvents || hasReminders { reload() }
+    }
+
+    private static func info(_ calendar: EKCalendar, kind: CalendarInfo.Kind) -> CalendarInfo {
+        var color: CalendarInfo.RGB?
+        if let cg = calendar.cgColor, let ns = NSColor(cgColor: cg)?.usingColorSpace(.sRGB) {
+            color = CalendarInfo.RGB(red: Double(ns.redComponent), green: Double(ns.greenComponent), blue: Double(ns.blueComponent))
+        }
+        return CalendarInfo(
+            id: calendar.calendarIdentifier, title: calendar.title,
+            source: calendar.source?.title ?? "Other", kind: kind, color: color
+        )
+    }
+
+    /// The calendars a query covers: all but the disabled ones. `nil`
+    /// when none are left, so the query is skipped rather than run over
+    /// an empty list (which EventKit reads as "all").
+    private func enabledCalendars(for entity: EKEntityType) -> [EKCalendar]? {
+        let calendars = store.calendars(for: entity).filter { !disabledCalendarIDs.contains($0.calendarIdentifier) }
+        return calendars.isEmpty ? nil : calendars
+    }
+
     /// The event under way or next up, for the hover preview
     /// (`NotchController.upcoming`). `nil` with nothing in the next day.
     public func nextEvent(at now: Date, allowing kinds: Set<MeetingEvent.Kind> = [.event, .reminder]) -> MeetingEvent? {
@@ -146,14 +188,14 @@ public final class CalendarService {
             let from = now.addingTimeInterval(-3600), to = now.addingTimeInterval(24 * 3600)
             var items: [MeetingEvent] = []
             var eventCount = 0
-            if hasEvents {
-                let all = store.events(matching: store.predicateForEvents(withStart: from, end: to, calendars: nil))
+            if hasEvents, let calendars = enabledCalendars(for: .event) {
+                let all = store.events(matching: store.predicateForEvents(withStart: from, end: to, calendars: calendars))
                 eventCount = all.count
                 items += all.compactMap(MeetingEvent.init(ekEvent:))
             }
             var reminderCount = 0
-            if hasReminders {
-                let reminders = await fetchTimedReminders(from: from, to: to)
+            if hasReminders, let lists = enabledCalendars(for: .reminder) {
+                let reminders = await fetchTimedReminders(from: from, to: to, lists: lists)
                 reminderCount = reminders.count
                 items += reminders
             }
@@ -169,8 +211,8 @@ public final class CalendarService {
     /// unticked is due in the PAST, and only its rule says when it is next
     /// (see `ReminderOccurrences`). `fetchReminders` calls back off the
     /// main queue; only the mapped, `Sendable` values cross back.
-    private func fetchTimedReminders(from: Date, to: Date) async -> [MeetingEvent] {
-        let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: to, calendars: nil)
+    private func fetchTimedReminders(from: Date, to: Date, lists: [EKCalendar]) async -> [MeetingEvent] {
+        let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: to, calendars: lists)
         return await withCheckedContinuation { continuation in
             // `@Sendable`, hence nonisolated: EventKit invokes this on its
             // own search queue, and a closure formed inside a @MainActor

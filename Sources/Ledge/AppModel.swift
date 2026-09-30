@@ -228,9 +228,13 @@ final class AppModel {
         hud.setSuppressStockOSD(settings.showsVolumeBrightness)
         presenter.setHoverDwell(settings.hoverDwell)
         calendar.setLeadTime(TimeInterval(settings.calendarLeadMinutes * 60))
+        calendar.setDisabledCalendars(settings.disabledCalendarIDs)
         LoginItem.setEnabled(settings.launchAtLogin)
         onStatusChange?()
     }
+
+    /// The Calendar pane's list.
+    var availableCalendars: [CalendarInfo] { calendar.availableCalendars() }
 
     /// The Permissions pane's rows.
     struct PermissionRow: Identifiable {

@@ -29,11 +29,13 @@ private func fresh() -> (AppSettings, UserDefaults) {
     s.hoverDwell = 0.5
     s.setMediaSource("com.spotify.client", enabled: false)
     s.calendarLeadMinutes = 10
-    #expect(changes == 4)
+    s.setCalendar("holidays", enabled: false)
+    #expect(changes == 5)
 
     let again = AppSettings(defaults: defaults)
     #expect(!again.showsBattery)
     #expect(again.hoverDwell == 0.5)
     #expect(!again.isMediaSourceEnabled("com.spotify.client") && again.isMediaSourceEnabled("com.apple.music"))
     #expect(again.calendarLeadMinutes == 10)
+    #expect(!again.isCalendarEnabled("holidays") && again.isCalendarEnabled("anything-new"), "off is remembered; new calendars start on")
 }

@@ -22,6 +22,7 @@ public final class AppSettings {
         public static let showsClockTimers = "showsClockTimers"
         public static let mediaSources = "mediaSources"
         public static let calendarLeadMinutes = "calendarLeadMinutes"
+        public static let disabledCalendarIDs = "disabledCalendarIDs"
     }
 
     /// The music apps the island follows, by bundle identifier, with the
@@ -62,6 +63,9 @@ public final class AppSettings {
     /// Enabled music apps' bundle identifiers.
     public var mediaSources: Set<String> { didSet { save(Array(mediaSources).sorted(), Key.mediaSources) } }
     public var calendarLeadMinutes: Int { didSet { save(calendarLeadMinutes, Key.calendarLeadMinutes) } }
+    /// Calendars and reminder lists switched off, by identifier — so a
+    /// calendar added later is on until the user says otherwise.
+    public var disabledCalendarIDs: Set<String> { didSet { save(Array(disabledCalendarIDs).sorted(), Key.disabledCalendarIDs) } }
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -79,6 +83,13 @@ public final class AppSettings {
         mediaSources = (defaults.object(forKey: Key.mediaSources) as? [String]).map(Set.init)
             ?? Set(Self.knownMediaSources.map(\.id))
         calendarLeadMinutes = defaults.object(forKey: Key.calendarLeadMinutes) as? Int ?? 5
+        disabledCalendarIDs = Set((defaults.object(forKey: Key.disabledCalendarIDs) as? [String]) ?? [])
+    }
+
+    public func isCalendarEnabled(_ id: String) -> Bool { !disabledCalendarIDs.contains(id) }
+
+    public func setCalendar(_ id: String, enabled: Bool) {
+        if enabled { disabledCalendarIDs.remove(id) } else { disabledCalendarIDs.insert(id) }
     }
 
     public func isMediaSourceEnabled(_ id: String) -> Bool { mediaSources.contains(id) }

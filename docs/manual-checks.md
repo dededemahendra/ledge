@@ -1483,3 +1483,11 @@ Calendar, green Permissions, grey About), grouped forms. Captured every pane via
 sidebar cannot be captured that way — judge live. Try: turn Battery off and
 plug in — no blip; set hover to "Immediately" — the island opens on contact;
 turn Volume and brightness off — the system's own overlay is back.
+
+## Choosing calendars (2026-09-30)
+
+Settings › Calendar lists the Mac's calendars by account with colour dots and
+reminder lists below. Captured (display cache, tall window): a per-account
+`Section` inside `ForEach` rendered merged/duplicated; one section per kind with
+account label rows renders right. Judge live: switch a calendar off — its events
+stop blipping and leave the hover preview within a second.

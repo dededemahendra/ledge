@@ -972,3 +972,14 @@ change through `onChange`. Media sources narrow `MediaSourcePolicy`'s allow-list
 `ledge://probe/settings` by writing each pane's display cache to
 `~/Library/Logs/Ledge` — the forms capture exactly; the sidebar's material does
 not (it needs the screen), so the sidebar is judged live.
+
+**Choosing calendars (2026-09-30).** The Calendar pane lists every calendar and
+reminder list the store has (`CalendarService.availableCalendars()` →
+`CalendarInfo`: title, account, colour, kind), grouped by account, each with a
+switch. Settings persist the switched-OFF identifiers (`disabledCalendarIDs`) so
+a calendar added later is followed until the user says otherwise; the service
+passes the enabled `EKCalendar`s to both queries and skips a query with none
+left (EventKit reads an empty list as "all"). Layout note: sections generated in
+a loop misrendered in a grouped `Form` on macOS (merged cards, rows drawn
+twice, seen in captures), so the pane is one fixed section per kind with the
+account names as label rows inside.

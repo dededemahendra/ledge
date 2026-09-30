@@ -76,7 +76,9 @@ System Settings' idiom: a sidebar of sections, grouped forms. General (launch at
 login, how long the cursor rests before the island opens, the song-change
 caption), Island (which blips show: keys, battery, devices, Focus, Clock timers,
 calendar events, reminders), Media (which music apps the island follows),
-Calendar (how many minutes before an event), Permissions (each grant, what it
+Calendar (how many minutes before an event, and which calendars and reminder
+lists to follow — every one the Mac has, grouped by account with its colour; a
+calendar added later is on until switched off), Permissions (each grant, what it
 unlocks, a button to the right pane), About. Everything is on by default, as
 the app behaved before it had settings; changes apply at once.
 

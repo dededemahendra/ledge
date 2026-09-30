@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import LedgeSettings
+import CalendarService
 
 /// The Settings window (2026-09-30), in System Settings' idiom: a sidebar
 /// of sections with coloured icon tiles, grouped forms on the right. One
@@ -32,9 +33,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func snapshotAll(to directory: URL) async {
         show()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // Tall enough that no pane scrolls: a lazy list renders only what
+        // shows, and a half-laid-out section reads as a bug in a capture.
+        let usual = window?.contentView?.bounds.size
+        window?.setContentSize(NSSize(width: 740, height: 1100))
+        defer { if let usual { window?.setContentSize(usual) } }
+        try? await Task.sleep(for: .seconds(1.5))
         for section in SettingsSection.allCases {
             selection.section = section
-            try? await Task.sleep(for: .seconds(1.2))
+            try? await Task.sleep(for: .seconds(2.5))
+            window?.contentView?.layoutSubtreeIfNeeded()
+            window?.contentView?.displayIfNeeded()
             // The view's own display cache: the forms come out exactly; the
             // sidebar's translucent material does not (it needs the screen
             // to composite), and the window-image API is gone from this SDK.
@@ -138,7 +147,7 @@ struct SettingsView: View {
                 case .general:     GeneralSettings(settings: settings)
                 case .island:      IslandSettings(settings: settings)
                 case .media:       MediaSettings(settings: settings)
-                case .calendar:    CalendarSettings(settings: settings)
+                case .calendar:    CalendarSettings(settings: settings, model: model)
                 case .permissions: PermissionsSettings(model: model)
                 case .about:       AboutSettings()
                 }
@@ -260,8 +269,12 @@ private struct MediaSettings: View {
 
 private struct CalendarSettings: View {
     let settings: AppSettings
+    let model: AppModel
 
     var body: some View {
+        let calendars = model.availableCalendars
+        let events = CalendarInfo.grouped(calendars.filter { $0.kind == .event })
+        let lists = CalendarInfo.grouped(calendars.filter { $0.kind == .reminder })
         Form {
             Section {
                 Picker("Remind me before an event", selection: Binding(
@@ -274,6 +287,79 @@ private struct CalendarSettings: View {
                 }
             } footer: {
                 Text("And again as it starts. A click on the blip joins the call, or opens the event in Calendar or Reminders.")
+            }
+            if calendars.isEmpty {
+                Section {
+                    Text("Grant Calendars and Reminders access to choose which to follow.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            // One card per kind with the accounts as labels inside it —
+            // not a section per account: sections made in a loop render
+            // unreliably in a grouped Form on macOS (merged cards, rows
+            // drawn twice), and a fixed structure does not.
+            if !events.isEmpty {
+                Section {
+                    ForEach(events, id: \.source) { group in
+                        AccountLabel(group.source)
+                        ForEach(group.calendars) { calendar in
+                            CalendarToggle(calendar: calendar, settings: settings)
+                        }
+                    }
+                } header: {
+                    Text("Calendars")
+                } footer: {
+                    Text("A calendar added later is followed until you switch it off here.")
+                }
+            }
+            if !lists.isEmpty {
+                Section {
+                    ForEach(lists, id: \.source) { group in
+                        AccountLabel(group.source)
+                        ForEach(group.calendars) { list in
+                            CalendarToggle(calendar: list, settings: settings)
+                        }
+                    }
+                } header: {
+                    Text("Reminder lists")
+                } footer: {
+                    Text("Only reminders with a time of day are shown.")
+                }
+            }
+        }
+    }
+}
+
+/// An account's name as a quiet label row inside the card.
+private struct AccountLabel: View {
+    let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.top, 2)
+    }
+}
+
+/// One calendar row: its colour dot, its name, its switch. A calendar
+/// added later starts on.
+private struct CalendarToggle: View {
+    let calendar: CalendarInfo
+    let settings: AppSettings
+
+    var body: some View {
+        Toggle(isOn: Binding(
+            get: { settings.isCalendarEnabled(calendar.id) },
+            set: { settings.setCalendar(calendar.id, enabled: $0) }
+        )) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(calendar.color.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? Color.secondary)
+                    .frame(width: 9, height: 9)
+                Text(calendar.title)
             }
         }
     }
