@@ -405,13 +405,10 @@ private struct AboutSettings: View {
         return Form {
             Section {
                 HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black)
-                        Image(systemName: "rectangle.topthird.inset.filled")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(.white)
-                    }
-                    .frame(width: 56, height: 56)
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 64, height: 64)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Ledge").font(.title3.weight(.semibold))
                         Text("Version \(version)").foregroundStyle(.secondary)

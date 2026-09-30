@@ -41,10 +41,22 @@ bundle: build
 	mkdir -p "$(APPDIR)/Contents/MacOS" "$(APPDIR)/Contents/Resources"
 	cp "$(BUILDDIR)/$(APP)" "$(APPDIR)/Contents/MacOS/$(APP)"
 	cp -R Resources/mediaremote-adapter "$(APPDIR)/Contents/Resources/"
+	cp Resources/Ledge.icns "$(APPDIR)/Contents/Resources/Ledge.icns"
 	chmod +x "$(APPDIR)/Contents/Resources/mediaremote-adapter/MediaRemoteAdapterTestClient"
 	sed -e 's/@APP_NAME@/$(APP)/g' -e 's/@BUNDLE_ID@/$(BUNDLE)/g' \
 	    Info.plist.in > "$(APPDIR)/Contents/Info.plist"
 	printf 'APPL????' > "$(APPDIR)/Contents/PkgInfo"
+
+# Regenerates the app icon from scripts/make-icon.swift (2026-09-30).
+icon:
+	mkdir -p .build/icon/Ledge.iconset
+	swiftc -O -o .build/icon/make-icon scripts/make-icon.swift
+	.build/icon/make-icon .build/icon/icon-1024.png
+	for s in 16 32 128 256 512; do \
+	  sips -z $$s $$s .build/icon/icon-1024.png --out .build/icon/Ledge.iconset/icon_$${s}x$${s}.png >/dev/null; \
+	  sips -z $$((s*2)) $$((s*2)) .build/icon/icon-1024.png --out .build/icon/Ledge.iconset/icon_$${s}x$${s}@2x.png >/dev/null; \
+	done
+	iconutil -c icns .build/icon/Ledge.iconset -o Resources/Ledge.icns
 
 sign: bundle
 	codesign --force --sign "$(IDENTITY)" "$(APPDIR)"
