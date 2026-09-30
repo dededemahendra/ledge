@@ -188,14 +188,19 @@ public final class NotchPresenter {
         window = nil
     }
 
-    /// Screen locked/unlocked (`LockScreenObserver`). The window's level
-    /// and the controller's mode change together, then the usual resync —
-    /// which also orders the window in at its new level if there is
-    /// something to show. `NotchWindow.setLocked` existed from the start
-    /// but had no caller until 2026-09-28.
+    /// Screen locked/unlocked (`LockScreenObserver`). Nothing is drawn on
+    /// the lock screen (2026-10-01): macOS 27 composites the lock screen
+    /// over every user window, so raising the island there only ever
+    /// bought an unlock that collapsed a card the user never saw — ears
+    /// drawn outside a shrinking shape, then a window left out (user's
+    /// recording). Now the island is simply hidden while locked, its state
+    /// untouched, and shown again exactly as it was.
+    public private(set) var isLocked = false
+
     public func setLocked(_ locked: Bool) {
-        window?.setLocked(locked)
+        isLocked = locked
         controller.setLocked(locked)
+        if !locked, window == nil { rebuildForCurrentScreen() }
         syncWindowToVisibility()
     }
 
@@ -337,7 +342,13 @@ public final class NotchPresenter {
         // not the dwell-promoted `controller.isHovered`: a click on a
         // visible island during the dwell must still land on it.
         window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside))
-        if controller.isVisible {
+        if isLocked {
+            // Hidden outright while the screen is locked; no retract, no
+            // level change. Unlocking re-syncs and orders it straight in.
+            hideTask?.cancel()
+            hideTask = nil
+            window.orderOut(nil)
+        } else if controller.isVisible {
             hideTask?.cancel()
             hideTask = nil
             window.orderFrontRegardless()

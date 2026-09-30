@@ -716,11 +716,6 @@ public final class NotchController {
     private func recomputeState() {
         if isPinnedOpen {
             state = .expanded
-        } else if isLocked, media != nil {
-            // Lock screen: now-playing stays up, display-only (see
-            // `setLocked`). Above `isHovered` only for clarity — with the
-            // cursor also there the outcome is the same.
-            state = .expanded
         } else if isHovered, media != nil {
             state = .expanded
         } else if isHovered, panel == .calendar, calendarMode != nil {

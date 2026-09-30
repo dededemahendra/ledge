@@ -1548,3 +1548,12 @@ User: "still looks too hard". Light 30 pt date, tracked small caps at a red
 pulled toward white, regular-weight digits (weekend at 30%), today on a 92%
 disc, chips rounder (7 pt) on a 16% tint with the label mixed toward white,
 a touch more air. Rendered and checked.
+
+## Lock screen (2026-10-01)
+
+User's recording: after unlocking, the cover and glyph drew outside a
+shrinking island, then the island vanished. Cause: the forced lock-screen card
+(never visible on macOS 27) collapsing on unlock across a window-level change.
+Now the island is hidden outright while locked, state untouched, and shown
+again as it was. Judge live: lock with music playing, unlock — the compact
+island is simply there, no animation, no gap.

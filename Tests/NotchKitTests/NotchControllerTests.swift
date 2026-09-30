@@ -296,7 +296,10 @@ private func someMedia() -> MediaPresentation {
 // MARK: - Lock screen (spec §7)
 
 @MainActor
-@Test func lockingShowsTheNowPlayingPanelAndUnlockingRestoresTheCompactIsland() {
+/// Locking changes nothing about the state (2026-10-01): the presenter
+/// hides the window while locked and shows it again as it was, so an
+/// unlock never plays a collapse the user did not ask for.
+@Test func lockingLeavesTheStateAloneAndUnlockingRestoresIt() {
     let c = makeController()
     c.setMedia(someMedia())
     c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
@@ -304,8 +307,8 @@ private func someMedia() -> MediaPresentation {
 
     c.setLocked(true)
     #expect(c.isLocked)
-    #expect(c.state == .expanded, "on the lock screen the now-playing card is the whole point")
-    #expect(!c.isPinnedOpen, "a lock is not a pin: unlocking must close it")
+    #expect(c.state == .activity, "no card is forced open on the lock screen — macOS never shows it")
+    #expect(!c.isPinnedOpen)
 
     c.setLocked(false)
     #expect(c.state == .activity)

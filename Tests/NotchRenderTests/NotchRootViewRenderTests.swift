@@ -543,13 +543,13 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
         let c = makeController()
         c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
         c.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 30, duration: 200))
-        if locked { c.setLocked(true) } else { c.click() }
+        c.click()
+        if locked { c.setLocked(true) }   // a pinned card while locked is the display-only one
         return c
     }
 
     let locked = controller(locked: true)
     #expect(locked.state == .expanded)
-    #expect(!locked.isPinnedOpen)
 
     let result = renderAndClassify(locked)
     #expect(result.hasContentInsideIsland, "the display-only card did not render")
