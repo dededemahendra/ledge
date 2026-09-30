@@ -166,6 +166,8 @@ public final class NotchController {
         /// (red, low battery). `nil` is the island's white.
         public enum Tint: Sendable, Equatable {
             case positive, warning
+            /// An Apple system colour by name — see `SystemTint`.
+            case system(String)
         }
         public let tint: Tint?
         /// What a click on the blip opens while it shows — see
@@ -239,11 +241,16 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". Any other blip
     /// pre-empting the island takes it whole.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isFocusLeading)
     }
 
-    /// `AppModel` inserts the Focus blip with this id.
+    /// `AppModel` inserts the Focus blip with this id; with the Focus
+    /// database readable, its caption names the Focus.
     public static let focusActivityID = "focus"
+
+    public var isFocusLeading: Bool {
+        activities.first?.id == Self.focusActivityID
+    }
 
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"

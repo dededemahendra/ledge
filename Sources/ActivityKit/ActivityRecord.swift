@@ -6,6 +6,9 @@ import Foundation
 public enum ActivityTint: Sendable, Equatable {
     case positive
     case warning
+    /// One of Apple's system colours by its name ("systemIndigoColor",
+    /// "indigo"): a Focus's own tint (2026-09-30).
+    case system(String)
 }
 
 /// One thing the island is currently saying.

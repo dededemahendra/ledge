@@ -215,3 +215,12 @@ with one (each record ~630 bytes; a switch between Focuses rewrites at ±2
 bytes). `FocusService` polls its size once a second; `FocusSizeDeriver` turns
 a jump of ≥300 bytes up into "on", down into "off". The Focus's name is not
 available this way.
+
+**With Full Disk Access (2026-09-30).** `Assertions.json`:
+`data[].storeAssertionRecords[].assertionDetails.assertionDetailsModeIdentifier`
+names the active Focus. `ModeConfigurations.json`:
+`data[].modeConfigurations[<id>].mode.{name,symbolImageName,tintColorName}`;
+tint names are Apple's ("systemIndigoColor"), mapped in `NotchKit.SystemTint`.
+Parsed defensively (`FocusDatabase`); layout not yet observed on this Mac
+because the grant was pending when written — the first read logs "database
+readable" and any missing field simply yields the moon or white.

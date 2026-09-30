@@ -1,24 +1,49 @@
 import Foundation
 
-/// A Focus turning on or off. No name: the Focus database is behind Full
-/// Disk Access, and this app reads only what it can without asking for
-/// that — the SIZE of `~/Library/DoNotDisturb/DB/Assertions.json`, which
-/// `stat` reports freely (2026-09-30, macOS 27). The file is rewritten on
-/// every toggle; with no Focus it is ~1.27 KB, and each active assertion
-/// adds ~630 bytes. The direction of a size jump is the event.
+/// A Focus turning on or off, with the Focus itself when the database is
+/// readable (Full Disk Access) and without it otherwise — then the state
+/// comes from the size of `Assertions.json`, which `stat` reports freely
+/// (2026-09-30): ~1.27 KB with no Focus, ~630 bytes more per assertion.
 public enum FocusEvent: Sendable, Equatable {
-    case on
-    case off
+    case on(FocusMode?)
+    case off(FocusMode?)
 
-    public var symbolName: String { self == .on ? "moon.fill" : "moon" }
-    public var compactText: String { self == .on ? "On" : "Off" }
+    public var mode: FocusMode? {
+        switch self {
+        case .on(let m), .off(let m): return m
+        }
+    }
+
+    public var isOn: Bool {
+        if case .on = self { return true }
+        return false
+    }
+
+    /// The Focus's own symbol when known; the moon otherwise — filled on,
+    /// outlined off.
+    public var symbolName: String {
+        if let symbol = mode?.symbolName, !symbol.isEmpty { return symbol }
+        return isOn ? "moon.fill" : "moon"
+    }
+
+    public var compactText: String { isOn ? "On" : "Off" }
+
+    /// From the database: nothing → a Focus is on; a Focus → gone is off;
+    /// one Focus → another is the new one coming on; the same is nothing.
+    public static func transition(from previous: FocusMode?, to current: FocusMode?) -> FocusEvent? {
+        switch (previous, current) {
+        case (nil, let now?):                              return .on(now)
+        case (let before?, nil):                           return .off(before)
+        case (let before?, let now?) where before != now:  return .on(now)
+        default:                                           return nil
+        }
+    }
 }
 
-/// Turns successive file sizes into events. The first sample sets the
-/// baseline silently — a Focus already on at launch is not news — and
-/// only jumps of at least `recordSize` count: switching from one Focus to
-/// another rewrites the record at nearly the same size, and that is not
-/// a toggle.
+/// Turns successive file sizes into events when the database itself is
+/// off limits. The first sample sets the baseline silently — a Focus
+/// already on at launch is not news — and only jumps of at least
+/// `recordSize` count: switching Focuses rewrites at nearly the same size.
 public struct FocusSizeDeriver: Sendable, Equatable {
     /// Half a record: well clear of the few bytes a rewrite can shift.
     public static let recordSize = 300
@@ -31,8 +56,8 @@ public struct FocusSizeDeriver: Sendable, Equatable {
         defer { last = size }
         guard let last else { return nil }
         let delta = size - last
-        if delta >= Self.recordSize { return .on }
-        if delta <= -Self.recordSize { return .off }
+        if delta >= Self.recordSize { return .on(nil) }
+        if delta <= -Self.recordSize { return .off(nil) }
         return nil
     }
 }

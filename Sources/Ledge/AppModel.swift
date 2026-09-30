@@ -82,6 +82,13 @@ final class AppModel {
         if let login = LoginItem.issue {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
+        if case .needsPermission = focus.detail {
+            issues.append(Issue(text: "Focus needs Full Disk Access for its icon, colour and name…", fix: {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+                    NSWorkspace.shared.open(url)
+                }
+            }))
+        }
         if case .needsPermission = hud.systemHUDReplacement {
             issues.append(Issue(text: "System HUD needs Accessibility…", fix: {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
@@ -245,7 +252,7 @@ final class AppModel {
                 title: event.activityTitle,
                 compactText: event.compactText,
                 symbolName: event.symbolName,
-                tint: event.tint.map { $0 == .positive ? .positive : .warning }
+                tint: event.tint.map { $0 == .positive ? ActivityTint.positive : .warning }
             )
         )
         publish()
@@ -338,22 +345,29 @@ final class AppModel {
         publish()
     }
 
-    /// A Focus turning on or off (2026-09-30): the moon left, On/Off
-    /// right — the Caps Lock idiom. No name: the state comes from the
-    /// Focus database's file size, the one thing readable without Full
-    /// Disk Access (see `FocusService`).
+    /// A Focus turning on or off (2026-09-30): its own symbol in its own
+    /// colour with its name under the hole when the Focus database is
+    /// readable (Full Disk Access), the moon and On/Off otherwise — the
+    /// Caps Lock idiom either way. A symbol this macOS lacks falls back
+    /// to the moon.
     private func handle(_ event: FocusEvent) {
+        let symbol = NSImage(systemSymbolName: event.symbolName, accessibilityDescription: nil) == nil
+            ? (event.isOn ? "moon.fill" : "moon") : event.symbolName
         queue.insert(
             ActivityRecord(
                 id: NotchController.focusActivityID,
                 kind: .focus,
                 insertedAt: Date(),
                 ttl: ActivityKind.focus.defaultTTL,
-                title: "Focus",
+                title: event.mode?.name ?? "Focus",
                 compactText: event.compactText,
-                symbolName: event.symbolName
+                symbolName: symbol,
+                tint: event.isOn ? event.mode?.tintColorName.map { .system($0) } : nil
             )
         )
+        if let name = event.mode?.name {
+            showCaption(name, for: ActivityKind.focus.defaultTTL ?? NotchController.captionDuration)
+        }
         publish()
     }
 
@@ -620,7 +634,7 @@ final class AppModel {
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }
 
-        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus, focusStatus].joined(separator: "|")
+        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus, focusStatus, focus.detail.statusText].joined(separator: "|")
         if fingerprint != statusFingerprint {
             statusFingerprint = fingerprint
             onStatusChange?()
@@ -667,6 +681,14 @@ final class AppModel {
         }
     }
 
+    private static func displayTint(_ tint: ActivityTint) -> NotchController.ActivityDisplay.Tint {
+        switch tint {
+        case .positive:           return .positive
+        case .warning:            return .warning
+        case .system(let name):   return .system(name)
+        }
+    }
+
     private func publish() {
         let display = queue.visible.map { record in
             NotchController.ActivityDisplay(
@@ -677,7 +699,7 @@ final class AppModel {
                 symbolName: record.symbolName,
                 barFill: record.barFill,
                 artwork: record.artwork,
-                tint: record.tint.map { $0 == .positive ? .positive : .warning },
+                tint: record.tint.map(Self.displayTint),
                 url: record.url
             )
         }

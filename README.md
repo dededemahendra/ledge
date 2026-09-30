@@ -16,7 +16,7 @@ run anywhere else either.
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00–22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
-| A Focus turns on or off | moon left, "On"/"Off" right, 3 s (no name: read without Full Disk Access) |
+| A Focus turns on or off | with Full Disk Access granted: the Focus's own symbol in its own colour left, "On"/"Off" right, its name under the hole, 3 s; without it: the moon and On/Off |
 | An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |

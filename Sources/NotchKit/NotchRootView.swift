@@ -568,9 +568,10 @@ public struct NotchRootView: View {
         if NotchRenderTestHook.contentColor != nil { return nil }
         #endif
         switch tint {
-        case .positive?: return Color(nsColor: .systemGreen)
-        case .warning?:  return Color(nsColor: .systemRed)
-        case nil:        return nil
+        case .positive?:          return Color(nsColor: .systemGreen)
+        case .warning?:           return Color(nsColor: .systemRed)
+        case .system(let name)?:  return SystemTint.color(named: name).map { Color(nsColor: $0) }
+        case nil:                 return nil
         }
     }
 

@@ -1458,3 +1458,12 @@ Menu bar route dead (no item, no notification). Calibrated with a watcher
 while the user toggled: 1271 → 1902 → 1904 → 1267 → 1902 bytes. Now size-based:
 moon + On/Off, no name. Judge live: toggle a Focus — "On" / "Off" blips; the
 log line "focus on/off (assertions file N bytes)" confirms.
+
+## Focus icon and colour (2026-09-30)
+
+User wants the Focus's own icon and colour. Needs Full Disk Access: System
+Settings › Privacy & Security › Full Disk Access › add dist/Ledge.app, then
+relaunch. Judge live: toggle Do Not Disturb — indigo moon + "On" + "Do Not
+Disturb" under the hole; a custom Focus — its symbol in its colour and its
+name; switch Focuses — the new one blips on. Without the grant: the menu row
+and the plain moon.

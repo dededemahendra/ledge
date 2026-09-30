@@ -933,3 +933,14 @@ and `FocusEventDeriver` turns presence into transitions. `ActivityKind.focus` =
 45: under the device blip, over notifications. If the user hides the Focus item
 from the menu bar, the blip has nothing to read; the menu's Accessibility row
 covers the missing grant.
+
+**Focus, with the database (2026-09-30).** The user wants the Focus's own icon
+and colour, as Control Center shows them. Those live only in
+`~/Library/DoNotDisturb/DB/ModeConfigurations.json` (`mode.symbolImageName`,
+`mode.tintColorName`, `mode.name`), and which Focus is on only in
+`Assertions.json` — both behind Full Disk Access. So: `FocusDatabaseReader`
+reads them when it can; then the blip is the symbol tinted with the system
+colour (`ActivityTint.system(name)` → `SystemTint`), the name in the caption,
+and a switch between Focuses reads as the new one coming on. Until the grant
+the size-based moon/On-Off stays, and the menu offers "Focus needs Full Disk
+Access…" opening the pane. The app never asks for the grant itself.
