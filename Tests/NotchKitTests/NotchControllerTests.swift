@@ -627,3 +627,40 @@ private func someMedia() -> MediaPresentation {
     c.setActivities([.init(id: "focus", title: "x", compactText: String(repeating: "Interruptions ", count: 6), symbolName: "moon.fill")], overflow: 0)
     #expect(c.parameters.width == c.metrics.oneActivity(earWidth: NotchMetrics.activityEarMaximum).width, "capped")
 }
+
+/// Modes of the open card (2026-09-30): a swipe moves between now-playing
+/// and the calendar; on the preview it opens the calendar; leaving resets.
+@MainActor
+@Test func aSwipeMovesBetweenTheCardsModesAndOpensTheCalendarFromThePreview() {
+    let c = makeController()
+    let item = UpcomingEvent(title: "Standup", compactText: "42m", caption: "Standup · 10:00", when: "10:00–10:15", url: nil)
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.setHovered(true)
+    #expect(c.state == .expanded && c.panel == .media)
+    #expect(!c.swipe(.next), "one mode only: not taken, so the presenter skips the track")
+
+    c.setAgenda([item])
+    #expect(c.availablePanels == [.media, .calendar])
+    #expect(c.swipe(.next) && c.panel == .calendar && c.state == .expanded)
+    #expect(c.swipe(.next) && c.panel == .calendar, "at the last mode: taken, nothing moves, no skip")
+    #expect(c.swipe(.previous) && c.panel == .media)
+    c.setHovered(false)
+    c.setHovered(true)
+    _ = c.swipe(.next)
+    c.setHovered(false)
+    #expect(c.panel == .media, "leaving resets to now-playing")
+
+    // Nothing playing: the preview swipes open into the calendar mode.
+    let d = makeController()
+    d.setUpcoming(item)
+    d.setAgenda([item])
+    d.setHovered(true)
+    #expect(d.state == .peek && d.isPreviewingUpcoming)
+    #expect(d.swipe(.next) && d.state == .expanded && d.panel == .calendar)
+    #expect(d.parameters == d.metrics.expanded)
+    d.setHovered(false)
+    #expect(d.state == .hidden && d.panel == .media)
+    d.setAgenda([])
+    #expect(d.availablePanels.isEmpty)
+}

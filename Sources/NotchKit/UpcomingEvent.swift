@@ -13,15 +13,18 @@ public struct UpcomingEvent: Sendable, Equatable {
     public let compactText: String
     /// The caption line: "Title · 14:00".
     public let caption: String
+    /// The time alone, for a list row: "14:00–14:30", "Tomorrow at 06:15".
+    public let when: String
     /// What a click opens: the join link, or the app model's open-Calendar
     /// stand-in.
     public let url: URL?
 
-    public init(title: String, symbolName: String = "calendar", compactText: String, caption: String, url: URL?) {
+    public init(title: String, symbolName: String = "calendar", compactText: String, caption: String, when: String = "", url: URL?) {
         self.title = title
         self.symbolName = symbolName
         self.compactText = compactText
         self.caption = caption
+        self.when = when
         self.url = url
     }
 }

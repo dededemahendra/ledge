@@ -436,14 +436,31 @@ final class AppModel {
     /// refreshed on the 250 ms tick so the countdown stays honest while the
     /// cursor rests. The caption's time formatting is cached per event.
     private var upcomingCaption: (id: String, day: Date, text: String)?
+    private var agendaTexts: [String: (day: Date, caption: String, when: String)] = [:]
+
     private func refreshUpcoming() {
         let now = Date()
+        let day = Calendar.current.startOfDay(for: now)
+        // The card's calendar mode: the next four, texts cached per item and day.
+        let list = calendar.upcoming(at: now, limit: 4, allowing: allowedCalendarKinds)
+        presenter.setAgenda(list.map { event in
+            if agendaTexts[event.id]?.day != day {
+                agendaTexts[event.id] = (day, event.captionText(at: now), event.whenText(at: now))
+            }
+            let texts = agendaTexts[event.id]!
+            return UpcomingEvent(
+                title: event.title, symbolName: event.symbolName, compactText: event.countdownText(at: now),
+                caption: texts.caption, when: texts.when,
+                url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind)
+            )
+        })
+        if agendaTexts.count > 64 { agendaTexts = [:] }
+
         guard let event = calendar.nextEvent(at: now, allowing: allowedCalendarKinds) else {
             presenter.setUpcoming(nil)
             return
         }
         // Keyed on the day too: "Tomorrow at 06:15" becomes "06:15" at midnight.
-        let day = Calendar.current.startOfDay(for: now)
         if upcomingCaption?.id != event.id || upcomingCaption?.day != day {
             upcomingCaption = (event.id, day, event.captionText(at: now))
         }

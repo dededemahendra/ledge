@@ -371,6 +371,13 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    /// The card's calendar mode rows; can change the card's shape.
+    public func setAgenda(_ items: [UpcomingEvent]) {
+        guard items != controller.agenda else { return }
+        controller.setAgenda(items)
+        syncWindowToVisibility()
+    }
+
     /// A song-change caption (`NotchController.caption`) grows the island,
     /// so it goes through the presenter for the window resync.
     public func setCaption(_ caption: String?) {
@@ -379,11 +386,18 @@ public final class NotchPresenter {
     }
 
     private func handleSwipe(deltaX: CGFloat, phase: SwipeToSkipTracker.Phase, invertedFromDevice: Bool) {
-        guard controller.isVisible, controller.media != nil else { return }
+        guard controller.isVisible else { return }
         guard let direction = swipe.track(deltaX: deltaX, phase: phase, invertedFromDevice: invertedFromDevice) else { return }
+        // Modes first (2026-09-30): on the open card the swipe changes mode;
+        // on the preview it opens the calendar. Only the compact island
+        // with music still skips a track.
+        if controller.swipe(direction) {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            syncWindowToVisibility()
+            return
+        }
+        guard controller.media != nil else { return }
         controller.emit(direction == .next ? .next : .previous)
-        // Feedback on the commit, like the scrubber's: the glyph in the
-        // ear and one haptic. Then the artwork comes back.
         controller.setSkipHint(direction == .next ? .next : .previous)
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         skipHintTask?.cancel()

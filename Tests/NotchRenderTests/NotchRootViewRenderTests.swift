@@ -700,3 +700,19 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
     #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
 }
+
+/// The calendar mode (2026-09-30): four rows and the dots, inside the
+/// island, clear of the notch.
+@MainActor
+@Test func calendarModeRendersInsideTheIslandAndClearOfTheNotch() {
+    let controller = makeController()
+    controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    controller.setAgenda((1...4).map { UpcomingEvent(title: "Item \($0)", compactText: "\($0)h", caption: "Item \($0) · 1\($0):00", when: "1\($0):00–1\($0):30", url: nil) })
+    controller.setHovered(true)
+    #expect(controller.swipe(.next) && controller.panel == .calendar)
+    let result = renderAndClassify(controller)
+    #expect(result.hasContentInsideIsland)
+    #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
+    #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
+}

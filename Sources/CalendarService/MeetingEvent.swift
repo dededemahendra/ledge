@@ -73,6 +73,14 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
     public func captionText(
         at now: Date = Date(), locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent
     ) -> String {
+        "\(title) · \(whenText(at: now, locale: locale, timeZone: timeZone))"
+    }
+
+    /// The time alone: "21:00–22:00", "06:15", "Tomorrow 09:00–10:00",
+    /// "Tomorrow at 06:15", "1 Oct 2026 09:00–10:00".
+    public func whenText(
+        at now: Date = Date(), locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = locale
         calendar.timeZone = timeZone
@@ -85,19 +93,19 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
             ? "\(time.string(from: start))–\(time.string(from: end))"
             : time.string(from: start)
         if calendar.isDate(start, inSameDayAs: now) {
-            return "\(title) · \(when)"
+            return when
         }
         // Relative to `now`, not to the wall clock (which is all
         // `doesRelativeDateFormatting` knows), so this stays testable.
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(start, inSameDayAs: tomorrow) {
-            return kind == .event ? "\(title) · Tomorrow \(when)" : "\(title) · Tomorrow at \(when)"
+            return kind == .event ? "Tomorrow \(when)" : "Tomorrow at \(when)"
         }
         let day = DateFormatter()
         day.locale = locale
         day.timeZone = timeZone
         day.dateStyle = .medium
         day.timeStyle = .none
-        return "\(title) · \(day.string(from: start)) \(when)"
+        return "\(day.string(from: start)) \(when)"
     }
 }
 

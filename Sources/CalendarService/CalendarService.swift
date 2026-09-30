@@ -168,6 +168,11 @@ public final class CalendarService {
         events.first { $0.end > now && kinds.contains($0.kind) }
     }
 
+    /// The next few, for the card's calendar mode.
+    public func upcoming(at now: Date, limit: Int, allowing kinds: Set<MeetingEvent.Kind> = [.event, .reminder]) -> [MeetingEvent] {
+        Array(events.lazy.filter { $0.end > now && kinds.contains($0.kind) }.prefix(limit))
+    }
+
     /// Settings (2026-09-30): a new lead time starts a fresh policy, so a
     /// reminder already announced at five minutes may come again at ten.
     public func setLeadTime(_ seconds: TimeInterval) {

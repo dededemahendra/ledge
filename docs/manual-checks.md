@@ -1506,3 +1506,11 @@ with a two-second override. Judge live: the bar moves continuously and the
 times flip exactly on the second; press pause — the bar and the disc stop on
 the click, not a beat later; drag the bar — it lands where released and stays
 there while the player catches up; skip — the bar drops to 0 at once.
+
+## Card modes (2026-09-30)
+
+Two-finger swipe on the open music card → "Up next" list with dots; swipe
+back → the card; at the last mode a swipe does nothing (never a skip). With
+nothing playing, swipe on the preview → Up next. Leaving resets to now-playing.
+Rendered the calendar mode headlessly: header, four rows, dots. Judge live for
+the swipe feel and that a row click opens the item.

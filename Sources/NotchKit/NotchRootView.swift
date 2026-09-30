@@ -547,6 +547,10 @@ public struct NotchRootView: View {
                     .transition(BlurReplaceTransition(configuration: .downUp).combined(with: OffsetTransition(CGSize(width: 0, height: 6))))
             } else if parameters.height > notch.height + 8 {
                 detailRow
+                    // Mode changes crossfade (2026-09-30); the dots say
+                    // which mode this is when there is more than one.
+                    .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: controller.panel)
+                    .overlay(alignment: .bottom) { panelDots }
                     .frame(maxWidth: .infinity)
                     // `alignment: .top`, not the default `.center`: content
                     // taller than its budget must overflow DOWNWARD, where
@@ -995,8 +999,34 @@ public struct NotchRootView: View {
     /// fighting it: `leadingEar` now yields its artwork slot entirely at
     /// `.expanded` (see its media branch), so the pair really is a transient
     /// insert/remove hand-off, which is the case hero semantics are for.
+    /// Two 4 pt dots at the card's foot when both modes exist, the current
+    /// one lit — the phone's page control, at island scale.
+    @ViewBuilder private var panelDots: some View {
+        let panels = controller.availablePanels
+        if panels.count > 1 {
+            HStack(spacing: 5) {
+                ForEach(Array(panels.enumerated()), id: \.offset) { _, panel in
+                    Circle()
+                        .fill(contentColor.opacity(panel == controller.panel ? 0.9 : 0.3))
+                        .frame(width: 4, height: 4)
+                }
+            }
+            .padding(.bottom, 5)
+            .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: controller.panel)
+        }
+    }
+
     @ViewBuilder private var detailRow: some View {
-        if controller.state == .expanded, let media = controller.media {
+        if controller.state == .expanded, controller.panel == .calendar, !controller.agenda.isEmpty {
+            // The calendar mode (2026-09-30).
+            CalendarPanelView(
+                items: controller.agenda, contentColor: contentColor,
+                reduceMotion: controller.reduceMotion, emit: { controller.emit($0) }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .id("calendar")
+            .transition(.blurReplace)
+        } else if controller.state == .expanded, let media = controller.media {
             MediaPanelView(
                 media: media,
                 reduceMotion: controller.reduceMotion,
@@ -1017,6 +1047,8 @@ public struct NotchRootView: View {
             // is unchanged: the call-site budget frame is still top-aligned,
             // so anything past the budget clips downward, never into the ears.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .id("media")
+            .transition(.blurReplace)
         } else {
             // Unreachable in practice since 2026-09-29: `.expanded` is only
             // ever the now-playing card (`NotchController.click()` needs

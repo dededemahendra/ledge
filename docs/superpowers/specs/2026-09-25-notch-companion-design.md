@@ -1019,3 +1019,22 @@ on reports and actions. Play/pause, seek and skip are optimistic:
 last report until the adapter reports something at least as new, or for two
 seconds — so the card moves the instant the user acts, and an unrelated report
 in between (artwork) cannot snap it back.
+
+
+## Modes of the open card (2026-09-30)
+
+**What.** The open card has modes, moved between with a two-finger horizontal
+swipe: now-playing, and "Up next" — the next four events and reminders
+(`CalendarPanelView`: glyph, title, when; each row opens the item through the
+same link pipeline as the blip). Two 4 pt dots at the card's foot show which
+mode is current when there are two. With nothing playing, a swipe on the
+next-item preview opens Up next directly. Leaving or unpinning puts the card
+back on now-playing. On the compact island with music a swipe still skips the
+track; on the open card it never does (a swipe at the last mode is taken and
+nothing moves).
+
+**How.** `NotchController.panel` / `agenda` / `availablePanels` / `swipe(_:)`;
+`recomputeState` opens `.expanded` for the calendar mode when hovered with an
+agenda; the output picker only lives in the media mode. `AppModel.refreshUpcoming`
+feeds the agenda (four items, texts cached per item and day) beside the
+preview. Modes crossfade (`.blurReplace`) on the panel change.

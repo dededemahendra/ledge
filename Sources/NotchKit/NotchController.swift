@@ -319,6 +319,57 @@ public final class NotchController {
         state == .peek && upcoming != nil
     }
 
+    // MARK: - Modes of the open card (2026-09-30)
+
+    /// What the open card shows: the now-playing card, or the calendar's
+    /// "Up next" list. A two-finger swipe moves between the ones available.
+    public enum Panel: Sendable, Equatable {
+        case media, calendar
+    }
+
+    public private(set) var panel: Panel = .media
+
+    /// The calendar mode's rows; empty means no calendar mode.
+    public private(set) var agenda: [UpcomingEvent] = []
+
+    public func setAgenda(_ items: [UpcomingEvent]) {
+        guard items != agenda else { return }
+        agenda = items
+        if agenda.isEmpty, panel == .calendar { panel = .media }
+        recomputeState()
+    }
+
+    /// The modes there are right now, in swipe order.
+    public var availablePanels: [Panel] {
+        var panels: [Panel] = []
+        if media != nil { panels.append(.media) }
+        if !agenda.isEmpty { panels.append(.calendar) }
+        return panels
+    }
+
+    /// A two-finger swipe. On the open card, the next or previous mode; on
+    /// the next-item preview, the calendar mode. Returns whether the
+    /// swipe was taken — otherwise the presenter treats it as a track skip.
+    /// At the last mode a swipe is taken and nothing moves: a swipe on the
+    /// card never skips a track by accident.
+    public func swipe(_ direction: SwipeToSkipTracker.Direction) -> Bool {
+        let panels = availablePanels
+        if state == .expanded, panels.count > 1, let index = panels.firstIndex(of: panel) {
+            let target = direction == .next ? index + 1 : index - 1
+            if panels.indices.contains(target) {
+                panel = panels[target]
+                recomputeState()
+            }
+            return true
+        }
+        if isPreviewingUpcoming, !agenda.isEmpty {
+            panel = .calendar
+            recomputeState()
+            return true
+        }
+        return false
+    }
+
     /// What the caption line under the hole says right now, if anything:
     /// the song/meeting caption at activity size, or the previewed event.
     public var captionText: String? {
@@ -453,12 +504,15 @@ public final class NotchController {
             // media itself leads.
             return hasCaption ? metrics.captioned : metrics.oneActivity(earWidth: leadingEarWidth)
         case .expanded:
-            return metrics.expanded(outputRows: isOutputPickerOpen ? outputs.count : 0)
+            return metrics.expanded(outputRows: panel == .media && isOutputPickerOpen ? outputs.count : 0)
         }
     }
 
     public func setHovered(_ hovered: Bool) {
         isHovered = hovered
+        // Leaving puts the card back on now-playing for next time, unless
+        // it is pinned where it is.
+        if !hovered, !isPinnedOpen { panel = .media }
         recomputeState()
     }
 
@@ -538,6 +592,7 @@ public final class NotchController {
     public func dismiss() {
         guard state == .expanded else { return }
         isPinnedOpen = false
+        panel = .media
         state = .hidden          // recomputeState restores peek/activity if warranted
         recomputeState()
     }
@@ -649,6 +704,9 @@ public final class NotchController {
             state = .expanded
         } else if isHovered, media != nil {
             state = .expanded
+        } else if isHovered, panel == .calendar, !agenda.isEmpty {
+            // The calendar mode, swiped open from the preview.
+            state = .expanded
         } else if activityCount > 0 {
             state = .activity
         } else if isHovered {
@@ -656,6 +714,6 @@ public final class NotchController {
         } else {
             state = .hidden
         }
-        if state != .expanded { isOutputPickerOpen = false }
+        if state != .expanded || panel != .media { isOutputPickerOpen = false }
     }
 }
