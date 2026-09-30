@@ -711,10 +711,10 @@ public struct NotchRootView: View {
             // their symbols below.
             ZStack {
                 Circle()
-                    .stroke(contentColor.opacity(0.25), lineWidth: 2)
+                    .stroke((tintColor(for: activity.tint) ?? contentColor).opacity(0.25), lineWidth: 2)
                 Circle()
                     .trim(from: 0, to: fill)
-                    .stroke(contentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .stroke(tintColor(for: activity.tint) ?? contentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     // Ticks arrive every quarter second; ease between them
                     // so the ring drains, not steps.
@@ -821,10 +821,11 @@ public struct NotchRootView: View {
         .fixedSize()
     }
 
-    private func compactValue(_ compact: String, bump: Bool = true) -> some View {
+    private func compactValue(_ compact: String, bump: Bool = true, color: Color? = nil) -> some View {
         Text(compact)
             .font(.system(size: 11, weight: .medium))
             .monospacedDigit()
+            .foregroundStyle(color ?? contentColor)
             .lineLimit(1)
             // Never truncate: the ear (38pt) holds the widest label ("100%",
             // 32pt), but the numeric transition below re-measures the text
@@ -949,7 +950,9 @@ public struct NotchRootView: View {
             } else if let compact = activity.compactText {
                 // A ticking clock must not bump every second; its digits
                 // still roll.
-                compactValue(compact, bump: activity.id != NotchController.timerActivityID)
+                // The Clock's timer is orange end to end, as on the phone
+                // (2026-10-01): its digits take the record's tint too.
+                compactValue(compact, bump: activity.id != NotchController.timerActivityID, color: tintColor(for: activity.tint))
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {

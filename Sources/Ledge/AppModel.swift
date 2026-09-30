@@ -581,6 +581,8 @@ final class AppModel {
                 compactText: fired ? "Done" : TimerText.format(seconds: remaining.rounded(.up)),
                 symbolName: fired ? "timer" : (timer.isRunning ? "stopwatch" : "pause.fill"),
                 barFill: timer.isRunning && !fired ? (timer.fraction(at: now) * 200).rounded() / 200 : nil,
+                // Orange, the phone's own timer colour (2026-10-01).
+                tint: .system("orange"),
                 url: URL(string: "clock-timer://")
             )
         case .stopwatch(let watch):
@@ -589,6 +591,7 @@ final class AppModel {
                 title: "Stopwatch",
                 compactText: TimerText.format(seconds: watch.elapsed(at: now).rounded(.down)),
                 symbolName: "stopwatch",
+                tint: .system("orange"),
                 url: URL(string: "clock-stopwatch://")
             )
         }
