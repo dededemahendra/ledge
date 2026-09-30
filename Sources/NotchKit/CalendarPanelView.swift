@@ -11,8 +11,10 @@ struct CalendarPanelView: View {
     let reduceMotion: Bool
     let emit: (NotchIntent) -> Void
 
-    private let cell = CGSize(width: 22, height: 15)
-    private var accent: Color { Color(nsColor: .systemRed) }
+    private let cell = CGSize(width: 22, height: 16)
+    /// Softer than the system red (2026-10-01, user's call: "too hard"):
+    /// pulled a little toward white, used at less than full strength.
+    private var accent: Color { Color(nsColor: .systemRed).mix(with: .white, by: 0.2) }
 
     /// The reveal (2026-09-30): the date first, then the chips one by one,
     /// then the grid row by row — each rising 6 pt as it fades in, on the
@@ -37,11 +39,11 @@ struct CalendarPanelView: View {
         HStack(alignment: .top, spacing: 0) {
             todayColumn
                 .padding(.leading, 16)
-                .padding(.top, 6)
+                .padding(.top, 8)
             Spacer(minLength: 8)
             grid
                 .padding(.trailing, 14)
-                .padding(.top, 6)
+                .padding(.top, 8)
         }
         .foregroundStyle(contentColor)
         .onAppear { revealed = true }
@@ -50,13 +52,15 @@ struct CalendarPanelView: View {
     private var todayColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
             reveal(Text(data.weekdayTitle)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(accent), order: 0)
+                .font(.system(size: 9.5, weight: .medium))
+                .tracking(0.6)
+                .foregroundStyle(accent.opacity(0.9)), order: 0)
             reveal(Text("\(data.dayNumber)")
-                .font(.system(size: 30, weight: .regular, design: .rounded))
+                .font(.system(size: 30, weight: .light, design: .rounded))
                 .monospacedDigit()
+                .foregroundStyle(contentColor.opacity(0.95))
                 .frame(height: 32), order: 0)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(data.items.prefix(3).enumerated()), id: \.offset) { index, item in
                     reveal(chip(item), order: 1 + index)
                 }
@@ -73,32 +77,33 @@ struct CalendarPanelView: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: item.symbolName)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 9, weight: .medium))
                 Text(item.title)
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 10.5, weight: .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(color.mix(with: .white, by: 0.35))
-            .padding(.horizontal, 7)
-            .frame(height: 18)
+            .foregroundStyle(color.mix(with: .white, by: 0.55))
+            .padding(.horizontal, 8)
+            .frame(height: 20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color.opacity(0.28), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(ListRowButtonStyle(reduceMotion: reduceMotion))
     }
 
     private var grid: some View {
-        VStack(alignment: .trailing, spacing: 1) {
+        VStack(alignment: .trailing, spacing: 2) {
             reveal(Text(data.monthShort)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(accent)
+                .font(.system(size: 9.5, weight: .medium))
+                .tracking(0.6)
+                .foregroundStyle(accent.opacity(0.9))
                 .frame(height: 14), order: 0)
             reveal(HStack(spacing: 0) {
                 ForEach(Array(data.weekdaySymbols.enumerated()), id: \.offset) { index, symbol in
                     Text(symbol)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(contentColor.opacity(data.weekendColumns[index] ? 0.35 : 0.9))
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .foregroundStyle(contentColor.opacity(data.weekendColumns[index] ? 0.25 : 0.5))
                         .frame(width: cell.width, height: 12)
                 }
             }, order: 1)
@@ -118,15 +123,15 @@ struct CalendarPanelView: View {
                 let isToday = day == data.today
                 let marked = data.markedDays.contains(day)
                 if isToday {
-                    Circle().fill(contentColor).frame(width: 15, height: 15)
+                    Circle().fill(contentColor.opacity(0.92)).frame(width: 16, height: 16)
                 }
                 Text("\(day)")
-                    .font(.system(size: 9.5, weight: .bold))
+                    .font(.system(size: 10, weight: isToday ? .semibold : .regular))
                     .monospacedDigit()
                     .foregroundStyle(
                         isToday ? Color.black
-                        : marked ? accent
-                        : contentColor.opacity(weekend ? 0.35 : 0.9)
+                        : marked ? accent.opacity(0.95)
+                        : contentColor.opacity(weekend ? 0.3 : 0.75)
                     )
             }
         }

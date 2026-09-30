@@ -1541,3 +1541,10 @@ User: "polish this blip" (song caption in a 342 pt island with the line at the
 left). The captioned island now fits the line — floor 255 (the plain blip's
 width), cap 430 (the card's) — for song captions, meeting captions and the
 next-item preview alike. Rendered short/mid/long. Judge live on a song change.
+
+## Calendar mode softened (2026-10-01)
+
+User: "still looks too hard". Light 30 pt date, tracked small caps at a red
+pulled toward white, regular-weight digits (weekend at 30%), today on a 92%
+disc, chips rounder (7 pt) on a 16% tint with the label mixed toward white,
+a touch more air. Rendered and checked.
