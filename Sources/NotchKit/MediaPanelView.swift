@@ -258,32 +258,34 @@ struct MediaPanelView: View {
     private var scrubRow: some View {
         let dragging = dragFraction != nil
 
-        return HStack(spacing: 8) {
+        // Drawn from the anchor on every frame while playing (2026-09-30):
+        // the bar and the times are exact, not a once-a-second value eased
+        // toward. Paused, or while a drag holds the bar, the clock stops.
+        return TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !media.isPlaying || dragging)) { context in
+            scrubRow(at: context.date, dragging: dragging)
+        }
+    }
+
+    private func scrubRow(at now: Date, dragging: Bool) -> some View {
+        HStack(spacing: 8) {
             // Natural width with a 34pt floor: monospaced digits keep the
             // bar from twitching as seconds tick, and the width only ever
             // changes at a 9:59 → 10:00 boundary. A FIXED 34pt slot used to
             // truncate anything past ten minutes to "-35:…" (2026-09-29,
             // seen on a 38-minute video); an hour-long one needs ~48pt.
-            Text(media.elapsedText)
+            Text(media.elapsedText(at: now))
                 .fixedSize(horizontal: true, vertical: false)
                 .frame(minWidth: 34, alignment: .leading)
 
             GeometryReader { geometry in
-                let fraction = dragFraction.map(Double.init) ?? media.progress
+                let fraction = dragFraction.map(Double.init) ?? media.progress(at: now)
                 ZStack(alignment: .leading) {
                     Capsule().fill(contentColor.opacity(0.22))
                     Capsule()
-                        // White fill, like Alcove's.
+                        // White fill, like Alcove's. No easing: the width is
+                        // the true position on this frame.
                         .fill(contentColor)
                         .frame(width: max(0, geometry.size.width * fraction))
-                        // Smooths the 1Hz position tick into a continuous
-                        // slide — but ONLY while not dragging: during a drag
-                        // the fill must track the pointer 1:1, and a 1s
-                        // animation would lag it by up to a second.
-                        .animation(
-                            dragging || reduceMotion ? nil : .linear(duration: 1),
-                            value: media.progress
-                        )
                 }
                 // Grab affordance: the bar thickens under the pointer,
                 // vertically centred in the 18pt gesture strip. Critically
@@ -304,7 +306,7 @@ struct MediaPanelView: View {
             }
             .frame(height: 18)   // the whole strip is the hit target (~10pt slop rule)
 
-            Text(media.remainingText ?? "")
+            Text(media.remainingText(at: now) ?? "")
                 .fixedSize(horizontal: true, vertical: false)
                 .frame(minWidth: 34, alignment: .trailing)
         }
@@ -313,7 +315,7 @@ struct MediaPanelView: View {
         .foregroundStyle(contentColor.opacity(0.55))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Playback position")
-        .accessibilityValue(media.elapsedText)
+        .accessibilityValue(media.elapsedText(at: now))
     }
 
     private func scrubGesture(width: CGFloat) -> some Gesture {

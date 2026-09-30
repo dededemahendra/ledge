@@ -19,8 +19,15 @@ public struct MediaPresentation: Sendable, Equatable {
     public let artist: String?
     public let artwork: Data?
     public let isPlaying: Bool
+    /// The position as of `anchor`; the live position is arithmetic from
+    /// there (`position(at:)`), so the card can draw it exactly on every
+    /// frame instead of chasing a once-a-second tick (2026-09-30).
     public let elapsed: Double
     public let duration: Double?
+    public let anchor: Date
+    /// Seconds of playback per second of wall clock: 0 paused, 1 playing,
+    /// the player's own rate otherwise.
+    public let rate: Double
     /// `nil`: the source does not report shuffle (browsers), and the
     /// panel's shuffle button is disabled. Otherwise the button shows it.
     public let isShuffling: Bool?
@@ -43,6 +50,7 @@ public struct MediaPresentation: Sendable, Equatable {
     public init(
         title: String, artist: String?, artwork: Data?,
         isPlaying: Bool, elapsed: Double, duration: Double?,
+        anchor: Date = Date(), rate: Double? = nil,
         isShuffling: Bool? = nil, repeatMode: RepeatMode? = nil,
         favorite: Favorite = .unsupported
     ) {
@@ -52,6 +60,8 @@ public struct MediaPresentation: Sendable, Equatable {
         self.isPlaying = isPlaying
         self.elapsed = elapsed
         self.duration = duration
+        self.anchor = anchor
+        self.rate = rate ?? (isPlaying ? 1 : 0)
         self.isShuffling = isShuffling
         self.repeatMode = repeatMode
         self.favorite = favorite
@@ -62,6 +72,26 @@ public struct MediaPresentation: Sendable, Equatable {
     public var progress: Double {
         guard let duration, duration > 0 else { return 0 }
         return min(1, max(0, elapsed / duration))
+    }
+
+    /// The position `now`, extrapolated from the anchor and clamped to the
+    /// track; never behind the anchor.
+    public func position(at now: Date) -> Double {
+        let advanced = elapsed + max(0, now.timeIntervalSince(anchor)) * rate
+        guard let duration, duration > 0 else { return max(0, advanced) }
+        return min(duration, max(0, advanced))
+    }
+
+    public func progress(at now: Date) -> Double {
+        guard let duration, duration > 0 else { return 0 }
+        return min(1, max(0, position(at: now) / duration))
+    }
+
+    public func elapsedText(at now: Date) -> String { Self.clock(position(at: now)) }
+
+    public func remainingText(at now: Date) -> String? {
+        guard let duration, duration > 0 else { return nil }
+        return "-" + Self.clock(max(0, duration - position(at: now)))
     }
 
     public var elapsedText: String { Self.clock(max(0, elapsed)) }

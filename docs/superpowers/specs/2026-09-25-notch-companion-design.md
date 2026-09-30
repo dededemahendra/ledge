@@ -1001,3 +1001,21 @@ with one battery keeps its one figure. A component not reported is left out.
 Beats with no permission; for anything else, `system_profiler SPBluetoothDataType
 -json` off the main actor (`BluetoothProfile`), capped at three seconds so the
 blip is never held up. Layout in `docs/private-api-notes.md`.
+
+
+## Playback timing (2026-09-30)
+
+User: the card felt delayed and the scrubber imprecise. Cause: the model
+pushed the position once a second and the bar eased toward that stale value,
+so it trailed reality by up to a second and the times moved in whole-second
+jumps; play, pause, seek and skip waited for the adapter's report.
+
+**Now.** `MediaPresentation` carries an anchor (`elapsed` as of `anchor`, plus
+`rate`) and the scrub row draws inside `TimelineView(.animation)` from
+`position(at:)` on every frame while playing — exact, no easing, the clock
+stopped while paused or dragging. The 1 Hz timer is gone; `setMedia` runs only
+on reports and actions. Play/pause, seek and skip are optimistic:
+`PositionOverride` (elapsed, timestamp, playing) is applied over the adapter's
+last report until the adapter reports something at least as new, or for two
+seconds — so the card moves the instant the user acts, and an unrelated report
+in between (artwork) cannot snap it back.

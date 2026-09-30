@@ -87,3 +87,23 @@ private func presentation(elapsed: Double, duration: Double?) -> MediaPresentati
     let known = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 100, favorite: .on)
     #expect(known.favorite == .on)
 }
+
+/// The card draws from the anchor (2026-09-30): exact on any frame while
+/// playing, still while paused, never past the end.
+@Test func positionAdvancesFromTheAnchorWhilePlayingAndHoldsWhenPaused() {
+    let t0 = Date(timeIntervalSinceReferenceDate: 830_000_000)
+    let playing = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 100, duration: 200, anchor: t0)
+    #expect(playing.position(at: t0 + 12.5) == 112.5)
+    #expect(playing.progress(at: t0 + 50) == 0.75)
+    #expect(playing.elapsedText(at: t0 + 12.5) == "1:52")
+    #expect(playing.remainingText(at: t0 + 12.5) == "-1:27")
+    #expect(playing.position(at: t0 + 500) == 200, "clamped at the end")
+    #expect(playing.position(at: t0 - 5) == 100, "never behind the anchor")
+
+    let paused = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: false, elapsed: 100, duration: 200, anchor: t0)
+    #expect(paused.position(at: t0 + 60) == 100)
+    #expect(paused.rate == 0 && playing.rate == 1)
+
+    let fast = MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 200, anchor: t0, rate: 2)
+    #expect(fast.position(at: t0 + 10) == 20)
+}

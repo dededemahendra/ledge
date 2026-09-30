@@ -1498,3 +1498,11 @@ Connect AirPods: their glyph left, left/right/case readings right with bud
 and case glyphs, island widened; Beats/other buds: L/R/Case labels; a
 one-battery headset: one figure. Renders of all four checked. Judge live with
 AirPods (HID service, instant) and a non-Apple headset (profiler, ≤3 s).
+
+## Playback timing (2026-09-30)
+
+Card position drawn per frame from an anchor; play/pause/seek/skip optimistic
+with a two-second override. Judge live: the bar moves continuously and the
+times flip exactly on the second; press pause — the bar and the disc stop on
+the click, not a beat later; drag the bar — it lands where released and stays
+there while the player catches up; skip — the bar drops to 0 at once.

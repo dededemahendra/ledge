@@ -36,7 +36,6 @@ final class AppModel {
     /// live duration/elapsed/timestamp/rate — none of which `NotchController`
     /// carries (it only ever gets the already-computed `MediaPresentation`).
     private var mediaPayload = MediaPayload()
-    private var positionTimer: Timer?
     /// The title the caption last announced, so a resumed or paused track
     /// is not re-announced; only a NEW title is.
     private var captionedTitle: String?
@@ -210,7 +209,6 @@ final class AppModel {
         tasks.removeAll()
         pruneTimer?.invalidate()
         pruneTimer = nil
-        stopPositionTicking()
         hud.stop()
         power.stop()
         media.stop()
@@ -333,6 +331,9 @@ final class AppModel {
     /// above, neither of which logs on this path.
     private func handle(_ payload: MediaPayload) {
         mediaPayload = payload
+        if let override = positionOverride, override.isSuperseded(by: payload) || !override.isFresh(at: Date()) {
+            positionOverride = nil
+        }
 
         // Music apps only (`MediaSourcePolicy`): a browser tab or a video
         // call is not "now playing" for the island, however loudly
@@ -342,7 +343,6 @@ final class AppModel {
               MediaSourcePolicy.isAllowed(bundleIdentifier: payload.bundleIdentifier, enabled: settings.mediaSources) else {
             queue.remove(kind: .media)
             presenter.controller.setMedia(nil)
-            stopPositionTicking()
             clearCaption()
             publish()
             return
@@ -370,7 +370,6 @@ final class AppModel {
             )
         )
         refreshMediaPresentation()
-        payload.isPlaying ? startPositionTicking() : stopPositionTicking()
         publish()
     }
 
@@ -584,9 +583,12 @@ final class AppModel {
         switch intent {
         case .open(let url):
             open(url)
-        case .togglePlayPause: media.send(.togglePlayPause)
-        case .next:             media.send(.nextTrack)
-        case .previous:         media.send(.previousTrack)
+        case .togglePlayPause:
+            act(playing: !isPlayingNow, elapsed: livePosition(at: Date()), then: .togglePlayPause)
+        case .next:
+            act(playing: isPlayingNow, elapsed: 0, then: .nextTrack)
+        case .previous:
+            act(playing: isPlayingNow, elapsed: 0, then: .previousTrack)
         case .toggleShuffle:    media.send(.toggleShuffle)
         case .toggleRepeat:     media.send(.toggleRepeat)
         case .selectOutput(let id): device.setDefaultOutput(uid: id)
@@ -596,7 +598,7 @@ final class AppModel {
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.
             guard let duration = mediaPayload.duration, duration > 0 else { return }
-            media.send(.seek(seconds: duration * fraction))
+            act(playing: isPlayingNow, elapsed: duration * fraction, then: .seek(seconds: duration * fraction))
         }
     }
 
@@ -649,37 +651,56 @@ final class AppModel {
     /// this task adds exactly such a drag — the panel's scrub bar, right
     /// next to the elapsed-time label this timer drives. `.common` keeps
     /// that label ticking even while the user is mid-drag on the scrubber.
-    private func startPositionTicking() {
-        guard positionTimer == nil else { return }
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshMediaPresentation() }
+    /// What the user just did, shown before the player confirms it — see
+    /// `PositionOverride`. Cleared when the adapter reports something at
+    /// least as new, or after its lifetime.
+    private var positionOverride: PositionOverride?
+
+    private var isPlayingNow: Bool {
+        if let override = positionOverride, override.isFresh(at: Date()) { return override.playing }
+        return mediaPayload.isPlaying
+    }
+
+    /// The live position now, from the override if one is fresh, else from
+    /// the adapter's last report.
+    private func livePosition(at now: Date) -> Double {
+        if let override = positionOverride, override.isFresh(at: now) {
+            return MediaPosition.elapsed(
+                at: now, elapsedTime: override.elapsedTime, timestamp: override.timestamp,
+                rate: override.playing ? (mediaPayload.playbackRate ?? 1) : 0, duration: mediaPayload.duration
+            )
         }
-        RunLoop.main.add(timer, forMode: .common)
-        positionTimer = timer
+        return MediaPosition.elapsed(
+            at: now, elapsedTime: mediaPayload.elapsedTime ?? 0, timestamp: mediaPayload.timestamp ?? now,
+            rate: mediaPayload.isPlaying ? (mediaPayload.playbackRate ?? 1) : 0, duration: mediaPayload.duration
+        )
     }
 
-    private func stopPositionTicking() {
-        positionTimer?.invalidate()
-        positionTimer = nil
+    /// Acts on playback optimistically: the card reflects the action now,
+    /// the command goes out, and the adapter's report reconciles.
+    private func act(playing: Bool, elapsed: Double, then command: MediaCommand) {
+        positionOverride = PositionOverride(elapsedTime: elapsed, timestamp: Date(), playing: playing)
+        refreshMediaPresentation()
+        media.send(command)
     }
 
+    /// Anchor-based (2026-09-30): the card gets the position as of `now`
+    /// and the rate, and draws every frame from there itself — nothing
+    /// ticks here any more.
     private func refreshMediaPresentation() {
         guard mediaPayload.hasMedia, let title = mediaPayload.title else { return }
-        let elapsed = MediaPosition.elapsed(
-            at: Date(),
-            elapsedTime: mediaPayload.elapsedTime ?? 0,
-            timestamp: mediaPayload.timestamp ?? Date(),
-            rate: mediaPayload.isPlaying ? (mediaPayload.playbackRate ?? 1) : 0,
-            duration: mediaPayload.duration
-        )
+        let now = Date()
+        let playing = isPlayingNow
         presenter.controller.setMedia(
             MediaPresentation(
                 title: title,
                 artist: mediaPayload.artist,
                 artwork: mediaPayload.artworkData,
-                isPlaying: mediaPayload.isPlaying,
-                elapsed: elapsed,
+                isPlaying: playing,
+                elapsed: livePosition(at: now),
                 duration: mediaPayload.duration,
+                anchor: now,
+                rate: playing ? (mediaPayload.playbackRate ?? 1) : 0,
                 isShuffling: mediaPayload.isShuffling,
                 repeatMode: mediaPayload.repeatSetting.map {
                     switch $0 {
@@ -748,7 +769,6 @@ final class AppModel {
             // has given up.
             if presenter.controller.media != nil {
                 presenter.controller.setMedia(nil)
-                stopPositionTicking()
             }
         }
     }
