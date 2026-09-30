@@ -260,16 +260,12 @@ final class AppModel {
         ]
     }
 
+    /// A device blip (2026-09-30): the product's flat glyph — the phone's
+    /// AirPods panel idiom, not a render — and, for buds, left, right and
+    /// case readings side by side; one figure for everything else that
+    /// reports a battery.
     private func handle(_ event: DeviceEvent) {
         guard settings.showsDevices else { return }
-        // The system's own product render for AirPods (`DeviceArtwork`),
-        // read from disk here — one small file, once per route change —
-        // rather than on the service's CoreAudio callback. Only Bluetooth
-        // routes can be AirPods; everything else keeps the glyph.
-        var artwork: Data?
-        if case .outputChanged(let name, .bluetooth, _) = event {
-            artwork = DeviceArtwork.load(forDeviceNamed: name)
-        }
         queue.insert(
             ActivityRecord(
                 id: ActivityKind.device.rawValue,
@@ -279,7 +275,7 @@ final class AppModel {
                 title: event.activityTitle,
                 compactText: event.compactText,
                 symbolName: event.symbolName,
-                artwork: artwork
+                parts: event.parts?.map { ActivityPart(symbolName: $0.symbolName, text: $0.text) }
             )
         )
         publish()
@@ -776,7 +772,8 @@ final class AppModel {
                 barFill: record.barFill,
                 artwork: record.artwork,
                 tint: record.tint.map(Self.displayTint),
-                url: record.url
+                url: record.url,
+                parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) }
             )
         }
         // `setActivities` sets the count itself — do not also call

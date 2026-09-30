@@ -224,3 +224,17 @@ tint names are Apple's ("systemIndigoColor"), mapped in `NotchKit.SystemTint`.
 Parsed defensively (`FocusDatabase`); layout not yet observed on this Mac
 because the grant was pending when written — the first read logs "database
 readable" and any missing field simply yields the moon or white.
+
+## Peripheral battery, per component (2026-09-30)
+
+`AppleDeviceManagementHIDEventService` entries (IO registry, no permission):
+`Product`, `BatteryPercent` (or `BatteryPercentMain`), and for AirPods/Beats
+buds `BatteryPercentLeft`, `BatteryPercentRight`, `BatteryPercentCase`; values
+outside 0…100 mean unknown. Read with `IORegistryEntryCreateCFProperties`.
+Other headsets: `system_profiler SPBluetoothDataType -json` →
+`SPBluetoothDataType[].device_connected[] / device_not_connected[]`, each a
+`{name: props}` with `device_batteryLevelMain/Left/Right/Case` as "85%" strings
+and `device_minorType` ("Headphones", "Headset", "Speaker"). Observed on this
+Mac with no buds connected; the per-component keys are as documented
+elsewhere and parsed defensively. The AirPods renders in
+`HeadphoneAssets.framework` are no longer used.

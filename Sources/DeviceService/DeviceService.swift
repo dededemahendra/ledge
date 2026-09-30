@@ -37,12 +37,23 @@ public final class DeviceService {
 
             let route = OutputRouteObserver { [weak self] route in
                 guard let self else { return }
-                let battery = route.transport == .bluetooth
-                    ? PeripheralBattery.percent(forDeviceNamed: route.name) : nil
-                if let event = self.deriver.outputChanged(
-                    uid: route.uid, name: route.name, transport: route.transport, batteryPercent: battery
-                ) {
-                    self.continuation?.yield(event)
+                guard self.deriver.outputChanged(uid: route.uid, name: route.name, transport: route.transport, battery: nil) != nil
+                else { return }
+                guard route.transport == .bluetooth else {
+                    self.continuation?.yield(.outputChanged(name: route.name, transport: route.transport, battery: nil))
+                    return
+                }
+                // Apple and Beats: the HID service, at once. Anything else:
+                // the profiler, off the main actor, capped at three seconds
+                // so the blip is never held hostage by a slow child process.
+                if let levels = PeripheralBattery.levels(forDeviceNamed: route.name) {
+                    self.continuation?.yield(.outputChanged(name: route.name, transport: .bluetooth, battery: levels))
+                    return
+                }
+                let name = route.name
+                Task { @MainActor [weak self] in
+                    let levels = await Self.profiledLevels(forDeviceNamed: name)
+                    self?.continuation?.yield(.outputChanged(name: name, transport: .bluetooth, battery: levels))
                 }
             }
             route.start()
@@ -60,6 +71,25 @@ public final class DeviceService {
             continuation.onTermination = { [weak self] _ in
                 Task { @MainActor in self?.stop() }
             }
+        }
+    }
+
+    /// The profiler's levels for `name`, or `nil` after three seconds.
+    static func profiledLevels(forDeviceNamed name: String) async -> PeripheralLevels? {
+        await withTaskGroup(of: PeripheralLevels?.self) { group in
+            group.addTask {
+                let devices = await BluetoothProfile.run()
+                let wanted = name.lowercased()
+                return devices.first { $0.name.lowercased() == wanted && $0.levels != nil }?.levels
+                    ?? devices.first { PeripheralBattery.matches(candidate: $0.name.lowercased(), wanted: wanted) && $0.levels != nil }?.levels
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(3))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
         }
     }
 

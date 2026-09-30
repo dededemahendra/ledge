@@ -11,6 +11,18 @@ public enum ActivityTint: Sendable, Equatable {
     case system(String)
 }
 
+/// One reading among several in a blip's trailing ear — a bud's or a
+/// case's charge (2026-09-30) — with its glyph where there is one.
+public struct ActivityPart: Sendable, Equatable {
+    public let symbolName: String?
+    public let text: String
+
+    public init(symbolName: String?, text: String) {
+        self.symbolName = symbolName
+        self.text = text
+    }
+}
+
 /// One thing the island is currently saying.
 public struct ActivityRecord: Sendable, Equatable, Identifiable {
     public let id: String
@@ -38,6 +50,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// What a click on the blip opens while it shows (a meeting's join
     /// link), or `nil` — then the blip is just a blip.
     public let url: URL?
+    /// Several readings side by side in the trailing ear, instead of
+    /// `compactText`; the island widens to fit them.
+    public let parts: [ActivityPart]?
 
     public init(
         id: String,
@@ -51,7 +66,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         barFill: Double? = nil,
         artwork: Data? = nil,
         tint: ActivityTint? = nil,
-        url: URL? = nil
+        url: URL? = nil,
+        parts: [ActivityPart]? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -65,6 +81,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.artwork = artwork
         self.tint = tint
         self.url = url
+        self.parts = parts
     }
 
     public var isSticky: Bool { ttl == nil }

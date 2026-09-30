@@ -1491,3 +1491,10 @@ reminder lists below. Captured (display cache, tall window): a per-account
 `Section` inside `ForEach` rendered merged/duplicated; one section per kind with
 account label rows renders right. Judge live: switch a calendar off — its events
 stop blipping and leave the hover preview within a second.
+
+## Buds battery (2026-09-30)
+
+Connect AirPods: their glyph left, left/right/case readings right with bud
+and case glyphs, island widened; Beats/other buds: L/R/Case labels; a
+one-battery headset: one figure. Renders of all four checked. Judge live with
+AirPods (HID service, instant) and a non-Apple headset (profiler, ≤3 s).

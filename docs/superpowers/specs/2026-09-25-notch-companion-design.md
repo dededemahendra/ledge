@@ -983,3 +983,21 @@ left (EventKit reads an empty list as "all"). Layout note: sections generated in
 a loop misrendered in a grouped `Form` on macOS (merged cards, rows drawn
 twice, seen in captures), so the pane is one fixed section per kind with the
 account names as label rows inside.
+
+
+## Buds: left, right, case (2026-09-30)
+
+**What.** A device blip in the flat glyph style of the phone's own AirPods
+panel (user's call — not the product renders, which are gone): the product's
+symbol left (AirPods, AirPods Pro, Max, the Beats families, `earbuds` for other
+true-wireless buds, headphones otherwise) and, for buds, three readings side by
+side right — left bud, right bud, case, each with its own symbol for AirPods
+and plain L/R/Case labels for others — the island widening to fit
+(`ActivityRecord.parts` → `ActivityDisplay.parts`, `leadingEarWidth`). A device
+with one battery keeps its one figure. A component not reported is left out.
+
+**How.** `PeripheralLevels` from the IO registry's HID battery service
+(`BatteryPercentLeft/Right/Case`, `BatteryPercent`), which covers Apple and
+Beats with no permission; for anything else, `system_profiler SPBluetoothDataType
+-json` off the main actor (`BluetoothProfile`), capped at three seconds so the
+blip is never held up. Layout in `docs/private-api-notes.md`.

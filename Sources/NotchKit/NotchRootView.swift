@@ -792,6 +792,26 @@ public struct NotchRootView: View {
     /// insertion/removal, so it needs the value-keyed `.id` to register as
     /// one, and its own animated transaction: the root's `.animation(value:
     /// parameters)` never attaches for a value tick alone.
+    /// Several readings side by side — left bud, right bud, case
+    /// (2026-09-30): each its glyph and figure at 10 pt, the island
+    /// widened to fit by `NotchController.leadingEarWidth`.
+    private func readings(_ parts: [NotchController.ActivityDisplay.Part]) -> some View {
+        HStack(spacing: 7) {
+            ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                HStack(spacing: 2) {
+                    if let symbol = part.symbolName {
+                        Image(systemName: symbol)
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    Text(part.text)
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                }
+            }
+        }
+        .fixedSize()
+    }
+
     private func compactValue(_ compact: String, bump: Bool = true) -> some View {
         Text(compact)
             .font(.system(size: 11, weight: .medium))
@@ -915,7 +935,9 @@ public struct NotchRootView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
         } else if let activity = controller.activities.first {
-            if let compact = activity.compactText {
+            if let parts = activity.parts, !parts.isEmpty {
+                readings(parts)
+            } else if let compact = activity.compactText {
                 // A ticking clock must not bump every second; its digits
                 // still roll.
                 compactValue(compact, bump: activity.id != NotchController.timerActivityID)

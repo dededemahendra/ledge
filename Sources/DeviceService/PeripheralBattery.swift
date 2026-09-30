@@ -1,26 +1,58 @@
 import Foundation
 import IOKit
 
-/// Battery level for Bluetooth accessories that publish one, read from the
-/// IORegistry — `AppleDeviceManagementHIDEventService` entries carry a
-/// `Product` name and `BatteryPercent` for AirPods, Beats and Magic
-/// peripherals. No permission: the registry is world-readable.
+/// A Bluetooth peripheral's charge, per component where it reports them
+/// (2026-09-30): AirPods and Beats buds give left, right and case; most
+/// other headsets give one figure.
+public struct PeripheralLevels: Sendable, Equatable {
+    public let main: Int?
+    public let left: Int?
+    public let right: Int?
+    public let `case`: Int?
+
+    public init(main: Int? = nil, left: Int? = nil, right: Int? = nil, case: Int? = nil) {
+        self.main = main
+        self.left = left
+        self.right = right
+        self.case = `case`
+    }
+
+    public var isEmpty: Bool { main == nil && left == nil && right == nil && `case` == nil }
+    public var hasBuds: Bool { left != nil || right != nil }
+
+    /// The IO registry's keys on `AppleDeviceManagementHIDEventService`:
+    /// `BatteryPercent` (or `BatteryPercentMain`), `BatteryPercentLeft`,
+    /// `BatteryPercentRight`, `BatteryPercentCase`. Values outside 0…100
+    /// are the driver's "unknown" and are dropped. `nil` with nothing left.
+    public static func parse(properties: [String: Any]) -> PeripheralLevels? {
+        func percent(_ key: String) -> Int? {
+            guard let value = (properties[key] as? NSNumber)?.intValue, (0...100).contains(value) else { return nil }
+            return value
+        }
+        let levels = PeripheralLevels(
+            main: percent("BatteryPercent") ?? percent("BatteryPercentMain"),
+            left: percent("BatteryPercentLeft"),
+            right: percent("BatteryPercentRight"),
+            case: percent("BatteryPercentCase")
+        )
+        return levels.isEmpty ? nil : levels
+    }
+}
+
 public enum PeripheralBattery {
     public struct Candidate: Sendable, Equatable {
         public let product: String
-        public let percent: Int
-        public init(product: String, percent: Int) {
+        public let levels: PeripheralLevels
+
+        public init(product: String, levels: PeripheralLevels) {
             self.product = product
-            self.percent = percent
+            self.levels = levels
         }
     }
 
-    /// Name-matched loosely in both directions, since CoreAudio's device
-    /// name ("Dede's AirPods Pro") and the registry's product string are
-    /// not always identical — but the BEST match wins, not the first
-    /// (review, 2026-09-29: with "AirPods" and "AirPods Pro" both paired,
-    /// first-match could hand the Pro the plain pair's charge).
-    public static func percent(forDeviceNamed name: String) -> Int? {
+    /// Apple and Beats peripherals, through the HID battery service —
+    /// no Bluetooth permission involved.
+    public static func levels(forDeviceNamed name: String) -> PeripheralLevels? {
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(
             kIOMainPortDefault, IOServiceMatching("AppleDeviceManagementHIDEventService"), &iterator
@@ -30,18 +62,17 @@ public enum PeripheralBattery {
         var candidates: [Candidate] = []
         while case let entry = IOIteratorNext(iterator), entry != 0 {
             defer { IOObjectRelease(entry) }
-            guard let product = IORegistryEntryCreateCFProperty(entry, "Product" as CFString, kCFAllocatorDefault, 0)?
-                .takeRetainedValue() as? String,
-                  let percent = IORegistryEntryCreateCFProperty(entry, "BatteryPercent" as CFString, kCFAllocatorDefault, 0)?
-                .takeRetainedValue() as? Int, (0...100).contains(percent) else { continue }
-            candidates.append(Candidate(product: product, percent: percent))
+            var raw: Unmanaged<CFMutableDictionary>?
+            guard IORegistryEntryCreateCFProperties(entry, &raw, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+                  let properties = raw?.takeRetainedValue() as? [String: Any],
+                  let product = properties["Product"] as? String,
+                  let levels = PeripheralLevels.parse(properties: properties)
+            else { continue }
+            candidates.append(Candidate(product: product, levels: levels))
         }
-        return best(among: candidates, wanted: name)?.percent
+        return best(among: candidates, wanted: name)?.levels
     }
 
-    /// Exact name first; otherwise the LONGEST product string that matches
-    /// in either direction — "AirPods Pro" over "AirPods" for a device
-    /// named "Dede's AirPods Pro". Pure, pinned by `DeviceServiceTests`.
     static func best(among candidates: [Candidate], wanted: String) -> Candidate? {
         let wantedLower = wanted.lowercased()
         let matching = candidates.filter { matches(candidate: $0.product.lowercased(), wanted: wantedLower) }

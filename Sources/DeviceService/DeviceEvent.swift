@@ -1,7 +1,5 @@
 import Foundation
 
-/// How audio reaches the current default output device. Mapped from
-/// CoreAudio's `kAudioDevicePropertyTransportType`.
 public enum AudioTransport: Sendable, Equatable {
     case builtIn
     case bluetooth
@@ -13,14 +11,19 @@ public enum AudioTransport: Sendable, Equatable {
 }
 
 public enum DeviceEvent: Sendable, Equatable {
-    /// The default output moved to a different device. Announced by NAME,
-    /// including a move back to the built-in speakers: CoreAudio only says
-    /// where sound goes now, not whether the previous device disconnected
-    /// or the user merely switched, so "AirPods disconnected" would be a
-    /// guess. `IOBluetooth`, which could tell, needs the Bluetooth privacy
-    /// prompt (the app crashed at launch without a usage description on
-    /// 2026-09-28) — a permission this service promised not to need.
-    case outputChanged(name: String, transport: AudioTransport, batteryPercent: Int?)
+    case outputChanged(name: String, transport: AudioTransport, battery: PeripheralLevels?)
+
+    /// One reading in the trailing ear beside others (2026-09-30): a bud
+    /// or the case, with its glyph where the product has one.
+    public struct Part: Sendable, Equatable {
+        public let symbolName: String?
+        public let text: String
+
+        public init(symbolName: String?, text: String) {
+            self.symbolName = symbolName
+            self.text = text
+        }
+    }
 
     public var activityTitle: String {
         switch self {
@@ -28,14 +31,27 @@ public enum DeviceEvent: Sendable, Equatable {
         }
     }
 
-    /// Battery for the trailing ear; nothing when unknown, so the ear stays
-    /// empty rather than showing a made-up value.
+    /// A single figure, for peripherals with one battery. Buds use `parts`.
     public var compactText: String? {
-        if case .outputChanged(_, _, let battery?) = self { return "\(battery)%" }
-        return nil
+        guard case .outputChanged(_, _, let levels?) = self, !levels.hasBuds, let main = levels.main else { return nil }
+        return "\(main)%"
     }
 
-    /// SF Symbol for the leading ear.
+    /// Left, right and case (2026-09-30, user's call), in the flat glyph
+    /// style of the phone's own AirPods panel — the product's own bud and
+    /// case symbols for AirPods, plain L/R/Case labels for anything else
+    /// that reports buds. A component the device did not report is left
+    /// out rather than invented.
+    public var parts: [Part]? {
+        guard case .outputChanged(let name, _, let levels?) = self, levels.hasBuds else { return nil }
+        let symbols = Self.budSymbols(name: name)
+        var parts: [Part] = []
+        if let left = levels.left { parts.append(Part(symbolName: symbols?.left, text: symbols == nil ? "L \(left)" : "\(left)")) }
+        if let right = levels.right { parts.append(Part(symbolName: symbols?.right, text: symbols == nil ? "R \(right)" : "\(right)")) }
+        if let box = levels.case { parts.append(Part(symbolName: symbols?.case, text: symbols == nil ? "Case \(box)" : "\(box)")) }
+        return parts
+    }
+
     public var symbolName: String {
         switch self {
         case .outputChanged(let name, let transport, _):
@@ -43,18 +59,29 @@ public enum DeviceEvent: Sendable, Equatable {
         }
     }
 
-    /// One glyph vocabulary for every audio output — the route blip and the
-    /// panel's output picker (`OutputDevice.symbolName`) both use it.
-    /// Product-specific where the name gives it away, transport-generic
-    /// otherwise. The headphone jack is the BUILT-IN device renamed
-    /// ("External Headphones"), so the name has to win over the transport
-    /// or wired headphones get the laptop glyph.
+    static func budSymbols(name: String) -> (left: String, right: String, case: String)? {
+        let lower = name.lowercased()
+        guard lower.contains("airpods"), !lower.contains("max") else { return nil }
+        if lower.contains("pro") {
+            return ("airpodpro.left", "airpodpro.right", "airpodspro.chargingcase.wireless")
+        }
+        return ("airpod.gen3.left", "airpod.gen3.right", "airpods.gen3.chargingcase.wireless")
+    }
+
     public static func glyph(name: String, transport: AudioTransport) -> String {
         let lower = name.lowercased()
         if lower.contains("airpods max") { return "airpods.max" }
         if lower.contains("airpods pro") { return "airpods.pro" }
         if lower.contains("airpods")     { return "airpods" }
-        if lower.contains("beats")       { return "beats.headphones" }
+        if lower.contains("beats") {
+            if lower.contains("fit pro")      { return "beats.fitpro" }
+            if lower.contains("studio buds")  { return "beats.studiobuds" }
+            if lower.contains("powerbeats")   { return "beats.powerbeatspro" }
+            return "beats.headphones"
+        }
+        // Other true-wireless buds: Galaxy Buds, Pixel Buds, Redmi Buds,
+        // anything calling itself TWS.
+        if lower.contains("buds") || lower.contains("tws") || lower.contains("earbud") { return "earbuds" }
         if lower.contains("headphone")   { return "headphones" }
         switch transport {
         case .bluetooth:                       return "headphones"
@@ -65,21 +92,16 @@ public enum DeviceEvent: Sendable, Equatable {
     }
 }
 
-/// Turns raw route observations into the events worth showing. Pure, so
-/// the observer stays a dumb shell.
 public struct DeviceEventDeriver: Sendable {
     private var lastOutputUID: String?
 
     public init() {}
 
-    /// The first call is a baseline: the device in use at launch is not
-    /// news. The same UID reported again (CoreAudio re-notifies freely) is
-    /// silent too.
     public mutating func outputChanged(
-        uid: String, name: String, transport: AudioTransport, batteryPercent: Int?
+        uid: String, name: String, transport: AudioTransport, battery: PeripheralLevels?
     ) -> DeviceEvent? {
         defer { lastOutputUID = uid }
         guard let last = lastOutputUID, last != uid else { return nil }
-        return .outputChanged(name: name, transport: transport, batteryPercent: batteryPercent)
+        return .outputChanged(name: name, transport: transport, battery: battery)
     }
 }

@@ -21,7 +21,7 @@ run anywhere else either.
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
 | Charger in/out, low or full battery | battery glyph left (bolt while charging, plug when held on AC; green charging, red low), percentage right, 3 s |
-| Audio output changes | the device's render or glyph, battery when known, 3 s |
+| Audio output changes | the device's glyph left (AirPods, AirPods Pro, Max, Beats, other buds, headphones…); for buds the left, right and case charge side by side with their own glyphs, otherwise one figure when the device reports one, 3 s |
 
 Browsers and everything else that MediaRemote reports are ignored on purpose
 (`MediaSourcePolicy`). One blip owns the island at a time; the rest queue.

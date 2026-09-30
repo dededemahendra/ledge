@@ -173,6 +173,19 @@ public final class NotchController {
         /// What a click on the blip opens while it shows — see
         /// `NotchController.tap()`. `nil`: the blip is just a blip.
         public let url: URL?
+        /// Several readings side by side in the trailing ear — a bud's and
+        /// a case's charge (2026-09-30) — drawn instead of `compactText`;
+        /// the island widens to fit them.
+        public struct Part: Sendable, Equatable {
+            public let symbolName: String?
+            public let text: String
+
+            public init(symbolName: String?, text: String) {
+                self.symbolName = symbolName
+                self.text = text
+            }
+        }
+        public let parts: [Part]?
 
         public init(
             id: String,
@@ -183,7 +196,8 @@ public final class NotchController {
             barFill: Double? = nil,
             artwork: Data? = nil,
             tint: Tint? = nil,
-            url: URL? = nil
+            url: URL? = nil,
+            parts: [Part]? = nil
         ) {
             self.id = id
             self.title = title
@@ -194,6 +208,7 @@ public final class NotchController {
             self.artwork = artwork
             self.tint = tint
             self.url = url
+            self.parts = parts
         }
     }
 
@@ -334,6 +349,16 @@ public final class NotchController {
     /// `compactValue` draws it, plus breathing room. Four characters or
     /// fewer — every percentage, "Now", "Off" — leave the default.
     public var leadingEarWidth: CGFloat {
+        if let parts = activities.first?.parts, !parts.isEmpty {
+            // Readings: 10 pt medium, a glyph's ~14 pt where one is set,
+            // 2 pt inside a reading and 7 pt between them, as `readings`
+            // in the view lays them out.
+            let font = NSFont.systemFont(ofSize: 10, weight: .medium)
+            let widths = parts.map { part -> CGFloat in
+                (part.symbolName == nil ? 0 : 16) + ceil(NSAttributedString(string: part.text, attributes: [.font: font]).size().width)
+            }
+            return widths.reduce(0, +) + CGFloat(max(0, parts.count - 1)) * 7 + 16
+        }
         guard let text = activities.first?.compactText, text.count > 4 else { return NotchMetrics.activityEarWidth }
         let width = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium)]).size().width
         return ceil(width) + 16
