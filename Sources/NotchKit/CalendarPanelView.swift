@@ -26,9 +26,9 @@ struct CalendarPanelView: View {
     private func reveal<V: View>(_ view: V, order: Int) -> some View {
         view
             .opacity(revealed ? 1 : 0)
-            .offset(y: revealed ? 0 : 6)
+            .offset(y: revealed ? 0 : 3)
             .animation(
-                reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8).delay(0.05 + Double(order) * 0.04),
+                reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1.0).delay(Double(order) * 0.022),
                 value: revealed
             )
     }

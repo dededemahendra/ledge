@@ -551,7 +551,9 @@ public struct NotchRootView: View {
                     // expand spring (2026-09-30, user's call); the island's
                     // clip keeps the outgoing panel inside.
                     .animation(
-                        controller.reduceMotion ? NotchAnimation.reduced : .spring(response: 0.38, dampingFraction: 0.82),
+                        // Calm (user's call, 2026-09-30: "less, but keep it
+                        // smooth"): critically damped, a third of a second.
+                        controller.reduceMotion ? NotchAnimation.reduced : .spring(response: 0.32, dampingFraction: 1.0),
                         value: controller.panel
                     )
                     .frame(maxWidth: .infinity)
@@ -1008,7 +1010,7 @@ public struct NotchRootView: View {
     private var panelTransition: AnyTransition {
         guard !controller.reduceMotion else { return .opacity }
         let sign: CGFloat = controller.lastSwipe == .next ? 1 : -1
-        let slide: CGFloat = 60
+        let slide: CGFloat = 22   // a nudge in the swipe's direction, not a page flying past
         return .asymmetric(
             insertion: AnyTransition(OffsetTransition(CGSize(width: slide * sign, height: 0))
                 .combined(with: BlurReplaceTransition(configuration: .downUp))),
