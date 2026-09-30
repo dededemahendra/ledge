@@ -304,8 +304,14 @@ extension MeetingEvent {
             start: start,
             end: end,
             joinURL: MeetingLinkDetector.joinURL(url: event.url, location: event.location, notes: event.notes),
-            detailURL: event.eventIdentifier.flatMap { Self.detailURL(scheme: "ical://ekevent/", identifier: $0) }
+            detailURL: event.eventIdentifier.flatMap { Self.detailURL(scheme: "ical://ekevent/", identifier: $0) },
+            color: Self.rgb(of: event.calendar)
         )
+    }
+
+    static func rgb(of calendar: EKCalendar?) -> CalendarInfo.RGB? {
+        guard let cg = calendar?.cgColor, let ns = NSColor(cgColor: cg)?.usingColorSpace(.sRGB) else { return nil }
+        return CalendarInfo.RGB(red: Double(ns.redComponent), green: Double(ns.greenComponent), blue: Double(ns.blueComponent))
     }
 
     /// `scheme` + the identifier, kept verbatim where a URL path allows it
@@ -330,7 +336,7 @@ extension MeetingEvent {
                 items.append(MeetingEvent(
                     id: "\(reminder.calendarItemIdentifier)@\(Int(date.timeIntervalSince1970))",
                     kind: .reminder, title: base.title, start: date,
-                    end: date.addingTimeInterval(reminderWindow), joinURL: base.joinURL, detailURL: base.detailURL
+                    end: date.addingTimeInterval(reminderWindow), joinURL: base.joinURL, detailURL: base.detailURL, color: base.color
                 ))
             }
         }
@@ -352,7 +358,8 @@ extension MeetingEvent {
             start: due,
             end: due.addingTimeInterval(Self.reminderWindow),
             joinURL: MeetingLinkDetector.joinURL(url: reminder.url, location: nil, notes: reminder.notes),
-            detailURL: Self.detailURL(scheme: "x-apple-reminderkit://REMCDReminder/", identifier: reminder.calendarItemIdentifier)
+            detailURL: Self.detailURL(scheme: "x-apple-reminderkit://REMCDReminder/", identifier: reminder.calendarItemIdentifier),
+            color: Self.rgb(of: reminder.calendar)
         )
     }
 }

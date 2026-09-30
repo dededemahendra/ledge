@@ -29,11 +29,13 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
     /// lands on the event, not on the app's last view. `nil` for an
     /// unsaved item.
     public let detailURL: URL?
+    /// The calendar's or list's colour, for the card's chips.
+    public let color: CalendarInfo.RGB?
 
     /// How long a due reminder stays "Now" (it has no duration of its own).
     public static let reminderWindow: TimeInterval = 15 * 60
 
-    public init(id: String, kind: Kind = .event, title: String, start: Date, end: Date, joinURL: URL?, detailURL: URL? = nil) {
+    public init(id: String, kind: Kind = .event, title: String, start: Date, end: Date, joinURL: URL?, detailURL: URL? = nil, color: CalendarInfo.RGB? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -41,6 +43,7 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         self.end = end
         self.joinURL = joinURL
         self.detailURL = detailURL
+        self.color = color
     }
 
     /// The leading ear's glyph: the calendar for an event, the checklist

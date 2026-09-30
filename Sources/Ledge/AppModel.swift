@@ -455,7 +455,8 @@ final class AppModel {
                     return UpcomingEvent(
                         title: event.title, symbolName: event.symbolName, compactText: event.countdownText(at: now),
                         caption: texts.caption, when: texts.when,
-                        url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind)
+                        url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind),
+                        tint: event.color.map { UpcomingEvent.Tint(red: $0.red, green: $0.green, blue: $0.blue) }
                     )
                 }
             var marks: Set<Int> = []

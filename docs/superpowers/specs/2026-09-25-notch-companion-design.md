@@ -1048,3 +1048,11 @@ the month's marks on every reload and reloads when the month turns;
 `AppModel` builds `CalendarModeData` on the tick and the presenter drops
 equal values. The mode exists whenever calendar access is granted, items or
 not.
+
+**After the reference (2026-09-30, user's screenshot).** Left: the weekday in
+red, the day number large, then today's items as chips tinted with their
+calendar's colour (`MeetingEvent.color` from `EKCalendar.cgColor`, through
+`UpcomingEvent.tint`), each opening its item. Right: the month's short name in
+red over the grid — weekday letters bold with the weekend dimmed, busy days in
+red instead of dotted, today on a white disc. `CalendarModeData` gained the
+weekday title, day number, short month and weekend columns.

@@ -1521,3 +1521,10 @@ Replaced the Up next list: month grid (today on a disc, dots on marked days)
 plus today's items. Rendered headlessly and checked. Judge live: swipe to it —
 this month with today marked; a day with an event has a dot; today's items on
 the right open on click; at midnight and at month's end the grid follows.
+
+## Calendar mode after the reference (2026-09-30)
+
+Big date + tinted chips left, red-titled month grid right (weekends dimmed,
+busy days red, today on a disc). Rendered headlessly and matched against the
+user's screenshot. Judge live: chip colours match Calendar's; a chip click
+opens the item.

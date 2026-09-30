@@ -6,8 +6,15 @@ import Foundation
 /// it. Built by `AppModel` from the calendar service; pure here.
 public struct CalendarModeData: Sendable, Equatable {
     public let monthTitle: String
+    /// "SEP", for the grid's corner.
+    public let monthShort: String
+    /// "TUE" and 30, for the big date.
+    public let weekdayTitle: String
+    public let dayNumber: Int
     /// Seven, starting on the calendar's first weekday.
     public let weekdaySymbols: [String]
+    /// Which of the seven columns are the weekend.
+    public let weekendColumns: [Bool]
     /// Rows of seven; `nil` pads the days before the 1st and after the last.
     public let weeks: [[Int?]]
     /// Today's day number when the month shown is the current one.
@@ -17,9 +24,13 @@ public struct CalendarModeData: Sendable, Equatable {
     /// Today's remaining items, a few at most.
     public let items: [UpcomingEvent]
 
-    public init(monthTitle: String, weekdaySymbols: [String], weeks: [[Int?]], today: Int?, markedDays: Set<Int>, items: [UpcomingEvent]) {
+    public init(monthTitle: String, monthShort: String = "", weekdayTitle: String = "", dayNumber: Int = 0, weekdaySymbols: [String], weekendColumns: [Bool] = Array(repeating: false, count: 7), weeks: [[Int?]], today: Int?, markedDays: Set<Int>, items: [UpcomingEvent]) {
         self.monthTitle = monthTitle
+        self.monthShort = monthShort
+        self.weekdayTitle = weekdayTitle
+        self.dayNumber = dayNumber
         self.weekdaySymbols = weekdaySymbols
+        self.weekendColumns = weekendColumns
         self.weeks = weeks
         self.today = today
         self.markedDays = markedDays
@@ -35,9 +46,21 @@ public struct CalendarModeData: Sendable, Equatable {
         formatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
         let first = calendar.firstWeekday - 1
+        let short = DateFormatter()
+        short.calendar = calendar
+        short.locale = calendar.locale
+        short.setLocalizedDateFormatFromTemplate("MMM")
+        let weekday = DateFormatter()
+        weekday.calendar = calendar
+        weekday.locale = calendar.locale
+        weekday.setLocalizedDateFormatFromTemplate("EEE")
         self.init(
             monthTitle: formatter.string(from: now),
+            monthShort: short.string(from: now).uppercased(),
+            weekdayTitle: weekday.string(from: now).uppercased(),
+            dayNumber: calendar.component(.day, from: now),
             weekdaySymbols: (0..<7).map { symbols[($0 + first) % 7] },
+            weekendColumns: (0..<7).map { let weekday = ($0 + first) % 7 + 1; return weekday == 1 || weekday == 7 },
             weeks: MonthGrid.weeks(containing: now, calendar: calendar),
             today: calendar.component(.day, from: now),
             markedDays: markedDays,

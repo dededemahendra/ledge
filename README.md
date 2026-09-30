@@ -33,9 +33,9 @@ previous · play/pause · next · repeat. The star works for Apple Music only
 (Spotify has no local way to like a track); the first tap makes macOS ask once
 to let Ledge control Music, and until that tap Ledge never talks to Music. The output button opens a list of every audio
 output below the controls (the card grows to fit); pick one to switch. A two-finger swipe on the open card slides
-to its other mode, **Calendar**: this month as a grid with today on a disc and a dot under each day that has
-something, and today's remaining items beside it, each a row that opens the item; two dots at the foot say which
-mode you are in. With nothing playing, a swipe on the next-item preview opens the calendar directly. Click the island to pin the card open; click
+to its other mode, **Calendar**: the weekday and a big date with today's remaining items as chips in their
+calendars' colours, and this month as a grid — weekends dimmed, busy days in red, today on a disc; a chip opens its
+item. Two dots at the foot say which mode you are in. With nothing playing, a swipe on the next-item preview opens the calendar directly. Click the island to pin the card open; click
 elsewhere, or Escape, to unpin. A click on a blip with nothing playing does nothing. Two-finger swipe left or right over the island
 to skip tracks.
 

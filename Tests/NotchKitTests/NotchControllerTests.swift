@@ -640,7 +640,7 @@ private func someMedia() -> MediaPresentation {
     #expect(c.state == .expanded && c.panel == .media)
     #expect(!c.swipe(.next), "one mode only: not taken, so the presenter skips the track")
 
-    let month = CalendarModeData(monthTitle: "September 2026", weekdaySymbols: ["S", "M", "T", "W", "T", "F", "S"], weeks: [[nil, nil, 1, 2, 3, 4, 5]], today: 30, markedDays: [30], items: [item])
+    let month = CalendarModeData(monthTitle: "September 2026", monthShort: "SEP", weekdayTitle: "WED", dayNumber: 30, weekdaySymbols: ["S", "M", "T", "W", "T", "F", "S"], weeks: [[nil, nil, 1, 2, 3, 4, 5]], today: 30, markedDays: [30], items: [item])
     c.setCalendarMode(month)
     #expect(c.availablePanels == [.media, .calendar])
     #expect(c.swipe(.next) && c.panel == .calendar && c.state == .expanded)
@@ -682,4 +682,5 @@ private func someMedia() -> MediaPresentation {
     #expect(MonthGrid.weeks(containing: sept30, calendar: mondayFirst)[0] == [nil, 1, 2, 3, 4, 5, 6])
     let data = CalendarModeData(now: sept30, calendar: mondayFirst, markedDays: [1], items: [])
     #expect(data.today == 30 && data.weekdaySymbols.count == 7 && data.weekdaySymbols[0] == mondayFirst.veryShortStandaloneWeekdaySymbols[1])
+    #expect(data.dayNumber == 30 && data.weekendColumns == [false, false, false, false, false, true, true], "Monday first: the weekend is the last two columns")
 }
