@@ -27,6 +27,12 @@ public final class CalendarService {
     /// Calendars and lists the user switched off in Settings (2026-09-30);
     /// anything new is on until switched off.
     private var disabledCalendarIDs: Set<String> = []
+    /// Days of the current month with an event / a timed reminder, for the
+    /// card's month grid (2026-09-30). All-day events count here (a holiday
+    /// is a mark) though they never blip.
+    public private(set) var markedEventDays: Set<Int> = []
+    public private(set) var markedReminderDays: Set<Int> = []
+    private var markedMonth: DateComponents?
     private var reloadTask: Task<Void, Never>?
     private var continuation: AsyncStream<MeetingReminder>.Continuation?
     private var accessTask: Task<Void, Never>?
@@ -204,6 +210,27 @@ public final class CalendarService {
                 reminderCount = reminders.count
                 items += reminders
             }
+            // The month grid's marks.
+            let calendar = Calendar.current
+            if let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
+               let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) {
+                var eventDays: Set<Int> = [], reminderDays: Set<Int> = []
+                if hasEvents, let calendars = enabledCalendars(for: .event) {
+                    for event in store.events(matching: store.predicateForEvents(withStart: monthStart, end: monthEnd, calendars: calendars))
+                    where event.status != .canceled {
+                        if let start = event.startDate { eventDays.insert(calendar.component(.day, from: start)) }
+                    }
+                }
+                if hasReminders, let lists = enabledCalendars(for: .reminder) {
+                    for item in await fetchTimedReminders(from: monthStart, to: monthEnd, lists: lists) {
+                        reminderDays.insert(calendar.component(.day, from: item.start))
+                    }
+                }
+                guard !Task.isCancelled else { return }
+                markedEventDays = eventDays
+                markedReminderDays = reminderDays
+                markedMonth = calendar.dateComponents([.year, .month], from: now)
+            }
             guard !Task.isCancelled else { return }
             events = items.filter { $0.end > now }.sorted { $0.start < $1.start }
             Self.log.notice("calendar reload: \(eventCount, privacy: .public) event(s) and \(reminderCount, privacy: .public) timed reminder(s) in the next day, \(self.events.count, privacy: .public) upcoming; next: \(self.events.first?.title ?? "none", privacy: .private)")
@@ -233,6 +260,12 @@ public final class CalendarService {
 
     private func evaluate() {
         let now = Date()
+        // A new month: the grid's marks are for the old one.
+        if let markedMonth, markedMonth != Calendar.current.dateComponents([.year, .month], from: now) {
+            self.markedMonth = nil
+            reload()
+            return
+        }
         for reminder in policy.due(for: events, at: now) {
             Self.log.debug("reminder: \(reminder.stage.rawValue, privacy: .public) \(reminder.compactText, privacy: .public)")
             continuation?.yield(reminder)

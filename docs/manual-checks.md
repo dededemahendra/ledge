@@ -1514,3 +1514,10 @@ back → the card; at the last mode a swipe does nothing (never a skip). With
 nothing playing, swipe on the preview → Up next. Leaving resets to now-playing.
 Rendered the calendar mode headlessly: header, four rows, dots. Judge live for
 the swipe feel and that a row click opens the item.
+
+## Calendar mode as a month grid (2026-09-30)
+
+Replaced the Up next list: month grid (today on a disc, dots on marked days)
+plus today's items. Rendered headlessly and checked. Judge live: swipe to it —
+this month with today marked; a day with an event has a dot; today's items on
+the right open on click; at midnight and at month's end the grid follows.

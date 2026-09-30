@@ -1038,3 +1038,13 @@ nothing moves).
 agenda; the output picker only lives in the media mode. `AppModel.refreshUpcoming`
 feeds the agenda (four items, texts cached per item and day) beside the
 preview. Modes crossfade (`.blurReplace`) on the panel change.
+
+**A calendar, not a list (2026-09-30, user's call).** The calendar mode is this
+month as a grid (`MonthGrid`, rows of seven from the calendar's first weekday;
+today on a white disc; a 2.5 pt dot under each day with an event or timed
+reminder, all-day events counting as marks) with today's remaining items — up
+to three, glyph, title, when — in a column beside it. `CalendarService` fetches
+the month's marks on every reload and reloads when the month turns;
+`AppModel` builds `CalendarModeData` on the tick and the presenter drops
+equal values. The mode exists whenever calendar access is granted, items or
+not.

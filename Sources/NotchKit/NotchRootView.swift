@@ -1017,10 +1017,10 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var detailRow: some View {
-        if controller.state == .expanded, controller.panel == .calendar, !controller.agenda.isEmpty {
+        if controller.state == .expanded, controller.panel == .calendar, let data = controller.calendarMode {
             // The calendar mode (2026-09-30).
             CalendarPanelView(
-                items: controller.agenda, contentColor: contentColor,
+                data: data, contentColor: contentColor,
                 reduceMotion: controller.reduceMotion, emit: { controller.emit($0) }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

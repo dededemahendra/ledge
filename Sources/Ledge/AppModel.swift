@@ -441,19 +441,30 @@ final class AppModel {
     private func refreshUpcoming() {
         let now = Date()
         let day = Calendar.current.startOfDay(for: now)
-        // The card's calendar mode: the next four, texts cached per item and day.
-        let list = calendar.upcoming(at: now, limit: 4, allowing: allowedCalendarKinds)
-        presenter.setAgenda(list.map { event in
-            if agendaTexts[event.id]?.day != day {
-                agendaTexts[event.id] = (day, event.captionText(at: now), event.whenText(at: now))
-            }
-            let texts = agendaTexts[event.id]!
-            return UpcomingEvent(
-                title: event.title, symbolName: event.symbolName, compactText: event.countdownText(at: now),
-                caption: texts.caption, when: texts.when,
-                url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind)
-            )
-        })
+        // The card's calendar mode (2026-09-30): this month's grid with its
+        // marks, and today's remaining items, texts cached per item and day.
+        if calendar.availability.isAvailable {
+            let today = calendar.upcoming(at: now, limit: 8, allowing: allowedCalendarKinds)
+                .filter { Calendar.current.isDate($0.start, inSameDayAs: now) }
+                .prefix(3)
+                .map { event -> UpcomingEvent in
+                    if agendaTexts[event.id]?.day != day {
+                        agendaTexts[event.id] = (day, event.captionText(at: now), event.whenText(at: now))
+                    }
+                    let texts = agendaTexts[event.id]!
+                    return UpcomingEvent(
+                        title: event.title, symbolName: event.symbolName, compactText: event.countdownText(at: now),
+                        caption: texts.caption, when: texts.when,
+                        url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind)
+                    )
+                }
+            var marks: Set<Int> = []
+            if settings.showsCalendarEvents { marks.formUnion(calendar.markedEventDays) }
+            if settings.showsReminders { marks.formUnion(calendar.markedReminderDays) }
+            presenter.setCalendarMode(CalendarModeData(now: now, calendar: Calendar.current, markedDays: marks, items: Array(today)))
+        } else {
+            presenter.setCalendarMode(nil)
+        }
         if agendaTexts.count > 64 { agendaTexts = [:] }
 
         guard let event = calendar.nextEvent(at: now, allowing: allowedCalendarKinds) else {

@@ -371,10 +371,10 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
-    /// The card's calendar mode rows; can change the card's shape.
-    public func setAgenda(_ items: [UpcomingEvent]) {
-        guard items != controller.agenda else { return }
-        controller.setAgenda(items)
+    /// The card's calendar mode; can change the card's shape.
+    public func setCalendarMode(_ data: CalendarModeData?) {
+        guard data != controller.calendarMode else { return }
+        controller.setCalendarMode(data)
         syncWindowToVisibility()
     }
 

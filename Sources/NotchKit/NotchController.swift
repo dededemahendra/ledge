@@ -329,13 +329,14 @@ public final class NotchController {
 
     public private(set) var panel: Panel = .media
 
-    /// The calendar mode's rows; empty means no calendar mode.
-    public private(set) var agenda: [UpcomingEvent] = []
+    /// What the calendar mode draws; `nil` means no calendar mode (no
+    /// calendar access).
+    public private(set) var calendarMode: CalendarModeData?
 
-    public func setAgenda(_ items: [UpcomingEvent]) {
-        guard items != agenda else { return }
-        agenda = items
-        if agenda.isEmpty, panel == .calendar { panel = .media }
+    public func setCalendarMode(_ data: CalendarModeData?) {
+        guard data != calendarMode else { return }
+        calendarMode = data
+        if calendarMode == nil, panel == .calendar { panel = .media }
         recomputeState()
     }
 
@@ -343,7 +344,7 @@ public final class NotchController {
     public var availablePanels: [Panel] {
         var panels: [Panel] = []
         if media != nil { panels.append(.media) }
-        if !agenda.isEmpty { panels.append(.calendar) }
+        if calendarMode != nil { panels.append(.calendar) }
         return panels
     }
 
@@ -362,7 +363,7 @@ public final class NotchController {
             }
             return true
         }
-        if isPreviewingUpcoming, !agenda.isEmpty {
+        if isPreviewingUpcoming, calendarMode != nil {
             panel = .calendar
             recomputeState()
             return true
@@ -704,7 +705,7 @@ public final class NotchController {
             state = .expanded
         } else if isHovered, media != nil {
             state = .expanded
-        } else if isHovered, panel == .calendar, !agenda.isEmpty {
+        } else if isHovered, panel == .calendar, calendarMode != nil {
             // The calendar mode, swiped open from the preview.
             state = .expanded
         } else if activityCount > 0 {

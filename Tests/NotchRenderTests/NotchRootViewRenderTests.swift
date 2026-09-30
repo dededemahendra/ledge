@@ -708,7 +708,10 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     let controller = makeController()
     controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
     controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
-    controller.setAgenda((1...4).map { UpcomingEvent(title: "Item \($0)", compactText: "\($0)h", caption: "Item \($0) · 1\($0):00", when: "1\($0):00–1\($0):30", url: nil) })
+    controller.setCalendarMode(CalendarModeData(
+        now: Date(), calendar: Calendar.current, markedDays: [1, 15, 30],
+        items: (1...3).map { UpcomingEvent(title: "Item \($0)", compactText: "\($0)h", caption: "Item \($0) · 1\($0):00", when: "1\($0):00–1\($0):30", url: nil) }
+    ))
     controller.setHovered(true)
     #expect(controller.swipe(.next) && controller.panel == .calendar)
     let result = renderAndClassify(controller)

@@ -640,7 +640,8 @@ private func someMedia() -> MediaPresentation {
     #expect(c.state == .expanded && c.panel == .media)
     #expect(!c.swipe(.next), "one mode only: not taken, so the presenter skips the track")
 
-    c.setAgenda([item])
+    let month = CalendarModeData(monthTitle: "September 2026", weekdaySymbols: ["S", "M", "T", "W", "T", "F", "S"], weeks: [[nil, nil, 1, 2, 3, 4, 5]], today: 30, markedDays: [30], items: [item])
+    c.setCalendarMode(month)
     #expect(c.availablePanels == [.media, .calendar])
     #expect(c.swipe(.next) && c.panel == .calendar && c.state == .expanded)
     #expect(c.swipe(.next) && c.panel == .calendar, "at the last mode: taken, nothing moves, no skip")
@@ -654,13 +655,31 @@ private func someMedia() -> MediaPresentation {
     // Nothing playing: the preview swipes open into the calendar mode.
     let d = makeController()
     d.setUpcoming(item)
-    d.setAgenda([item])
+    d.setCalendarMode(month)
     d.setHovered(true)
     #expect(d.state == .peek && d.isPreviewingUpcoming)
     #expect(d.swipe(.next) && d.state == .expanded && d.panel == .calendar)
     #expect(d.parameters == d.metrics.expanded)
     d.setHovered(false)
     #expect(d.state == .hidden && d.panel == .media)
-    d.setAgenda([])
+    d.setCalendarMode(nil)
     #expect(d.availablePanels.isEmpty)
+}
+
+/// The month grid (2026-09-30): rows of seven from the calendar's first
+/// weekday, padded at both ends.
+@Test func theMonthGridPadsToWholeWeeks() {
+    var sundayFirst = Calendar(identifier: .gregorian)
+    sundayFirst.firstWeekday = 1
+    sundayFirst.timeZone = TimeZone(identifier: "UTC")!
+    let sept30 = sundayFirst.date(from: DateComponents(year: 2026, month: 9, day: 30))!
+    let weeks = MonthGrid.weeks(containing: sept30, calendar: sundayFirst)
+    #expect(weeks.count == 5)
+    #expect(weeks[0] == [nil, nil, 1, 2, 3, 4, 5], "September 2026 starts on a Tuesday")
+    #expect(weeks[4] == [27, 28, 29, 30, nil, nil, nil])
+    var mondayFirst = sundayFirst
+    mondayFirst.firstWeekday = 2
+    #expect(MonthGrid.weeks(containing: sept30, calendar: mondayFirst)[0] == [nil, 1, 2, 3, 4, 5, 6])
+    let data = CalendarModeData(now: sept30, calendar: mondayFirst, markedDays: [1], items: [])
+    #expect(data.today == 30 && data.weekdaySymbols.count == 7 && data.weekdaySymbols[0] == mondayFirst.veryShortStandaloneWeekdaySymbols[1])
 }
