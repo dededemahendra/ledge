@@ -431,6 +431,19 @@ public final class NotchController {
 
     public var isVisible: Bool { state != .hidden }
 
+    /// The island a caption line needs: the line at the caption row's own
+    /// fonts (11 pt semibold title, regular rest), plus its 14 pt side
+    /// paddings and room to spare (2026-10-01).
+    func captionWidth(_ caption: String?) -> CGFloat {
+        guard let caption else { return NotchMetrics.captionedMinimumWidth }
+        let parts = caption.components(separatedBy: " · ")
+        let title = NSAttributedString(string: parts.first ?? caption, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
+        let rest = parts.count > 1
+            ? NSAttributedString(string: " · " + parts.dropFirst().joined(separator: " · "), attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
+            : 0
+        return ceil(title + rest) + 2 * 14 + 16
+    }
+
     /// The ear the leading activity's trailing text needs (2026-09-30: a
     /// Focus's name stands where "On" was): measured at the 11 pt medium
     /// `compactValue` draws it, plus breathing room. Four characters or
@@ -500,7 +513,7 @@ public final class NotchController {
         case .hidden:
             return metrics.collapsed
         case .peek:
-            return upcoming != nil ? metrics.captioned : metrics.peek
+            return upcoming != nil ? metrics.captioned(fitting: captionWidth(upcoming?.caption)) : metrics.peek
         case .activity:
             // One size for every activity, however many are queued
             // (2026-09-29): the "grow down when crowded" two-slot layout
@@ -508,7 +521,7 @@ public final class NotchController {
             // own the island alone. The one thing that still grows the
             // compact island is a song-change caption, and only while
             // media itself leads.
-            return hasCaption ? metrics.captioned : metrics.oneActivity(earWidth: leadingEarWidth)
+            return hasCaption ? metrics.captioned(fitting: captionWidth(caption)) : metrics.oneActivity(earWidth: leadingEarWidth)
         case .expanded:
             return metrics.expanded(outputRows: panel == .media && isOutputPickerOpen ? outputs.count : 0)
         }

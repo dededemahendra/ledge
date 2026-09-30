@@ -656,7 +656,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     controller.setMedia(MediaPresentation(title: "Tangerine Rays", artist: "Zedd, Bea Miller & Grey", artwork: nil, isPlaying: true, elapsed: 3, duration: 200))
     controller.setActivities([.init(id: "media", title: "Tangerine Rays", detail: "Zedd")], overflow: 0)
     controller.setCaption("Tangerine Rays · Zedd, Bea Miller & Grey")
-    #expect(controller.parameters == controller.metrics.captioned)
+    #expect(controller.parameters.height == controller.metrics.captioned.height && controller.parameters.width >= NotchMetrics.captionedMinimumWidth)
 
     let result = renderAndClassify(controller)
     #expect(result.hasContentInsideIsland, "the caption did not render")
@@ -675,7 +675,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     controller.setUpcoming(UpcomingEvent(title: "Design review", compactText: "42m", caption: "Design review · 14:00", url: nil))
     controller.setHovered(true)
     #expect(controller.state == .peek)
-    #expect(controller.parameters == controller.metrics.captioned)
+    #expect(controller.parameters.height == controller.metrics.captioned.height && controller.parameters.width >= NotchMetrics.captionedMinimumWidth)
 
     let result = renderAndClassify(controller)
     #expect(result.hasContentInsideIsland, "no content pixel inside \(result.islandBounds) — the preview did not render")

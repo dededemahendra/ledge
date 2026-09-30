@@ -1534,3 +1534,10 @@ opens the item.
 Swipe: the old panel slides out the way the finger went and softens, the new
 one slides in from the other side on the expand spring; the calendar reveals
 date → chips → grid rows with a 40 ms stagger. Dots removed. Judge live.
+
+## Caption blip fits its line (2026-10-01)
+
+User: "polish this blip" (song caption in a 342 pt island with the line at the
+left). The captioned island now fits the line — floor 255 (the plain blip's
+width), cap 430 (the card's) — for song captions, meeting captions and the
+next-item preview alike. Rendered short/mid/long. Judge live on a song change.

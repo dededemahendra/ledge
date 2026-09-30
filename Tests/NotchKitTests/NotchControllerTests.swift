@@ -265,7 +265,7 @@ private func someMedia() -> MediaPresentation {
     c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
     c.setCaption("Song · Artist")
     #expect(c.hasCaption)
-    #expect(c.parameters == c.metrics.captioned)
+    #expect(c.parameters.height == c.metrics.captioned.height && c.parameters.width >= NotchMetrics.captionedMinimumWidth)
 
     c.setActivities([.init(id: "hud", title: "Sound", compactText: "50%", symbolName: "speaker.wave.3.fill", barFill: 0.5),
                      .init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
@@ -571,7 +571,7 @@ private func someMedia() -> MediaPresentation {
     c.setUpcoming(UpcomingEvent(title: "Design review", compactText: "42m", caption: "Design review · 14:00", url: url))
     c.setHovered(true)
     #expect(c.state == .peek && c.isPreviewingUpcoming)
-    #expect(c.parameters == c.metrics.captioned, "ears plus the caption line, like the reminder blip")
+    #expect(c.parameters.height == c.metrics.captioned.height && c.parameters.width >= NotchMetrics.captionedMinimumWidth, "ears plus the caption line, like the reminder blip")
     #expect(c.captionText == "Design review · 14:00")
     #expect(c.linkURL == url, "the island is a button now — the view dips it on press")
     c.tap()
@@ -602,7 +602,7 @@ private func someMedia() -> MediaPresentation {
     c.setActivities([meeting], overflow: 0)
     c.setCaption("Standup · 10:00")
     #expect(c.hasCaption && c.captionText == "Standup · 10:00")
-    #expect(c.parameters == c.metrics.captioned)
+    #expect(c.parameters.height == c.metrics.captioned.height && c.parameters.width >= NotchMetrics.captionedMinimumWidth)
     c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"), meeting], overflow: 0)
     #expect(!c.hasCaption && c.parameters == c.metrics.oneActivity)
 }
@@ -683,4 +683,21 @@ private func someMedia() -> MediaPresentation {
     let data = CalendarModeData(now: sept30, calendar: mondayFirst, markedDays: [1], items: [])
     #expect(data.today == 30 && data.weekdaySymbols.count == 7 && data.weekdaySymbols[0] == mondayFirst.veryShortStandaloneWeekdaySymbols[1])
     #expect(data.dayNumber == 30 && data.weekendColumns == [false, false, false, false, false, true, true], "Monday first: the weekend is the last two columns")
+}
+
+/// The caption island fits its line (2026-10-01): short lines keep the
+/// floor, long ones widen up to the card's width, the row's height stays.
+@MainActor
+@Test func theCaptionIslandFitsItsLine() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.setCaption("Hey · Sia")
+    #expect(c.hasCaption)
+    #expect(c.parameters.width == NotchMetrics.captionedMinimumWidth)
+    #expect(c.parameters.height == c.metrics.captioned.height)
+    c.setCaption("Somewhere Only We Know (Live at the Royal Albert Hall) · Keane")
+    #expect(c.parameters.width > NotchMetrics.captionedMinimumWidth && c.parameters.width < NotchMetrics.captionedMaximumWidth)
+    c.setCaption(String(repeating: "Supercalifragilistic ", count: 4) + "· Someone")
+    #expect(c.parameters.width == NotchMetrics.captionedMaximumWidth, "capped at the card's width; the row truncates")
 }

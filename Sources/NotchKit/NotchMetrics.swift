@@ -47,9 +47,17 @@ public struct NotchMetrics: Sendable, Equatable {
     /// down and back rather than swapping shapes.
     public static let captionRowHeight: CGFloat = 26
 
-    public var captioned: NotchShapeParameters {
+    public var captioned: NotchShapeParameters { captioned(fitting: 342) }
+
+    /// The caption line's island, as wide as the line needs (2026-10-01,
+    /// user's call: the fixed 342 pt left a short title in a sea of black)
+    /// and never narrower than the ears want or wider than the card.
+    public static let captionedMinimumWidth: CGFloat = 255
+    public static let captionedMaximumWidth: CGFloat = 430
+
+    public func captioned(fitting width: CGFloat) -> NotchShapeParameters {
         NotchShapeParameters(
-            width: 342,
+            width: min(Self.captionedMaximumWidth, max(Self.captionedMinimumWidth, width)),
             height: notchRect.height + Self.captionRowHeight,
             bottomRadius: 18,
             outerFillet: 9
