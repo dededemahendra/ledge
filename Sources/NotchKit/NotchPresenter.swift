@@ -201,6 +201,10 @@ public final class NotchPresenter {
         isLocked = locked
         controller.setLocked(locked)
         if !locked, window == nil { rebuildForCurrentScreen() }
+        // The compact island rides the shield level while locked, with
+        // `canBecomeVisibleWithoutLogin`; the state itself never changes
+        // on lock, so unlock has nothing to animate.
+        window?.setLocked(locked)
         syncWindowToVisibility()
     }
 
@@ -342,13 +346,7 @@ public final class NotchPresenter {
         // not the dwell-promoted `controller.isHovered`: a click on a
         // visible island during the dwell must still land on it.
         window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside))
-        if isLocked {
-            // Hidden outright while the screen is locked; no retract, no
-            // level change. Unlocking re-syncs and orders it straight in.
-            hideTask?.cancel()
-            hideTask = nil
-            window.orderOut(nil)
-        } else if controller.isVisible {
+        if controller.isVisible {
             hideTask?.cancel()
             hideTask = nil
             window.orderFrontRegardless()

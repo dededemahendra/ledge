@@ -35,6 +35,11 @@ public final class NotchWindow: NSPanel {
         )
 
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        // The one door onto the lock screen (2026-10-01): windows meant
+        // for login-time agents may show without a logged-in session, and
+        // with the shield level that is what puts a window over the lock
+        // screen — where a plain level change alone never reached.
+        canBecomeVisibleWithoutLogin = true
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
