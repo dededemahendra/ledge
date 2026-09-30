@@ -24,12 +24,21 @@ enum MenuBarProbe {
             let element = AXUIElementCreateApplication(app.processIdentifier)
             var extras: CFTypeRef?
             let status = AXUIElementCopyAttributeValue(element, kAXExtrasMenuBarAttribute as CFString, &extras)
-            guard status == .success, let bar = extras else {
+            if status == .success, let bar = extras {
+                lines.append("\(bundle) extras:")
+                describe(bar as! AXUIElement, depth: 0, into: &lines)
+            } else {
                 lines.append("\(bundle): no extras menu bar (\(status.rawValue))")
-                continue
             }
-            lines.append("\(bundle):")
-            describe(bar as! AXUIElement, depth: 0, into: &lines)
+            // The whole top level too: a Focus item or a live activity may
+            // be hosted as a window or a child rather than an extra.
+            for attribute in [kAXWindowsAttribute, kAXChildrenAttribute, kAXMenuBarAttribute] {
+                var value: CFTypeRef?
+                guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success, let value else { continue }
+                let items = (value as? [AXUIElement]) ?? [value as! AXUIElement]
+                lines.append("\(bundle) \(attribute) (\(items.count)):")
+                for item in items.prefix(30) { describe(item, depth: 0, into: &lines) }
+            }
         }
         return lines
     }

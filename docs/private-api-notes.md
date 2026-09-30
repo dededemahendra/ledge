@@ -205,3 +205,13 @@ identifier expected `com.apple.menuextra.focusmodes`) appears in
 `MenuBarAgent`'s `AXExtrasMenuBar` while a Focus is on; its value/description
 carries the mode's name. Exact text not yet observed — `FocusState.name(from:)`
 strips a leading "Focus" and trailing ", on".
+
+**Update 2026-09-30.** No Focus item ever appeared in `MenuBarAgent`'s tree on
+this Mac while a Focus was on, and no distributed notification fired. What IS
+readable without Full Disk Access is the metadata of
+`~/Library/DoNotDisturb/DB/Assertions.json` (`stat` succeeds; `open` does not).
+The file is rewritten on every toggle: ~1270 bytes with no assertion, ~1900
+with one (each record ~630 bytes; a switch between Focuses rewrites at ±2
+bytes). `FocusService` polls its size once a second; `FocusSizeDeriver` turns
+a jump of ≥300 bytes up into "on", down into "off". The Focus's name is not
+available this way.

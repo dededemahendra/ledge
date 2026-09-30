@@ -239,16 +239,11 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". Any other blip
     /// pre-empting the island takes it whole.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isFocusLeading)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading)
     }
 
-    /// `AppModel` inserts the Focus blip with this id; its caption names
-    /// the Focus.
+    /// `AppModel` inserts the Focus blip with this id.
     public static let focusActivityID = "focus"
-
-    public var isFocusLeading: Bool {
-        activities.first?.id == Self.focusActivityID
-    }
 
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"

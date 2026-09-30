@@ -2,17 +2,20 @@ import Foundation
 import OSLog
 import ActivityKit
 
-/// Focus on/off as a blip (2026-09-29): polls the menu bar's extras once a
-/// second through Accessibility and streams the transitions. Needs the
-/// Accessibility grant; without it the menu says so, like the media keys.
+/// Focus on/off as a blip (2026-09-30): polls the size of the Focus
+/// database's assertions file once a second — metadata only, readable
+/// without Full Disk Access — and streams the transitions
+/// (`FocusSizeDeriver`). If the file cannot be stat'ed the menu says so.
 @MainActor
 public final class FocusService {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "focus")
 
-    public private(set) var availability: ServiceAvailability = .available
-    public private(set) var current: FocusState?
+    public static let assertionsFile = FileManager.default.homeDirectoryForCurrentUser
+        .appending(path: "Library/DoNotDisturb/DB/Assertions.json")
 
-    private var deriver = FocusEventDeriver()
+    public private(set) var availability: ServiceAvailability = .available
+
+    private var deriver = FocusSizeDeriver()
     private var timer: Timer?
     private var continuation: AsyncStream<FocusEvent>.Continuation?
 
@@ -38,19 +41,15 @@ public final class FocusService {
     }
 
     private func poll() {
-        guard MenuBarExtrasReader.isTrusted else {
-            availability = .needsPermission("Accessibility")
-            return
-        }
-        guard let extras = MenuBarExtrasReader.read() else {
-            availability = .unavailable(reason: "menu bar not readable")
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: Self.assertionsFile.path),
+              let size = (attributes[.size] as? NSNumber)?.intValue
+        else {
+            availability = .unavailable(reason: "Focus state not readable")
             return
         }
         availability = .available
-        let state = FocusState.current(in: extras)
-        current = state
-        if let event = deriver.sample(state) {
-            Self.log.notice("focus \(event.isOn ? "on" : "off", privacy: .public): \(event.state.name, privacy: .private)")
+        if let event = deriver.sample(size: size) {
+            Self.log.notice("focus \(event == .on ? "on" : "off", privacy: .public) (assertions file \(size, privacy: .public) bytes)")
             continuation?.yield(event)
         }
     }

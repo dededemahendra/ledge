@@ -1451,3 +1451,10 @@ for 3 s; off: outline moon + "Off". The log's "focus on/off" line confirms the
 transition (name private). If nothing shows, the extra's identifier or text
 differs from the guess — `ledge://probe/menubar` (debug) writes the tree to
 ~/Library/Logs/Ledge/menubar-probe.txt.
+
+## Focus blip, second route (2026-09-30)
+
+Menu bar route dead (no item, no notification). Calibrated with a watcher
+while the user toggled: 1271 → 1902 → 1904 → 1267 → 1902 bytes. Now size-based:
+moon + On/Off, no name. Judge live: toggle a Focus — "On" / "Off" blips; the
+log line "focus on/off (assertions file N bytes)" confirms.

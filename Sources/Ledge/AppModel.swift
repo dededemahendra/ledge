@@ -338,9 +338,10 @@ final class AppModel {
         publish()
     }
 
-    /// A Focus turning on or off (2026-09-29): its glyph left, On/Off
-    /// right, its name in the caption line for the blip's lifetime — the
-    /// Caps Lock idiom with a name, since which Focus matters.
+    /// A Focus turning on or off (2026-09-30): the moon left, On/Off
+    /// right — the Caps Lock idiom. No name: the state comes from the
+    /// Focus database's file size, the one thing readable without Full
+    /// Disk Access (see `FocusService`).
     private func handle(_ event: FocusEvent) {
         queue.insert(
             ActivityRecord(
@@ -348,12 +349,11 @@ final class AppModel {
                 kind: .focus,
                 insertedAt: Date(),
                 ttl: ActivityKind.focus.defaultTTL,
-                title: event.state.name,
+                title: "Focus",
                 compactText: event.compactText,
                 symbolName: event.symbolName
             )
         )
-        showCaption(event.state.name, for: ActivityKind.focus.defaultTTL ?? NotchController.captionDuration)
         publish()
     }
 

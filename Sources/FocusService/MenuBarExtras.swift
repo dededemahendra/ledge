@@ -27,16 +27,27 @@ public enum MenuBarExtrasReader {
 
     public static var isTrusted: Bool { AXIsProcessTrusted() }
 
-    /// `nil` when the host is not running or exposes no extras bar.
+    /// Every `com.apple.menuextra.*` item on the strip. The agent's window
+    /// holds the whole menu bar — system extras and third-party buttons —
+    /// so it is walked three levels deep, with the extras bar as a second
+    /// source; duplicates collapse. `nil` when the host is not running.
     public static func read() -> [MenuBarExtra]? {
         guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: host).first else { return nil }
         let element = AXUIElementCreateApplication(app.processIdentifier)
+        var roots: [AXUIElement] = []
         var bar: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXExtrasMenuBarAttribute as CFString, &bar) == .success, let bar else { return nil }
+        if AXUIElementCopyAttributeValue(element, kAXExtrasMenuBarAttribute as CFString, &bar) == .success, let bar {
+            roots.append(bar as! AXUIElement)
+        }
+        var windows: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &windows) == .success,
+           let windows = windows as? [AXUIElement] {
+            roots += windows
+        }
         var extras: [MenuBarExtra] = []
-        for group in children(of: bar as! AXUIElement) {
-            for item in [group] + children(of: group) {
-                guard let id = string(kAXIdentifierAttribute, of: item), id.hasPrefix("com.apple.menuextra.") else { continue }
+        var seen: Set<String> = []
+        func visit(_ item: AXUIElement, depth: Int) {
+            if let id = string(kAXIdentifierAttribute, of: item), id.hasPrefix("com.apple.menuextra."), seen.insert(id).inserted {
                 extras.append(MenuBarExtra(
                     identifier: id,
                     description: string(kAXDescriptionAttribute, of: item),
@@ -44,7 +55,10 @@ public enum MenuBarExtrasReader {
                     title: string(kAXTitleAttribute, of: item)
                 ))
             }
+            guard depth < 4 else { return }
+            for child in children(of: item) { visit(child, depth: depth + 1) }
         }
+        for root in roots { visit(root, depth: 0) }
         return extras
     }
 
