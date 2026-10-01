@@ -516,9 +516,9 @@ final class AppModel {
 
     /// The island's record for the activity (2026-10-01): the pill's two
     /// compact slots either side of the notch when the Mac draws them;
-    /// otherwise the copied card's teams in the ears, its score under the
-    /// notch and the card itself on hover; the phone glyph alone when
-    /// there is neither.
+    /// otherwise the copied card's crest-and-figure pairs in the ears and
+    /// the card itself on hover; the phone glyph alone when there is
+    /// neither.
     private func publishLiveActivity() {
         guard let frame = livePill else { return }
         func mirror(_ image: PillImage?) -> ActivityMirror? {
@@ -528,11 +528,9 @@ final class AppModel {
         let split = frame.leading != nil || frame.trailing != nil
         var leading = split ? mirror(frame.leading) : nil
         var trailing = split ? mirror(frame.trailing) : mirror(frame.whole)
-        var caption: ActivityMirror?
         if let card = liveCard, leading == nil, trailing == nil {
             leading = mirror(card.leading)
             trailing = mirror(card.trailing)
-            caption = mirror(card.center)
         }
         queue.insert(
             ActivityRecord(
@@ -545,7 +543,6 @@ final class AppModel {
                 url: URL(string: "ledge://live-activity"),
                 mirror: trailing,
                 leadingMirror: leading,
-                captionMirror: caption,
                 card: liveCard.flatMap { mirror($0.whole) }
             )
         )
@@ -1001,7 +998,6 @@ final class AppModel {
                 parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
                 mirror: record.mirror.map { .init(png: $0.png, size: $0.size) },
                 leadingMirror: record.leadingMirror.map { .init(png: $0.png, size: $0.size) },
-                captionMirror: record.captionMirror.map { .init(png: $0.png, size: $0.size) },
                 card: record.card.map { .init(png: $0.png, size: $0.size) }
             )
         }

@@ -242,11 +242,13 @@ own render — for a football match, flags, score and clock. `CardPeek` finds
 that window through `SCShareableContent` (owner `com.apple.MenuBarAgent`, on
 screen, just below the pill, wider than it), captures it with
 `SCContentFilter(desktopIndependentWindow:)`, and `CardCropper` trims it to
-its opaque bounds and slices it: a round crest a sixth of the way in on each
-side, a third of the way down and a tenth of the width across (measured on
-the real card), cut square for the ears, which clip it round; and the band
-between them keyed to its bright, uncoloured pixels and trimmed to them, so
-the caption row gets white figures on black and not the card's gradient (the
+its opaque bounds and slices it into the phone's own compact pair: a round
+crest a sixth of the way in on each side, a third of the way down and a tenth
+of the width across (measured on the real card), drawn round into a small
+bitmap with that side's figure beside it — crest outward, figure toward the
+notch. The figure comes from the band between the crests, split down the
+middle and keyed to its bright, uncoloured pixels, then trimmed to them, so
+what lands in the ear is a white numeral and not the card's gradient (the
 little ball between the numbers is colourful, and keyed without that test it
 came through as a speck). The whole card goes to the open panel.
 The peek takes about a fifth of a second and the system card flashes for it;

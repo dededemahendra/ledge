@@ -1585,8 +1585,8 @@ pill.
 
 With a match activity on the phone (pill blank on the Mac): on arrival the
 system card flashes once under the menu bar and the island shows the home
-team's crest as a round badge left, the away team's right, and the score as
-white figures under the notch. Rest on the island — the card flashes again and the island opens
+crest with its score in the left ear and the away score with its crest in the
+right, around the notch, as the phone's island does. Rest on the island — the card flashes again and the island opens
 on the card itself (flags, score, clock); swipe for the now-playing card.
 Click — the system's own card. Headless renders of the resting and open
 island checked against a capture of the real card (Indonesia 0–0

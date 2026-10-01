@@ -10,20 +10,17 @@ import OSLog
 /// popover's window the moment it is on screen, presses again to close
 /// it. A flash of the system card, about a fifth of a second.
 public struct CardFrame: Sendable, Equatable {
-    /// The card itself, at its own point size.
+    /// The card itself, at its own point size — what the open panel shows.
     public let whole: PillImage
-    /// The card's left and right thirds, top part — a home team and the
-    /// away team — sized for an ear.
+    /// The compact pair for each ear, as the phone's island draws it: the
+    /// home crest with its figure, and the away figure with its crest.
     public let leading: PillImage
     public let trailing: PillImage
-    /// The middle, top part — the score — sized for the caption row.
-    public let center: PillImage
 
-    public init(whole: PillImage, leading: PillImage, trailing: PillImage, center: PillImage) {
+    public init(whole: PillImage, leading: PillImage, trailing: PillImage) {
         self.whole = whole
         self.leading = leading
         self.trailing = trailing
-        self.center = center
     }
 }
 
@@ -52,20 +49,23 @@ public enum CardCropper {
         return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 
-    /// Where a score card keeps its badges and its score, measured on the
-    /// real thing (2026-10-01): a round crest a sixth of the way in on
-    /// each side, a third of the way down, about a tenth of the width
-    /// across; the score between them, in the band above the clock. The
-    /// crest is cut as a square and the island's ear clips it round, so
-    /// the gradient behind it never reaches the island; the score is
-    /// keyed to its bright figures and trimmed to them, so what lands
-    /// under the notch is white digits on black, the island's own idiom.
+    /// Where a score card keeps its badges and its figures, measured on
+    /// the real thing (2026-10-01): a round crest a sixth of the way in
+    /// on each side, a third of the way down, about a tenth of the width
+    /// across; each side's figure in the band between the crests, split
+    /// down the middle.
     public static let crestCentreX = 0.165
     public static let crestCentreY = 0.33
     public static let crestSize = 0.092
-    public static let scoreBand = CGRect(x: 0.30, y: 0.14, width: 0.40, height: 0.38)
+    public static let scoreTop = 0.14
+    public static let scoreBottom = 0.52
+    public static let scoreInner = 0.50
+    public static let scoreOuter = 0.28
     public static let earHeight: CGFloat = 24
-    public static let captionHeight: CGFloat = 19
+    /// A figure beside a crest, as a fraction of the crest, and the air
+    /// between them — the phone's island proportions.
+    static let figureHeight = 0.78
+    static let figureGap = 0.28
     /// Below this luminance a score pixel is background.
     static let scoreFloor = 110.0
     static let scoreCeiling = 190.0
@@ -75,27 +75,66 @@ public enum CardCropper {
     static let scoreSaturationFloor = 0.25
     static let scoreSaturationCeiling = 0.45
 
-    /// Slices a window capture (`scale` pixels per point) into a frame.
+    /// Slices a window capture (`scale` pixels per point) into a frame:
+    /// the whole card for the panel, and a crest-and-figure pair for each
+    /// ear — crest outward, figure toward the notch, the way the phone's
+    /// island splits a scoreline around its camera.
     public static func frame(from window: CGImage, scale: CGFloat) -> CardFrame? {
         guard let bounds = opaqueBounds(of: window), bounds.width >= 40 * scale, bounds.height >= 24 * scale,
               let card = window.cropping(to: bounds)
         else { return nil }
         let w = CGFloat(card.width), h = CGFloat(card.height)
         let side = max(2, (w * crestSize).rounded())
+        let top = (h * scoreTop).rounded(), bottom = (h * scoreBottom).rounded()
         func crest(at centreX: Double) -> CGImage? {
             card.cropping(to: CGRect(x: (w * centreX - side / 2).rounded(), y: (h * crestCentreY - side / 2).rounded(),
                                      width: side, height: side).integral)
         }
-        let band = CGRect(x: (w * scoreBand.minX).rounded(), y: (h * scoreBand.minY).rounded(),
-                          width: (w * scoreBand.width).rounded(), height: (h * scoreBand.height).rounded()).integral
-        guard let left = crest(at: crestCentreX), let right = crest(at: 1 - crestCentreX),
-              let middle = card.cropping(to: band), let score = keyedBright(middle),
+        func figure(from x0: Double, to x1: Double) -> CGImage? {
+            let rect = CGRect(x: (w * x0).rounded(), y: top, width: (w * (x1 - x0)).rounded(), height: bottom - top).integral
+            return card.cropping(to: rect).flatMap(keyedBright)
+        }
+        guard let homeCrest = crest(at: crestCentreX), let awayCrest = crest(at: 1 - crestCentreX),
               let whole = encode(card, size: CGSize(width: w / scale, height: h / scale)),
-              let leading = encode(left, size: CGSize(width: earHeight, height: earHeight)),
-              let trailing = encode(right, size: CGSize(width: earHeight, height: earHeight)),
-              let center = encode(score, size: fitted(score, height: captionHeight))
+              let home = pair(crest: homeCrest, figure: figure(from: scoreOuter, to: scoreInner), figureLeading: false),
+              let away = pair(crest: awayCrest, figure: figure(from: scoreInner, to: 1 - scoreOuter), figureLeading: true),
+              let leading = encode(home, size: fitted(home, height: earHeight)),
+              let trailing = encode(away, size: fitted(away, height: earHeight))
         else { return nil }
-        return CardFrame(whole: whole, leading: leading, trailing: trailing, center: center)
+        return CardFrame(whole: whole, leading: leading, trailing: trailing)
+    }
+
+    /// A crest and its figure side by side on transparency: the crest
+    /// drawn round (the square cut carries the card's gradient in its
+    /// corners), the figure scaled to the crest and set beside it.
+    static func pair(crest: CGImage, figure: CGImage?, figureLeading: Bool) -> CGImage? {
+        let size = crest.height
+        var figureSize = CGSize.zero
+        if let figure, figure.height > 0 {
+            let height = (Double(size) * figureHeight).rounded()
+            figureSize = CGSize(width: (Double(figure.width) * height / Double(figure.height)).rounded(), height: height)
+        }
+        let gap = figureSize.width > 0 ? (Double(size) * figureGap).rounded() : 0
+        let width = Int(Double(crest.width) + gap + figureSize.width)
+        guard width > 0, size > 0,
+              let context = CGContext(data: nil, width: width, height: size, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.clear(CGRect(x: 0, y: 0, width: width, height: size))
+        context.interpolationQuality = .high
+        let crestX = figureLeading ? Double(width) - Double(crest.width) : 0
+        let crestRect = CGRect(x: crestX, y: 0, width: Double(crest.width), height: Double(size))
+        context.saveGState()
+        context.addEllipse(in: crestRect)
+        context.clip()
+        context.draw(crest, in: crestRect)
+        context.restoreGState()
+        if let figure, figureSize.width > 0 {
+            let x = figureLeading ? 0 : Double(crest.width) + gap
+            context.draw(figure, in: CGRect(x: x, y: (Double(size) - figureSize.height) / 2,
+                                            width: figureSize.width, height: figureSize.height))
+        }
+        return context.makeImage()
     }
 
     /// The bright figures of a slice on transparency, trimmed to them —

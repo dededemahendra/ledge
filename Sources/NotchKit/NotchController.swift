@@ -232,9 +232,7 @@ public final class NotchController {
         /// The pill's leading slot for the leading ear, in place of the
         /// glyph — the home team to `mirror`'s away team.
         public let leadingMirror: Mirror?
-        /// A picture for the caption row — a match's score — and the
-        /// whole system card for the open panel (`Panel.liveActivity`).
-        public let captionMirror: Mirror?
+        /// The whole system card, for the open panel (`Panel.liveActivity`).
         public let card: Mirror?
 
         public init(
@@ -250,7 +248,6 @@ public final class NotchController {
             parts: [Part]? = nil,
             mirror: Mirror? = nil,
             leadingMirror: Mirror? = nil,
-            captionMirror: Mirror? = nil,
             card: Mirror? = nil
         ) {
             self.id = id
@@ -265,7 +262,6 @@ public final class NotchController {
             self.parts = parts
             self.mirror = mirror
             self.leadingMirror = leadingMirror
-            self.captionMirror = captionMirror
             self.card = card
         }
     }
@@ -314,7 +310,7 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". Any other blip
     /// pre-empting the island takes it whole.
     public var hasCaption: Bool {
-        state == .activity && ((caption != nil && (isMediaLeading || isCalendarLeading)) || activities.first?.captionMirror != nil)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading)
     }
 
     public var isLiveActivityLeading: Bool {
@@ -725,9 +721,6 @@ public final class NotchController {
         if activities.first?.leadingMirror?.png != self.activities.first?.leadingMirror?.png {
             leadingMirrorImage = activities.first?.leadingMirror.flatMap { NSImage(data: $0.png) }
         }
-        if activities.first?.captionMirror?.png != self.activities.first?.captionMirror?.png {
-            captionMirrorImage = activities.first?.captionMirror.flatMap { NSImage(data: $0.png) }
-        }
         if activities.first?.card?.png != self.activities.first?.card?.png {
             cardImage = activities.first?.card.flatMap { NSImage(data: $0.png) }
         }
@@ -756,7 +749,6 @@ public final class NotchController {
     /// view must not decode a PNG on every body pass.
     public private(set) var mirrorImage: NSImage?
     public private(set) var leadingMirrorImage: NSImage?
-    public private(set) var captionMirrorImage: NSImage?
     public private(set) var cardImage: NSImage?
 
     /// Identity of the leading blip, if the leading activity is one.

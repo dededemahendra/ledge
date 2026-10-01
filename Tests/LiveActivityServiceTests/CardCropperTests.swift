@@ -25,13 +25,33 @@ private func window() -> CGImage {
     #expect(CardCropper.opaqueBounds(of: window()) == CGRect(x: 20, y: 30, width: 200, height: 80))
 }
 
-@Test func theCardIsSlicedIntoCrestsAScoreAndTheWhole() {
+@Test func theCardIsSlicedIntoACrestAndFigurePairPerEar() {
     let frame = CardCropper.frame(from: window(), scale: 2)!
     #expect(frame.whole.size == CGSize(width: 100, height: 40), "the card at its own point size")
-    #expect(frame.leading.size == CGSize(width: CardCropper.earHeight, height: CardCropper.earHeight), "a square crest, the ear clips it round")
-    #expect(frame.trailing.size == CGSize(width: CardCropper.earHeight, height: CardCropper.earHeight))
-    #expect(frame.center.size.height == CardCropper.captionHeight)
-    #expect(frame.center.size.width > 0)
+    #expect(frame.leading.size.height == CardCropper.earHeight)
+    #expect(frame.trailing.size.height == CardCropper.earHeight)
+    #expect(frame.leading.size.width > CardCropper.earHeight, "a crest AND its figure, so wider than tall")
+}
+
+/// The pair is crest-outward: the figure sits toward the notch on each
+/// side, as the phone's island draws a scoreline around its camera.
+@Test func aPairPutsTheCrestOutwardAndTheFigureInward() {
+    let crest = solid(red: 0.8)
+    let figure = solid(red: 1)
+    let home = CardCropper.pair(crest: crest, figure: figure, figureLeading: false)!
+    let away = CardCropper.pair(crest: crest, figure: figure, figureLeading: true)!
+    #expect(home.width == away.width && home.height == crest.height)
+    #expect(home.width > crest.width, "the figure widens the pair")
+    // The crest is drawn round, so a pair's outer top corner is clear.
+    #expect(alpha(home, x: 0, y: 0) == 0, "home crest leads, its corner rounded away")
+    #expect(alpha(away, x: away.width - 1, y: 0) == 0, "away crest trails")
+    #expect(CardCropper.pair(crest: crest, figure: nil, figureLeading: false)!.width == crest.width,
+            "no figure, no widening")
+}
+
+private func alpha(_ image: CGImage, x: Int, y: Int) -> UInt8 {
+    let data = image.dataProvider!.data! as Data
+    return data[(y * image.bytesPerRow) + x * 4 + 3]
 }
 
 @Test func theScoreIsKeyedToItsBrightFiguresAndTrimmedToThem() {
