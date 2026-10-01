@@ -830,10 +830,11 @@ public struct NotchRootView: View {
         return first.id == Self.mediaActivityID && controller.media != nil && controller.state != .expanded
     }
 
-    /// A system pill's pixels at its own size (2026-10-01): the iPhone
-    /// Live Activity as the menu bar draws it, clipped to its capsule so
-    /// the menu bar's material around it stays out of the island. Frames
-    /// replace in place, no transition — it is a live picture.
+    /// A system pill's content at its own size (2026-10-01): the iPhone
+    /// Live Activity as the menu bar draws it, its capsule fill keyed out
+    /// upstream so only the phone's glyphs and text land on the island;
+    /// the capsule clip is a second guard. Frames replace in place, no
+    /// transition — it is a live picture.
     private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror) -> some View {
         Group {
             if let image = controller.mirrorImage {

@@ -4,12 +4,16 @@ import OSLog
 
 /// One frame of the pill: its pixels as PNG and its size in points.
 public struct PillFrame: Sendable, Equatable {
+    /// The pill's content on transparency — see `PillKeyer`.
     public let png: Data
     public let size: CGSize
+    /// `false` for a pill with nothing drawn in it.
+    public let hasContent: Bool
 
-    public init(png: Data, size: CGSize) {
+    public init(png: Data, size: CGSize, hasContent: Bool = true) {
         self.png = png
         self.size = size
+        self.hasContent = hasContent
     }
 }
 
@@ -99,9 +103,11 @@ actor PillCapture {
         guard let filter, let configuration else { return }
         do {
             let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
-            guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]), png != lastPNG else { return }
+            guard let keyed = PillKeyer.key(image),
+                  let png = NSBitmapImageRep(cgImage: keyed.image).representation(using: .png, properties: [:]), png != lastPNG
+            else { return }
             lastPNG = png
-            onFrame(PillFrame(png: png, size: pointSize))
+            onFrame(PillFrame(png: png, size: pointSize, hasContent: keyed.hasContent))
         } catch {
             Self.log.notice("live activity: screenshot failed — \(error.localizedDescription, privacy: .public)")
         }

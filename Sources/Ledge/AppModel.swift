@@ -495,7 +495,9 @@ final class AppModel {
                     title: "Live Activity",
                     symbolName: "iphone",
                     url: URL(string: "ledge://live-activity"),
-                    mirror: ActivityMirror(png: frame.png, size: frame.size)
+                    // An empty pill mirrors as nothing: the phone glyph
+                    // alone says an activity is running.
+                    mirror: frame.hasContent ? ActivityMirror(png: frame.png, size: frame.size) : nil
                 )
             )
         case .ended:
