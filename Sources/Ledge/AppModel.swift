@@ -236,7 +236,9 @@ final class AppModel {
             }
             return
         }
-        let symbol = latest.isCharged ? "battery.100percent" : (latest.isCharging ? "battery.100percent.bolt" : "powerplug.fill")
+        // Plugged in is the bolt battery, full is the full battery; the
+        // system's "attached but holding" is not a third face (2026-10-01).
+        let symbol = latest.isCharged ? "battery.100percent" : "battery.100percent.bolt"
         let text = "\(latest.percent)%"
         guard chargingShown?.symbol != symbol || chargingShown?.text != text else { return }
         chargingShown = (symbol, text)
