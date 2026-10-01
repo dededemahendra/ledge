@@ -487,6 +487,11 @@ final class AppModel {
     private var liveCard: CardFrame?
     private var peekTask: Task<Void, Never>?
     private var peekedThisHover = false
+    private var lastPeekAt: Date?
+    /// A rest on the island refreshes the card at most this often: each
+    /// peek flashes the system card, and the cursor passing in and out
+    /// (2026-10-01, from a recording) must not strobe it.
+    private static let peekRefreshInterval: TimeInterval = 30
 
     private func handle(_ event: LiveActivityEvent) {
         switch event {
@@ -501,6 +506,7 @@ final class AppModel {
         case .ended:
             livePill = nil
             liveCard = nil
+            lastPeekAt = nil
             peekTask?.cancel()
             peekTask = nil
             queue.remove(kind: .liveActivity)
@@ -556,17 +562,20 @@ final class AppModel {
             defer { self.peekTask = nil }
             if let card = await self.liveActivities.peek(), self.livePill != nil {
                 self.liveCard = card
+                self.lastPeekAt = Date()
                 self.publishLiveActivity()
             }
         }
     }
 
-    /// On the tick: a rest on the island refreshes the card once per rest.
+    /// On the tick: a rest on the island refreshes the card once per rest,
+    /// and not within `peekRefreshInterval` of the last look.
     private func refreshCardOnHover() {
         let controller = presenter.controller
         guard controller.isHovered else { peekedThisHover = false; return }
         guard !peekedThisHover, controller.isLiveActivityLeading, livePill != nil else { return }
         peekedThisHover = true
+        if let last = lastPeekAt, Date().timeIntervalSince(last) < Self.peekRefreshInterval { return }
         peekCard()
     }
 

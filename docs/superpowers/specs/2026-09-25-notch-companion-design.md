@@ -1087,7 +1087,8 @@ render, the pill stays blank and the activity lives only in the system card
 that pressing the pill opens. The island then peeks: `LiveActivityService.
 peek()` presses the pill, captures the card's window the moment it is on
 screen and presses again to close it — a flash of about a fifth of a second
-— once when the blank pill arrives and again on each rest on the island. The
+— once when the blank pill arrives and again on a rest on the island, at most
+once every 30 s (a cursor passing in and out must not strobe the card). The
 card's left and right thirds go to the ears as team capsules, its middle
 under the notch as the score (`captionMirror`), and the whole card is the
 hover's own panel (`Panel.liveActivity`, ahead of the now-playing card, a

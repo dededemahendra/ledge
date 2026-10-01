@@ -1079,8 +1079,8 @@ public struct NotchRootView: View {
                 .scaleEffect(min(1, (controller.parameters.width - 24) / max(1, card.size.width)), anchor: .top)
                 .frame(width: controller.parameters.width - 24, height: min(card.size.height, controller.parameters.height - controller.metrics.notchRect.height - 16), alignment: .top)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .padding(.top, 2)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                // Centred in the panel's budget, like the now-playing card.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .id("live-activity")
                 .transition(panelTransition)
         } else if controller.state == .expanded, controller.panel == .calendar, let data = controller.calendarMode {
