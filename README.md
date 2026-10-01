@@ -16,7 +16,7 @@ run anywhere else either.
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00–22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
-| An iPhone Live Activity (paired iPhone, macOS 26+) | a match shows its crest and score in each ear, around the notch, keeping up by the second; hover for the names, period and a clock that counts; click for the system's own. Needs Screen Recording |
+| An iPhone Live Activity (paired iPhone, macOS 26+) | a match shows its crest and score in each ear, around the notch, keeping up by the second; hover and the pair drops into a card with names, period and a clock that counts; click for the system's own. Needs Screen Recording |
 | A Focus turns on or off | with Full Disk Access granted: the Focus's own symbol in its own colour left and its name right (the island stretches to fit), "Off" with the symbol uncoloured, 3 s; without it: the moon and On/Off |
 | An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |

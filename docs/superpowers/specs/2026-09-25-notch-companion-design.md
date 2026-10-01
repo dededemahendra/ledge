@@ -1089,9 +1089,11 @@ as text, and it keeps answering after being moved off the screen — so the
 island presses the pill once, photographs the card for its crests, parks the
 window out of sight and reads it once a second (`CardReader`). A match becomes
 a crest and a figure in each ear, crest outward, as the phone's island draws
-one around its camera; the hover panel says only what the ears cannot — who is
-playing, the period and the clock — since repeating the crests and figures
-below them was the same thing twice (user's call). It is the island's own
+one around its camera. Hovering hands the pair down into the card and empties
+the ears, the way the now-playing artwork hands off to the media panel (user's
+call: "like music player"), with each crest flying on its own
+`matchedGeometryEffect`; the open card then carries both crests, names and
+figures with the period and the clock between them. It is the island's own
 drawing, not a picture, so the clock keeps time. Anything that is not a match keeps the phone glyph
 and shows the card's state line in the trailing ear. A click puts the system's
 own card back under the pill for a few seconds.

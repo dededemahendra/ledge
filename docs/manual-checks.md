@@ -1588,9 +1588,10 @@ flashes once under the menu bar as the activity arrives, then the island shows
 the home crest with its score in the left ear and the away score with its
 crest in the right, around the notch. The score and clock keep up by
 themselves, a second at a time, with no further flash — watch a goal land.
-Rest on the island: the competition, both team names and a clock that counts,
-with the ears keeping the crests and figures — nothing said twice. Watch that
-the middle shows the period or nothing, never the away side's own figure. Click it: the system's own card appears under the pill
+Rest on the island: the crests fly down out of the ears into the card, which
+then holds both crests, names and figures with the clock between them, and the
+ears are empty — nothing is drawn twice. Watch that the middle shows the
+period or nothing, never the away side's own figure. Click it: the system's own card appears under the pill
 for eight seconds, then goes again. The menu bar pill shows its collapse
 chevron while all this runs, which is the one visible sign. End the activity
 on the phone — the island clears within a second and the card is closed and

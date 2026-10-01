@@ -350,6 +350,10 @@ public struct NotchRootView: View {
 
     /// Hero-pair id for the compact-ear ↔ panel artwork morph.
     static let artworkGeometryID = "media-artwork"
+    /// The crests fly the same way between the ears and the open card
+    /// (2026-10-01, user's call: "like music player").
+    static let homeCrestGeometryID = "live-home-crest"
+    static let awayCrestGeometryID = "live-away-crest"
 
     /// See `previousHeight` above for why this is the spelled-out property
     /// wrapper type rather than the attribute. `Namespace` is a
@@ -685,7 +689,16 @@ public struct NotchRootView: View {
                     value: media.title
                 )
         } else if let score = controller.score {
-            scoreSide(score.home, crest: controller.homeCrestImage, crestLeading: true)
+            // The open card owns the pair, exactly as it owns the artwork
+            // when music is playing: this slot yields it so the crest can
+            // fly down into the card instead of being drawn twice.
+            // `Color.clear`, not `EmptyView`, keeps the ear's width.
+            if controller.state == .expanded, controller.panel == .liveActivity {
+                Color.clear
+            } else {
+                scoreSide(score.home, crest: controller.homeCrestImage, crestLeading: true,
+                          geometryID: Self.homeCrestGeometryID)
+            }
         } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
@@ -836,7 +849,8 @@ public struct NotchRootView: View {
     /// the figure toward the notch, as the phone's island draws a match
     /// around its camera. The figure rolls between values like every
     /// other number on the island.
-    private func scoreSide(_ side: NotchController.ActivityDisplay.Score.Side, crest: NSImage?, crestLeading: Bool) -> some View {
+    private func scoreSide(_ side: NotchController.ActivityDisplay.Score.Side, crest: NSImage?,
+                           crestLeading: Bool, geometryID: String) -> some View {
         let badge = Group {
             if let crest {
                 Image(nsImage: crest).resizable().interpolation(.high)
@@ -845,6 +859,7 @@ public struct NotchRootView: View {
             }
         }
         .frame(width: 20, height: 20)
+        .matchedGeometryEffect(id: geometryID, in: artworkNamespace)
         let figure = Text(side.value)
             .font(.system(size: 15, weight: .semibold))
             .monospacedDigit()
@@ -987,7 +1002,12 @@ public struct NotchRootView: View {
                 .monospacedDigit()
         } else if let activity = controller.activities.first {
             if let score = controller.score {
-                scoreSide(score.away, crest: controller.awayCrestImage, crestLeading: false)
+                if controller.state == .expanded, controller.panel == .liveActivity {
+                    Color.clear
+                } else {
+                    scoreSide(score.away, crest: controller.awayCrestImage, crestLeading: false,
+                              geometryID: Self.awayCrestGeometryID)
+                }
             } else if let parts = activity.parts, !parts.isEmpty {
                 readings(parts)
             } else if let compact = activity.compactText {
@@ -1069,7 +1089,10 @@ public struct NotchRootView: View {
 
     @ViewBuilder private var detailRow: some View {
         if controller.state == .expanded, controller.panel == .liveActivity, let score = controller.score {
-            ScorePanelView(score: score, contentColor: contentColor)
+            ScorePanelView(
+                score: score, homeCrest: controller.homeCrestImage, awayCrest: controller.awayCrestImage,
+                contentColor: contentColor, crestNamespace: artworkNamespace
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .id("live-activity")
             .transition(panelTransition)
