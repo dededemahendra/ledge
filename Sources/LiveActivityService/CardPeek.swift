@@ -104,6 +104,33 @@ public enum CardCropper {
         return CardFrame(whole: whole, leading: leading, trailing: trailing)
     }
 
+    /// A crest cut from the captured card at the rectangle the card's own
+    /// Accessibility tree gives for it, drawn round on transparency —
+    /// exact, where guessing at fractions left the badges ragged
+    /// (2026-10-01).
+    public static func crest(from card: CGImage, at rect: CGRect, scale: CGFloat, size: CGFloat) -> PillImage? {
+        let pixels = CGRect(x: rect.minX * scale, y: rect.minY * scale,
+                            width: rect.width * scale, height: rect.height * scale).integral
+        guard pixels.width >= 2, pixels.height >= 2,
+              pixels.maxX <= CGFloat(card.width) + 1, pixels.maxY <= CGFloat(card.height) + 1,
+              let cut = card.cropping(to: pixels.intersection(CGRect(x: 0, y: 0, width: card.width, height: card.height)))
+        else { return nil }
+        let side = Int((size * scale).rounded())
+        guard side > 1,
+              let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.clear(CGRect(x: 0, y: 0, width: side, height: side))
+        context.interpolationQuality = .high
+        context.addEllipse(in: CGRect(x: 0, y: 0, width: side, height: side))
+        context.clip()
+        context.draw(cut, in: CGRect(x: 0, y: 0, width: side, height: side))
+        guard let image = context.makeImage(),
+              let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+        else { return nil }
+        return PillImage(png: png, size: CGSize(width: size, height: size), hasContent: true)
+    }
+
     /// A crest and its figure side by side on transparency: the crest
     /// drawn round (the square cut carries the card's gradient in its
     /// corners), the figure scaled to the crest and set beside it.
@@ -192,6 +219,16 @@ enum CardPeek {
                 && window.frame.minY >= pill.maxY - 4 && window.frame.minY < pill.maxY + 40
                 && window.frame.width > pill.width * 2 && window.frame.height > 40
                 && window.frame.midX > pill.minX - 400 && window.frame.midX < pill.maxX + 400
+        }
+    }
+
+    /// The card's window wherever it is, on screen or not — used after
+    /// it has been moved out of sight.
+    static func anyPopover() async -> SCWindow? {
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false) else { return nil }
+        return content.windows.first { window in
+            window.owningApplication?.bundleIdentifier == PillLocator.host
+                && window.frame.width > 200 && window.frame.height > 200
         }
     }
 

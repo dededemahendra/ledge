@@ -684,6 +684,8 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: media.title
                 )
+        } else if let score = controller.score {
+            scoreSide(score.home, crest: controller.homeCrestImage, crestLeading: true)
         } else if let activity = controller.activities.first, let mirror = activity.leadingMirror {
             // The pill's leading slot (2026-10-01): a home team's crest
             // and score where the phone glyph would be.
@@ -839,6 +841,32 @@ public struct NotchRootView: View {
     /// cut from the system's card. Shaped upstream — keyed, trimmed,
     /// rounded — so nothing is clipped here. Frames replace in place, no
     /// transition: it is a live picture.
+    /// One side of a scoreline in an ear (2026-10-01): the crest outward,
+    /// the figure toward the notch, as the phone's island draws a match
+    /// around its camera. The figure rolls between values like every
+    /// other number on the island.
+    private func scoreSide(_ side: NotchController.ActivityDisplay.Score.Side, crest: NSImage?, crestLeading: Bool) -> some View {
+        let badge = Group {
+            if let crest {
+                Image(nsImage: crest).resizable().interpolation(.high)
+            } else {
+                Circle().fill(contentColor.opacity(0.22))
+            }
+        }
+        .frame(width: 20, height: 20)
+        let figure = Text(side.value)
+            .font(.system(size: 15, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(contentColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .contentTransition(.numericText())
+            .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: side.value)
+        return HStack(spacing: 5) {
+            if crestLeading { badge; figure } else { figure; badge }
+        }
+    }
+
     private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror, image: NSImage?) -> some View {
         Group {
             if let image {
@@ -980,7 +1008,9 @@ public struct NotchRootView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
         } else if let activity = controller.activities.first {
-            if let mirror = activity.mirror {
+            if let score = controller.score {
+                scoreSide(score.away, crest: controller.awayCrestImage, crestLeading: false)
+            } else if let mirror = activity.mirror {
                 pillMirror(mirror, image: controller.mirrorImage)
             } else if let parts = activity.parts, !parts.isEmpty {
                 readings(parts)
@@ -1062,7 +1092,15 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var detailRow: some View {
-        if controller.state == .expanded, controller.panel == .liveActivity, controller.hasCard,
+        if controller.state == .expanded, controller.panel == .liveActivity, let score = controller.score {
+            ScorePanelView(
+                score: score, homeCrest: controller.homeCrestImage,
+                awayCrest: controller.awayCrestImage, contentColor: contentColor
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .id("live-activity")
+            .transition(panelTransition)
+        } else if controller.state == .expanded, controller.panel == .liveActivity, controller.hasCard,
            let card = controller.activities.first?.card {
             // The system's own card for the iPhone Live Activity, copied
             // (2026-10-01): fitted to the panel, its corners kept.

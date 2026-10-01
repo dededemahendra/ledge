@@ -1082,19 +1082,18 @@ without the Settings toggle, asks for Screen Recording once when a pill is
 first seen, and reports `.needsPermission("Screen Recording")` until granted
 — the Permissions pane and the menu both say so.
 
-**Peek and copy (user's call, 2026-10-01).** For an app the Mac cannot
-render, the pill stays blank and the activity lives only in the system card
-that pressing the pill opens. The island then peeks: `LiveActivityService.
-peek()` presses the pill, captures the card's window the moment it is on
-screen and presses again to close it — a flash of about a fifth of a second
-— once when the blank pill arrives and again on a rest on the island, at most
-once every 30 s (a cursor passing in and out must not strobe the card). The
-card gives each ear a crest-and-figure pair, as the phone's island draws a
-scoreline around its camera: the crest cut round and set outward, the side's
-own numeral keyed off the gradient and set toward the notch; and the whole
-card is the
-hover's own panel (`Panel.liveActivity`, ahead of the now-playing card, a
-swipe away from it). Between peeks the score is as of the last look.
+**A live scoreline (2026-10-01).** For an app the Mac cannot render, the pill
+stays blank and everything the activity says lives in the card the pill opens.
+That card is an ordinary window whose Accessibility tree carries the figures
+as text, and it keeps answering after being moved off the screen — so the
+island presses the pill once, photographs the card for its crests, parks the
+window out of sight and reads it once a second (`CardReader`). A match becomes
+a crest and a figure in each ear, crest outward, as the phone's island draws
+one around its camera; the hover panel is the island's own drawing of the card
+— crests, names, the figures, the period and the clock — not a picture of it,
+so the clock keeps time. Anything that is not a match keeps the phone glyph
+and shows the card's state line in the trailing ear. A click puts the system's
+own card back under the pill for a few seconds.
 
 **Overflow pip.** The "+N" count in the trailing ear now shows only when the
 leading activity leaves that ear empty: a Clock timer's clock or a Live

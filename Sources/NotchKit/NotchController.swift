@@ -235,6 +235,36 @@ public final class NotchController {
         /// The whole system card, for the open panel (`Panel.liveActivity`).
         public let card: Mirror?
 
+        /// A scoreline from an iPhone Live Activity (2026-10-01): a crest
+        /// and a figure in each ear, and the card itself on hover.
+        public struct Score: Sendable, Equatable {
+            public struct Side: Sendable, Equatable {
+                public let name: String
+                public let value: String
+                public let crest: Data?
+
+                public init(name: String, value: String, crest: Data?) {
+                    self.name = name
+                    self.value = value
+                    self.crest = crest
+                }
+            }
+            public let home: Side
+            public let away: Side
+            public let status: String?
+            public let clock: String?
+            public let title: String?
+
+            public init(home: Side, away: Side, status: String? = nil, clock: String? = nil, title: String? = nil) {
+                self.home = home
+                self.away = away
+                self.status = status
+                self.clock = clock
+                self.title = title
+            }
+        }
+        public let score: Score?
+
         public init(
             id: String,
             title: String,
@@ -248,7 +278,8 @@ public final class NotchController {
             parts: [Part]? = nil,
             mirror: Mirror? = nil,
             leadingMirror: Mirror? = nil,
-            card: Mirror? = nil
+            card: Mirror? = nil,
+            score: Score? = nil
         ) {
             self.id = id
             self.title = title
@@ -263,6 +294,7 @@ public final class NotchController {
             self.mirror = mirror
             self.leadingMirror = leadingMirror
             self.card = card
+            self.score = score
         }
     }
 
@@ -320,7 +352,12 @@ public final class NotchController {
     /// The system card to open on hover, when the leading live activity
     /// has one.
     public var hasCard: Bool {
-        isLiveActivityLeading && activities.first?.card != nil
+        isLiveActivityLeading && (activities.first?.card != nil || activities.first?.score != nil)
+    }
+
+    /// The scoreline the ears are drawing, if any.
+    public var score: ActivityDisplay.Score? {
+        isLiveActivityLeading ? activities.first?.score : nil
     }
 
     /// `AppModel` inserts the Focus blip with this id.
@@ -498,6 +535,16 @@ public final class NotchController {
     /// `compactValue` draws it, plus breathing room. Four characters or
     /// fewer — every percentage, "Now", "Off" — leave the default.
     public var leadingEarWidth: CGFloat {
+        if let score {
+            // A crest and its figure, as the view lays them out: a 20 pt
+            // badge, 5 pt of air, the figure at 15 pt semibold, and the
+            // ear's own breathing room. Both ears take the wider.
+            let font = NSFont.monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
+            let figures = [score.home.value, score.away.value].map {
+                ceil(NSAttributedString(string: $0, attributes: [.font: font]).size().width)
+            }
+            return max(NotchMetrics.activityEarWidth, 20 + 5 + (figures.max() ?? 0) + 14)
+        }
         let mirrored = max(activities.first?.mirror?.size.width ?? 0, activities.first?.leadingMirror?.size.width ?? 0)
         if mirrored > 0 {
             // The pill's slot at its own size, with 6 pt of air each side
@@ -724,6 +771,12 @@ public final class NotchController {
         if activities.first?.card?.png != self.activities.first?.card?.png {
             cardImage = activities.first?.card.flatMap { NSImage(data: $0.png) }
         }
+        if activities.first?.score?.home.crest != self.activities.first?.score?.home.crest {
+            homeCrestImage = activities.first?.score?.home.crest.flatMap(NSImage.init(data:))
+        }
+        if activities.first?.score?.away.crest != self.activities.first?.score?.away.crest {
+            awayCrestImage = activities.first?.score?.away.crest.flatMap(NSImage.init(data:))
+        }
         if panel == .liveActivity, !(activities.first?.id == Self.liveActivityID && activities.first?.card != nil) {
             panel = .media
         }
@@ -750,6 +803,9 @@ public final class NotchController {
     public private(set) var mirrorImage: NSImage?
     public private(set) var leadingMirrorImage: NSImage?
     public private(set) var cardImage: NSImage?
+    /// The scoreline's crests, decoded once per change.
+    public private(set) var homeCrestImage: NSImage?
+    public private(set) var awayCrestImage: NSImage?
 
     /// Identity of the leading blip, if the leading activity is one.
     /// Title included so plug → unplug (same id, new title) pulses again.

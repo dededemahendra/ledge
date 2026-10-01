@@ -37,6 +37,38 @@ public struct ActivityMirror: Sendable, Equatable {
     }
 }
 
+/// A scoreline an iPhone Live Activity is running (2026-10-01): two
+/// sides with a crest and a figure, and whatever the card says between
+/// them — the period and a running clock.
+public struct ActivityScore: Sendable, Equatable {
+    public struct Side: Sendable, Equatable {
+        public let name: String
+        public let value: String
+        /// The crest as a round picture, cut from the card.
+        public let crest: Data?
+
+        public init(name: String, value: String, crest: Data?) {
+            self.name = name
+            self.value = value
+            self.crest = crest
+        }
+    }
+
+    public let home: Side
+    public let away: Side
+    public let status: String?
+    public let clock: String?
+    public let title: String?
+
+    public init(home: Side, away: Side, status: String? = nil, clock: String? = nil, title: String? = nil) {
+        self.home = home
+        self.away = away
+        self.status = status
+        self.clock = clock
+        self.title = title
+    }
+}
+
 /// One thing the island is currently saying.
 public struct ActivityRecord: Sendable, Equatable, Identifiable {
     public let id: String
@@ -76,6 +108,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     public let leadingMirror: ActivityMirror?
     /// The whole system card, for the open panel.
     public let card: ActivityMirror?
+    /// A scoreline, when the activity is a match — see `ActivityScore`.
+    public let score: ActivityScore?
 
     public init(
         id: String,
@@ -93,7 +127,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         parts: [ActivityPart]? = nil,
         mirror: ActivityMirror? = nil,
         leadingMirror: ActivityMirror? = nil,
-        card: ActivityMirror? = nil
+        card: ActivityMirror? = nil,
+        score: ActivityScore? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -111,6 +146,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.mirror = mirror
         self.leadingMirror = leadingMirror
         self.card = card
+        self.score = score
     }
 
     public var isSticky: Bool { ttl == nil }

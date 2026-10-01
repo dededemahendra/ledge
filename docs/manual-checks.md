@@ -1581,14 +1581,17 @@ Checked live: the island showed the phone glyph and the pill's own pixels,
 following the pill when it moved. Headless render checked with a captured
 pill.
 
-## Live score, peek and copy (2026-10-01)
+## Live score (2026-10-01)
 
-With a match activity on the phone (pill blank on the Mac): on arrival the
-system card flashes once under the menu bar and the island shows the home
-crest with its score in the left ear and the away score with its crest in the
-right, around the notch, as the phone's island does. Rest on the island — the card flashes again and the island opens
-on the card itself (flags, score, clock); swipe for the now-playing card.
-Click — the system's own card. Headless renders of the resting and open
-island checked against a capture of the real card (Indonesia 0–0
-Bangladesh); the popover's window identified live (MenuBarAgent, layer 101,
-408×960) and gone once closed.
+With a match activity on the phone (pill blank on the Mac): the system card
+flashes once under the menu bar as the activity arrives, then the island shows
+the home crest with its score in the left ear and the away score with its
+crest in the right, around the notch. The score and clock keep up by
+themselves, a second at a time, with no further flash — watch a goal land.
+Rest on the island: the island's own card, crests, names, figures, period and
+a clock that counts. Click it: the system's own card appears under the pill
+for eight seconds, then goes again. The menu bar pill shows its collapse
+chevron while all this runs, which is the one visible sign. End the activity
+on the phone — the island clears within a second and the card is closed and
+put back. Headless renders of both states checked; the reader checked against
+the real Accessibility tree of a football card and a golf card.

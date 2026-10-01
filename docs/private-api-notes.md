@@ -234,25 +234,35 @@ menu bar. The
 first time a pill is seen without the grant, `CGRequestScreenCaptureAccess`
 asks once; the grant takes effect for a new process, so relaunch after it.
 
-**The card (2026-10-01).** Pressing the pill makes `MenuBarAgent` a popover
-window (layer 101, ~408×960 pt hanging from the pill's bottom edge, the card
-drawn in its top ~120 pt, the rest transparent) and the next press destroys
-it; a new window id each time, nothing while closed. The card is the phone's
-own render — for a football match, flags, score and clock. `CardPeek` finds
-that window through `SCShareableContent` (owner `com.apple.MenuBarAgent`, on
-screen, just below the pill, wider than it), captures it with
-`SCContentFilter(desktopIndependentWindow:)`, and `CardCropper` trims it to
-its opaque bounds and slices it into the phone's own compact pair: a round
-crest a sixth of the way in on each side, a third of the way down and a tenth
-of the width across (measured on the real card), drawn round into a small
-bitmap with that side's figure beside it — crest outward, figure toward the
-notch. The figure comes from the band between the crests, split down the
-middle and keyed to its bright, uncoloured pixels, then trimmed to them, so
-what lands in the ear is a white numeral and not the card's gradient (the
-little ball between the numbers is colourful, and keyed without that test it
-came through as a speck). The whole card goes to the open panel.
-The peek takes about a fifth of a second and the system card flashes for it;
-once when a blank pill arrives, then on each rest on the island.
+**The card, and how it is read (2026-10-01, final).** Pressing the pill makes
+`MenuBarAgent` a window `live-activity-expanded` (~408×960 pt hanging from the
+pill, the card drawn in its top ~122 pt) and the next press destroys it;
+nothing exists while it is closed. Its Accessibility tree carries everything
+the activity says as text: for a football match, `AXImage` per crest
+(description = the team), `AXStaticText` for each figure, and below them the
+team names, the period ("HT") and a running clock ("5:56"); for a golf round,
+two lines and no sides. The content lives in whichever `AXHostingView` child
+actually has children, whose frame is the card's own origin, so every
+element's rectangle can be taken relative to it — that is how the crests are
+cut exactly instead of guessed at by fractions.
+
+Two things make this live rather than a snapshot. The window's `AXPosition` is
+writable, so the card can be moved far off every screen; and it keeps
+answering Accessibility there, with its figures and clock updating, for as
+long as it is open (checked over twelve seconds). So `LiveActivityService`
+presses once, takes a single `SCScreenshotManager` picture for the crests
+while the card is still where the system put it, parks the window at
+(12000, -8000) and then just reads it once a second. One brief flash when an
+activity arrives, nothing after that, and a score that keeps up by itself.
+A click on the island moves the card back under the pill for eight seconds.
+The window is put back and pressed closed when the activity ends or the app
+quits; an already-open card (after a crash or relaunch) is adopted instead of
+pressed again. Note the pill shows its collapse chevron the whole time the
+card is held open.
+
+Pixels are still needed for the crests only, and cannot be taken off-screen:
+`SCScreenshotManager` fails for a window that is not on screen, and
+`CGWindowListCreateImage` is gone in macOS 27.
 
 ## Focus state (2026-09-29)
 

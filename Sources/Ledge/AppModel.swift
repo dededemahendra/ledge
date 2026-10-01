@@ -217,7 +217,6 @@ final class AppModel {
                 self?.refreshUpcoming()
                 self?.refreshTimer()
                 self?.refreshCharging()
-                self?.refreshCardOnHover()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -483,97 +482,53 @@ final class AppModel {
     /// the leading ear, the pill's live pixels in the trailing one, sticky
     /// while the pill shows; a click presses the pill and the system opens
     /// its own expanded view. Each changed frame republishes the record.
-    private var livePill: PillFrame?
-    private var liveCard: CardFrame?
-    private var peekTask: Task<Void, Never>?
-    private var peekedThisHover = false
-    private var lastPeekAt: Date?
-    /// A rest on the island refreshes the card at most this often: each
-    /// peek flashes the system card, and the cursor passing in and out
-    /// (2026-10-01, from a recording) must not strobe it.
-    private static let peekRefreshInterval: TimeInterval = 30
+    private var liveContent: LiveActivityContent?
 
+    /// An iPhone Live Activity (2026-10-01): what its card says, read a
+    /// second at a time. A match becomes a scoreline — a crest and a
+    /// figure in each ear, around the notch, as the phone's island draws
+    /// it; anything else becomes the phone glyph and the card's own state
+    /// line. A click shows the system's card where the menu bar puts it.
     private func handle(_ event: LiveActivityEvent) {
         switch event {
-        case .showing(let frame):
+        case .showing(let content):
             guard settings.showsLiveActivities else { return }
-            let isNew = livePill == nil
-            livePill = frame
+            liveContent = content
             publishLiveActivity()
-            // A blank pill on arrival: peek once for the card, so the
-            // teams and score are there before any hover.
-            if isNew, liveCard == nil, !frame.whole.hasContent { peekCard() }
         case .ended:
-            livePill = nil
-            liveCard = nil
-            lastPeekAt = nil
-            peekTask?.cancel()
-            peekTask = nil
+            liveContent = nil
             queue.remove(kind: .liveActivity)
             publish()
         }
     }
 
-    /// The island's record for the activity (2026-10-01): the pill's two
-    /// compact slots either side of the notch when the Mac draws them;
-    /// otherwise the copied card's crest-and-figure pairs in the ears and
-    /// the card itself on hover; the phone glyph alone when there is
-    /// neither.
     private func publishLiveActivity() {
-        guard let frame = livePill else { return }
-        func mirror(_ image: PillImage?) -> ActivityMirror? {
-            guard let image, image.hasContent else { return nil }
-            return ActivityMirror(png: image.png, size: image.size)
+        guard let content = liveContent else { return }
+        var score: ActivityScore?
+        if let home = content.home, let away = content.away {
+            score = ActivityScore(
+                home: .init(name: home.name, value: home.value, crest: home.crest),
+                away: .init(name: away.name, value: away.value, crest: away.crest),
+                status: content.status, clock: content.clock, title: content.title
+            )
         }
-        let split = frame.leading != nil || frame.trailing != nil
-        var leading = split ? mirror(frame.leading) : nil
-        var trailing = split ? mirror(frame.trailing) : mirror(frame.whole)
-        if let card = liveCard, leading == nil, trailing == nil {
-            leading = mirror(card.leading)
-            trailing = mirror(card.trailing)
-        }
+        // Not a match: the island says what state the card is in, in the
+        // trailing ear, and keeps the phone glyph.
+        let line = score == nil ? (content.status ?? content.title ?? content.lines.first) : nil
         queue.insert(
             ActivityRecord(
                 id: NotchController.liveActivityID,
                 kind: .liveActivity,
                 insertedAt: Date(),
                 ttl: nil,
-                title: "Live Activity",
+                title: content.title ?? "Live Activity",
+                compactText: line.map { String($0.prefix(22)) },
                 symbolName: "iphone",
                 url: URL(string: "ledge://live-activity"),
-                mirror: trailing,
-                leadingMirror: leading,
-                card: liveCard.flatMap { mirror($0.whole) }
+                score: score
             )
         )
         publish()
-    }
-
-    /// Peek and copy (user's call, 2026-10-01): the system card flashes
-    /// for a fifth of a second and the island keeps its picture. Once
-    /// when a blank pill arrives, and again on each rest on the island.
-    private func peekCard() {
-        guard peekTask == nil, settings.showsLiveActivities else { return }
-        peekTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            defer { self.peekTask = nil }
-            if let card = await self.liveActivities.peek(), self.livePill != nil {
-                self.liveCard = card
-                self.lastPeekAt = Date()
-                self.publishLiveActivity()
-            }
-        }
-    }
-
-    /// On the tick: a rest on the island refreshes the card once per rest,
-    /// and not within `peekRefreshInterval` of the last look.
-    private func refreshCardOnHover() {
-        let controller = presenter.controller
-        guard controller.isHovered else { peekedThisHover = false; return }
-        guard !peekedThisHover, controller.isLiveActivityLeading, livePill != nil else { return }
-        peekedThisHover = true
-        if let last = lastPeekAt, Date().timeIntervalSince(last) < Self.peekRefreshInterval { return }
-        peekCard()
     }
 
     /// Stands in for "open the Calendar (or Reminders) app" on an item
@@ -998,7 +953,12 @@ final class AppModel {
                 parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
                 mirror: record.mirror.map { .init(png: $0.png, size: $0.size) },
                 leadingMirror: record.leadingMirror.map { .init(png: $0.png, size: $0.size) },
-                card: record.card.map { .init(png: $0.png, size: $0.size) }
+                card: record.card.map { .init(png: $0.png, size: $0.size) },
+                score: record.score.map {
+                    .init(home: .init(name: $0.home.name, value: $0.home.value, crest: $0.home.crest),
+                          away: .init(name: $0.away.name, value: $0.away.value, crest: $0.away.crest),
+                          status: $0.status, clock: $0.clock, title: $0.title)
+                }
             )
         }
         // `setActivities` sets the count itself — do not also call
