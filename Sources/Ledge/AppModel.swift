@@ -228,6 +228,8 @@ final class AppModel {
         tasks.removeAll()
         pruneTimer?.invalidate()
         pruneTimer = nil
+        clearMediaTask?.cancel()
+        clearMediaTask = nil
         hud.stop()
         liveActivities.stop()
         power.stop()
@@ -390,22 +392,24 @@ final class AppModel {
     /// matching `handle(_ event: PowerEvent)`/`handle(_ event: HUDEvent)`
     /// above, neither of which logs on this path.
     private func handle(_ payload: MediaPayload) {
+        // Music apps only (`MediaSourcePolicy`): a browser tab or a video
+        // call is not "now playing" for the island, however loudly
+        // MediaRemote reports it.
+        guard payload.hasMedia, let title = payload.title,
+              MediaSourcePolicy.isAllowed(bundleIdentifier: payload.bundleIdentifier, enabled: settings.mediaSources) else {
+            if payload.hasMedia {
+                Self.log.debug("media: ignoring a source the island does not follow (\(payload.bundleIdentifier ?? "?", privacy: .private))")
+            }
+            holdThenClearMedia()
+            return
+        }
+        // It is ours: whatever was about to clear the card no longer is.
+        clearMediaTask?.cancel()
+        clearMediaTask = nil
+
         mediaPayload = payload
         if let override = positionOverride, override.isSuperseded(by: payload) || !override.isFresh(at: Date()) {
             positionOverride = nil
-        }
-
-        // Music apps only (`MediaSourcePolicy`): a browser tab or a video
-        // call is not "now playing" for the island, however loudly
-        // MediaRemote reports it. Falls into the nothing-playing branch so
-        // the artwork, the panel and the position tick all go away too.
-        guard payload.hasMedia, let title = payload.title,
-              MediaSourcePolicy.isAllowed(bundleIdentifier: payload.bundleIdentifier, enabled: settings.mediaSources) else {
-            queue.remove(kind: .media)
-            presenter.controller.setMedia(nil)
-            clearCaption()
-            publish()
-            return
         }
 
         // A new song announces itself for a few seconds (the reference
@@ -773,6 +777,47 @@ final class AppModel {
             guard !Task.isCancelled else { return }
             self?.presenter.setCaption(nil)
         }
+    }
+
+    /// A payload the island cannot show — a browser tab, or nothing
+    /// playing at all — does not take the card away at once (2026-10-01,
+    /// from a recording). With a music app and a browser both holding
+    /// audio, MediaRemote hands "now playing" back and forth a second at
+    /// a time; clearing on every handover made the island collapse and
+    /// grow again, re-announcing the song each time it came back, because
+    /// clearing forgets which title was announced. The card is given a
+    /// moment instead, and any payload the island can show cancels the
+    /// departure. Nothing on screen clears straight away: there is
+    /// nothing to flicker.
+    private var clearMediaTask: Task<Void, Never>?
+    private static let mediaClearGrace: Duration = .milliseconds(1500)
+
+    private func holdThenClearMedia() {
+        guard presenter.controller.media != nil else {
+            clearMedia()
+            return
+        }
+        guard clearMediaTask == nil else { return }
+        clearMediaTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: AppModel.mediaClearGrace)
+            guard !Task.isCancelled, let self else { return }
+            self.clearMediaTask = nil
+            self.clearMedia()
+        }
+    }
+
+    /// The card and everything that belongs to it: the queue's entry, the
+    /// presentation, the caption, and the payload the scrubber and the
+    /// position tick read.
+    private func clearMedia() {
+        clearMediaTask?.cancel()
+        clearMediaTask = nil
+        mediaPayload = MediaPayload()
+        positionOverride = nil
+        queue.remove(kind: .media)
+        presenter.controller.setMedia(nil)
+        clearCaption()
+        publish()
     }
 
     private func clearCaption() {

@@ -1605,3 +1605,17 @@ three panels checked at the new width: the now-playing card keeps its air
 around the artwork, title and control row; the calendar keeps its month grid
 and chips; the scoreline keeps both sides and the clock. The panel's ideal
 height still fits the 168 pt budget, which the render tests pin.
+
+## The island pumping with two players open (2026-10-01)
+
+From a recording: a music app playing and a browser on a video, the island
+grew to the song caption, collapsed to nothing, and grew again, over and over
+for the length of the clip. MediaRemote hands "now playing" back and forth
+between the two a second at a time; every handover to the browser cleared the
+card, and clearing forgets which title was announced, so the music app's next
+report re-announced the song and the island pumped. A payload the island
+cannot show now only takes the card away after 1.5 s, and any payload it can
+show cancels that. To check: play something in a music app, then start a video
+in a browser; the card should sit still, and should go once the music app
+itself stops. The rejected source is logged at debug with its identifier
+private.
