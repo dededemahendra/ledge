@@ -1069,10 +1069,7 @@ public struct NotchRootView: View {
 
     @ViewBuilder private var detailRow: some View {
         if controller.state == .expanded, controller.panel == .liveActivity, let score = controller.score {
-            ScorePanelView(
-                score: score, homeCrest: controller.homeCrestImage,
-                awayCrest: controller.awayCrestImage, contentColor: contentColor
-            )
+            ScorePanelView(score: score, contentColor: contentColor)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .id("live-activity")
             .transition(panelTransition)

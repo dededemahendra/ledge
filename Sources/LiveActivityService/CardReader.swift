@@ -97,18 +97,23 @@ public enum CardReader {
         }
         // The names: the text nearest under each crest, the crest's own
         // description when the card gives no name.
-        func name(near crest: CardElement) -> String {
-            let under = texts
+        func name(near crest: CardElement) -> CardElement? {
+            texts
                 .filter { $0.frame.midY > crest.frame.maxY - cardSize.height * 0.1 && !$0.text.contains(":") }
                 .min { abs($0.frame.midX - crest.frame.midX) < abs($1.frame.midX - crest.frame.midX) }
-            return under?.text ?? crest.text
         }
+        let homeName = name(near: first), awayName = name(near: last)
+        // The period is whatever is left in the middle: not a figure, not
+        // a name, not the clock. Without this the away side's own figure
+        // sat under the notch calling itself the period (2026-10-01).
+        let spoken = [homeValue, awayValue, homeName, awayName].compactMap { $0?.frame }
+        let rest = texts.filter { element in !spoken.contains(element.frame) }
         return LiveActivityContent(
-            home: .init(name: name(near: first), value: homeValue.text, crestRect: first.frame),
-            away: .init(name: name(near: last), value: awayValue.text, crestRect: last.frame),
-            status: statusLine(texts, cardSize: cardSize),
-            clock: clockLine(texts),
-            title: titleLine(texts, cardSize: cardSize),
+            home: .init(name: homeName?.text ?? first.text, value: homeValue.text, crestRect: first.frame),
+            away: .init(name: awayName?.text ?? last.text, value: awayValue.text, crestRect: last.frame),
+            status: statusLine(rest, cardSize: cardSize),
+            clock: clockLine(rest),
+            title: titleLine(rest, cardSize: cardSize),
             lines: lines
         )
     }

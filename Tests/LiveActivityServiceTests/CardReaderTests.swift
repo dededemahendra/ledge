@@ -27,7 +27,7 @@ private let cardSize = CGSize(width: 408, height: 122)
     #expect(content.home?.name == "Indonesia" && content.home?.value == "6")
     #expect(content.away?.name == "Bangladesh" && content.away?.value == "1")
     #expect(content.clock == "5:56")
-    #expect(content.status == "HT")
+    #expect(content.status == "HT", "the period, not the away side's own figure")
     #expect(content.home?.crestRect == CGRect(x: 50, y: 26, width: 40, height: 40), "the crest's own rectangle, for cutting")
     #expect(content.lines.first == "6", "everything the card says, in reading order")
 }
@@ -53,4 +53,14 @@ private let cardSize = CGSize(width: 408, height: 122)
 @Test func anEmptyCardSaysNothing() {
     #expect(CardReader.read([], cardSize: cardSize) == LiveActivityContent())
     #expect(CardReader.read(matchCard(), cardSize: .zero) == LiveActivityContent())
+}
+
+/// A match with no period named: the middle holds only the clock, and
+/// neither side's figure may stand in for a period (2026-10-01).
+@Test func aMatchWithoutAPeriodHasNoStatus() {
+    let elements = matchCard().filter { $0.text != "HT" }
+    let content = CardReader.read(elements, cardSize: cardSize)
+    #expect(content.isMatch && content.away?.value == "1")
+    #expect(content.clock == "5:56")
+    #expect(content.status == nil, "the away figure sat here calling itself the period")
 }
