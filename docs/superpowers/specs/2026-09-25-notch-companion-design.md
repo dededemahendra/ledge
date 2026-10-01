@@ -1089,8 +1089,9 @@ peek()` presses the pill, captures the card's window the moment it is on
 screen and presses again to close it — a flash of about a fifth of a second
 — once when the blank pill arrives and again on a rest on the island, at most
 once every 30 s (a cursor passing in and out must not strobe the card). The
-card's left and right thirds go to the ears as team capsules, its middle
-under the notch as the score (`captionMirror`), and the whole card is the
+card's two crests go to the ears, cut square and clipped round; its score is
+keyed off the gradient to white figures and trimmed to them, under the notch
+(`captionMirror`); and the whole card is the
 hover's own panel (`Panel.liveActivity`, ahead of the now-playing card, a
 swipe away from it). Between peeks the score is as of the last look.
 

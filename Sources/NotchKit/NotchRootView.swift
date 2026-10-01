@@ -537,9 +537,9 @@ public struct NotchRootView: View {
             if controller.hasCaption, let activity = controller.activities.first, let mirror = activity.captionMirror {
                 // A score under the notch (2026-10-01): the middle of the
                 // system card, centred, at caption height.
-                pillMirror(mirror, image: controller.captionMirrorImage)
+                pillMirror(mirror, image: controller.captionMirrorImage, clipped: false)
                     .frame(width: parameters.width, height: parameters.height - notch.height, alignment: .top)
-                    .padding(.top, 1)
+                    .padding(.top, 2)
                     .id("caption-mirror")
                     .transition(BlurReplaceTransition(configuration: .downUp).combined(with: OffsetTransition(CGSize(width: 0, height: 6))))
             } else if let caption = controller.captionText {

@@ -52,13 +52,28 @@ public enum CardCropper {
         return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 
-    /// Where a score card keeps its teams and score: the left and right
-    /// 30 % hold a crest and a name, the middle 40 % the score and the
-    /// clock; the top 62 % is the crests-and-score row.
-    public static let sideFraction = 0.30
-    public static let topFraction = 0.62
+    /// Where a score card keeps its badges and its score, measured on the
+    /// real thing (2026-10-01): a round crest a sixth of the way in on
+    /// each side, a third of the way down, about a tenth of the width
+    /// across; the score between them, in the band above the clock. The
+    /// crest is cut as a square and the island's ear clips it round, so
+    /// the gradient behind it never reaches the island; the score is
+    /// keyed to its bright figures and trimmed to them, so what lands
+    /// under the notch is white digits on black, the island's own idiom.
+    public static let crestCentreX = 0.165
+    public static let crestCentreY = 0.33
+    public static let crestSize = 0.092
+    public static let scoreBand = CGRect(x: 0.30, y: 0.14, width: 0.40, height: 0.38)
     public static let earHeight: CGFloat = 24
-    public static let captionHeight: CGFloat = 22
+    public static let captionHeight: CGFloat = 19
+    /// Below this luminance a score pixel is background.
+    static let scoreFloor = 110.0
+    static let scoreCeiling = 190.0
+    /// And above this much colour it is not a figure: a score is drawn in
+    /// white, while the little ball between the numbers is not, and keyed
+    /// it came through as a speck of dirt (2026-10-01).
+    static let scoreSaturationFloor = 0.25
+    static let scoreSaturationCeiling = 0.45
 
     /// Slices a window capture (`scale` pixels per point) into a frame.
     public static func frame(from window: CGImage, scale: CGFloat) -> CardFrame? {
@@ -66,17 +81,51 @@ public enum CardCropper {
               let card = window.cropping(to: bounds)
         else { return nil }
         let w = CGFloat(card.width), h = CGFloat(card.height)
-        let top = (h * topFraction).rounded()
-        let side = (w * sideFraction).rounded()
-        guard let left = card.cropping(to: CGRect(x: 0, y: 0, width: side, height: top)),
-              let right = card.cropping(to: CGRect(x: w - side, y: 0, width: side, height: top)),
-              let middle = card.cropping(to: CGRect(x: side, y: 0, width: w - 2 * side, height: top)),
+        let side = max(2, (w * crestSize).rounded())
+        func crest(at centreX: Double) -> CGImage? {
+            card.cropping(to: CGRect(x: (w * centreX - side / 2).rounded(), y: (h * crestCentreY - side / 2).rounded(),
+                                     width: side, height: side).integral)
+        }
+        let band = CGRect(x: (w * scoreBand.minX).rounded(), y: (h * scoreBand.minY).rounded(),
+                          width: (w * scoreBand.width).rounded(), height: (h * scoreBand.height).rounded()).integral
+        guard let left = crest(at: crestCentreX), let right = crest(at: 1 - crestCentreX),
+              let middle = card.cropping(to: band), let score = keyedBright(middle),
               let whole = encode(card, size: CGSize(width: w / scale, height: h / scale)),
-              let leading = encode(left, size: fitted(left, height: earHeight)),
-              let trailing = encode(right, size: fitted(right, height: earHeight)),
-              let center = encode(middle, size: fitted(middle, height: captionHeight))
+              let leading = encode(left, size: CGSize(width: earHeight, height: earHeight)),
+              let trailing = encode(right, size: CGSize(width: earHeight, height: earHeight)),
+              let center = encode(score, size: fitted(score, height: captionHeight))
         else { return nil }
         return CardFrame(whole: whole, leading: leading, trailing: trailing, center: center)
+    }
+
+    /// The bright figures of a slice on transparency, trimmed to them —
+    /// a score lifted off whatever gradient the card draws behind it.
+    /// `nil` when there is nothing bright enough to be a figure.
+    static func keyedBright(_ image: CGImage) -> CGImage? {
+        let width = image.width, height = image.height
+        guard width > 0, height > 0,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = context.data
+        else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        for i in stride(from: 0, to: width * height * 4, by: 4) {
+            let r = Double(pixels[i]), g = Double(pixels[i + 1]), b = Double(pixels[i + 2])
+            let luma = r * 0.299 + g * 0.587 + b * 0.114
+            let high = max(r, g, b), low = min(r, g, b)
+            let saturation = high > 0 ? (high - low) / high : 0
+            let colour = min(1, max(0, (saturation - scoreSaturationFloor) / (scoreSaturationCeiling - scoreSaturationFloor)))
+            let alpha = min(1, max(0, (luma - scoreFloor) / (scoreCeiling - scoreFloor))) * (1 - colour)
+            pixels[i] = UInt8(Double(pixels[i]) * alpha)
+            pixels[i + 1] = UInt8(Double(pixels[i + 1]) * alpha)
+            pixels[i + 2] = UInt8(Double(pixels[i + 2]) * alpha)
+            pixels[i + 3] = UInt8(255 * alpha)
+        }
+        guard let keyed = context.makeImage(), let bounds = opaqueBounds(of: keyed, threshold: 128),
+              bounds.width >= 2, bounds.height >= 2
+        else { return nil }
+        return keyed.cropping(to: bounds)
     }
 
     static func fitted(_ image: CGImage, height: CGFloat) -> CGSize {
