@@ -734,3 +734,20 @@ private func someMedia() -> MediaPresentation {
     c.setUpcoming(UpcomingEvent(title: "Report", compactText: "42m", caption: "Report · 20:00", url: nil))
     #expect(c.parameters.width == NotchMetrics.captionedMinimumWidth, "a short countdown fits the default ear")
 }
+
+/// The live charging state is background (2026-10-01): alone on the
+/// island it yields to the hover preview, and a blip over it still wins.
+@MainActor
+@Test func theChargingStateAloneYieldsToTheHoverPreview() {
+    let c = makeController()
+    c.setActivities([.init(id: "charging", title: "Charging", compactText: "37%", symbolName: "battery.100percent.bolt")], overflow: 0)
+    #expect(c.state == .activity)
+    c.setUpcoming(UpcomingEvent(title: "Standup", compactText: "42m", caption: "Standup · 10:00", url: nil))
+    c.setHovered(true)
+    #expect(c.state == .peek && c.isPreviewingUpcoming, "the preview, not the charger")
+    c.setHovered(false)
+    #expect(c.state == .activity)
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"), .init(id: "charging", title: "Charging", compactText: "37%", symbolName: "battery.100percent.bolt")], overflow: 0)
+    c.setHovered(true)
+    #expect(c.state == .activity, "a real blip over it keeps the island")
+}

@@ -19,6 +19,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
     /// below every blip, which pre-empts it for its few seconds.
     case timer
     case media
+    /// The live charging state (2026-10-01): sticky while the charger is
+    /// in, under everything — the island's resting face when nothing else
+    /// is on, never in the way of music or a blip.
+    case charging
 
     /// Higher wins a visible slot. Values fixed by spec §7.
     public var priority: Int {
@@ -31,6 +35,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .notification: return 40
         case .timer:        return 20
         case .media:        return 10
+        case .charging:     return 5
         }
     }
 
@@ -45,6 +50,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .notification: return 5
         case .timer:        return nil
         case .media:        return nil
+        case .charging:     return nil
         }
     }
 

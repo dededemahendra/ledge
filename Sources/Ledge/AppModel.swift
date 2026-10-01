@@ -198,6 +198,7 @@ final class AppModel {
                 self?.prune()
                 self?.refreshUpcoming()
                 self?.refreshTimer()
+                self?.refreshCharging()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -219,6 +220,33 @@ final class AppModel {
     /// the detail row, a glyph for the leading ear, an optional battery
     /// percentage for the trailing ear. Same id for every device event, so
     /// AirPods connecting right after a keyboard coalesces into one slot.
+    /// The live charging state (2026-10-01): a white bolt battery and the
+    /// live percentage, sticky while the charger is in and under
+    /// everything else — the plug-in blip keeps its green for its three
+    /// seconds, this does not shout. Republished only when the figure or
+    /// glyph changes.
+    private var chargingShown: (symbol: String, text: String)?
+
+    private func refreshCharging() {
+        guard settings.showsBattery, let latest = power.latest, latest.isPluggedIn else {
+            if chargingShown != nil {
+                chargingShown = nil
+                queue.remove(kind: .charging)
+                publish()
+            }
+            return
+        }
+        let symbol = latest.isCharged ? "battery.100percent" : (latest.isCharging ? "battery.100percent.bolt" : "powerplug.fill")
+        let text = "\(latest.percent)%"
+        guard chargingShown?.symbol != symbol || chargingShown?.text != text else { return }
+        chargingShown = (symbol, text)
+        queue.insert(ActivityRecord(
+            id: NotchController.chargingActivityID, kind: .charging, insertedAt: Date(), ttl: nil,
+            title: latest.isCharged ? "Charged" : "Charging", compactText: text, symbolName: symbol
+        ))
+        publish()
+    }
+
     /// What cannot be checked at event time: the system HUD replacement,
     /// the hover dwell, the calendar lead time, the login item. Everything
     /// else is a `guard` where the event lands.
@@ -792,6 +820,7 @@ final class AppModel {
             presenter.setUpcoming(nil)
         }
         if !focus.availability.isAvailable { queue.remove(kind: .focus) }
+        if !power.availability.isAvailable { queue.remove(kind: .charging) }
         if !media.availability.isAvailable {
             queue.remove(kind: .media)
             // The activity is not the only thing a dead media service leaves

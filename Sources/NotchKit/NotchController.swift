@@ -292,6 +292,14 @@ public final class NotchController {
     /// `AppModel` inserts the Focus blip with this id.
     public static let focusActivityID = "focus"
 
+    /// `AppModel` inserts the live charging state with this id. It is
+    /// background: alone, it yields to the hover preview.
+    public static let chargingActivityID = "charging"
+
+    private var onlyChargingIsShowing: Bool {
+        activities.count == 1 && activities.first?.id == Self.chargingActivityID && overflowCount == 0
+    }
+
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"
 
@@ -744,7 +752,7 @@ public final class NotchController {
         } else if isHovered, panel == .calendar, calendarMode != nil {
             // The calendar mode, swiped open from the preview.
             state = .expanded
-        } else if activityCount > 0 {
+        } else if activityCount > 0, !(isHovered && onlyChargingIsShowing && upcoming != nil) {
             state = .activity
         } else if isHovered {
             state = .peek

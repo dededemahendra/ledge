@@ -11,6 +11,9 @@ public final class PowerService {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "power")
 
     public private(set) var availability: ServiceAvailability = .available
+    /// The latest reading, for the live charging state on the notch
+    /// (2026-10-01); `nil` until the first one.
+    public private(set) var latest: PowerSnapshot?
 
     private var deriver = PowerEventDeriver()
     // `nonisolated(unsafe)`: both are touched from `deinit`, which is always
@@ -133,6 +136,7 @@ public final class PowerService {
                 let snapshot = PowerSnapshot.parse(raw)
             else { continue }
 
+            latest = snapshot
             availability = .available
             for event in deriver.events(for: snapshot) {
                 Self.log.debug("power event: \(String(describing: event), privacy: .public)")

@@ -1557,3 +1557,10 @@ shrinking island, then the island vanished. Cause: the forced lock-screen card
 Now the island is hidden outright while locked, state untouched, and shown
 again as it was. Judge live: lock with music playing, unlock — the compact
 island is simply there, no animation, no gap.
+
+## Live charging state (2026-10-01)
+
+Plug in: the green blip for 3 s as before, then a white bolt battery with the
+live percentage stays on the notch (priority 5, under everything); music takes
+the island over it; hovering with nothing playing still shows the next-item
+preview; full → plain full battery; unplug → gone. Judge live over a charge.
