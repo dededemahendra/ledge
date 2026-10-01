@@ -686,10 +686,6 @@ public struct NotchRootView: View {
                 )
         } else if let score = controller.score {
             scoreSide(score.home, crest: controller.homeCrestImage, crestLeading: true)
-        } else if let activity = controller.activities.first, let mirror = activity.leadingMirror {
-            // The pill's leading slot (2026-10-01): a home team's crest
-            // and score where the phone glyph would be.
-            pillMirror(mirror, image: controller.leadingMirrorImage)
         } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
@@ -828,19 +824,14 @@ public struct NotchRootView: View {
     }
 
     /// Whether the leading activity has something of its own for the
-    /// trailing ear — a mirror, readings, a value, or music's output glyph.
+    /// trailing ear — a figure, readings, a value, or music's output glyph.
     private var leadingActivityFillsTrailingEar: Bool {
         guard let first = controller.activities.first else { return false }
-        if first.mirror != nil || first.leadingMirror != nil || first.compactText != nil { return true }
+        if first.score != nil || first.compactText != nil { return true }
         if let parts = first.parts, !parts.isEmpty { return true }
         return first.id == Self.mediaActivityID && controller.media != nil && controller.state != .expanded
     }
 
-    /// A system picture at its own size (2026-10-01): the iPhone Live
-    /// Activity's pill as the menu bar draws it, or a crest and figure
-    /// cut from the system's card. Shaped upstream — keyed, trimmed,
-    /// rounded — so nothing is clipped here. Frames replace in place, no
-    /// transition: it is a live picture.
     /// One side of a scoreline in an ear (2026-10-01): the crest outward,
     /// the figure toward the notch, as the phone's island draws a match
     /// around its camera. The figure rolls between values like every
@@ -865,19 +856,6 @@ public struct NotchRootView: View {
         return HStack(spacing: 5) {
             if crestLeading { badge; figure } else { figure; badge }
         }
-    }
-
-    private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror, image: NSImage?) -> some View {
-        Group {
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-            } else {
-                Color.clear
-            }
-        }
-        .frame(width: mirror.size.width, height: mirror.size.height)
     }
 
     private func compactValue(_ compact: String, bump: Bool = true, color: Color? = nil) -> some View {
@@ -1010,8 +988,6 @@ public struct NotchRootView: View {
         } else if let activity = controller.activities.first {
             if let score = controller.score {
                 scoreSide(score.away, crest: controller.awayCrestImage, crestLeading: false)
-            } else if let mirror = activity.mirror {
-                pillMirror(mirror, image: controller.mirrorImage)
             } else if let parts = activity.parts, !parts.isEmpty {
                 readings(parts)
             } else if let compact = activity.compactText {
@@ -1101,17 +1077,22 @@ public struct NotchRootView: View {
             .id("live-activity")
             .transition(panelTransition)
         } else if controller.state == .expanded, controller.panel == .liveActivity, controller.hasCard,
-           let card = controller.activities.first?.card {
-            // The system's own card for the iPhone Live Activity, copied
-            // (2026-10-01): fitted to the panel, its corners kept.
-            pillMirror(card, image: controller.cardImage)
-                .scaleEffect(min(1, (controller.parameters.width - 24) / max(1, card.size.width)), anchor: .top)
-                .frame(width: controller.parameters.width - 24, height: min(card.size.height, controller.parameters.height - controller.metrics.notchRect.height - 16), alignment: .top)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                // Centred in the panel's budget, like the now-playing card.
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .id("live-activity")
-                .transition(panelTransition)
+                  let activity = controller.activities.first, !activity.lines.isEmpty {
+            // Not a match: what the card says, line by line, the first
+            // line carrying the weight (2026-10-01).
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(activity.lines.prefix(4).enumerated()), id: \.offset) { index, line in
+                    Text(line)
+                        .font(.system(size: index == 0 ? 13 : 11, weight: index == 0 ? .semibold : .regular))
+                        .foregroundStyle(contentColor.opacity(index == 0 ? 1 : 0.6))
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                }
+            }
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .id("live-activity")
+            .transition(panelTransition)
         } else if controller.state == .expanded, controller.panel == .calendar, let data = controller.calendarMode {
             // The calendar mode (2026-09-30).
             CalendarPanelView(

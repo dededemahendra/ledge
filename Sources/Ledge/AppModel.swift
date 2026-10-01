@@ -312,7 +312,7 @@ final class AppModel {
                           detail: "A Focus's own icon, colour and name. Without it: the moon and On/Off.",
                           isGranted: focus.detail.isAvailable, settingsURL: pane("Privacy_AllFiles")),
             PermissionRow(id: "screen", name: "Screen Recording",
-                          detail: "Mirrors an iPhone Live Activity's pill from the menu bar into the island.",
+                          detail: "Cuts the crests from an iPhone Live Activity's card, once, when it arrives.",
                           isGranted: liveActivities.hasScreenAccess, settingsURL: pane("Privacy_ScreenCapture")),
         ]
     }
@@ -478,10 +478,6 @@ final class AppModel {
         publish()
     }
 
-    /// The iPhone Live Activity mirror (2026-10-01): the phone glyph in
-    /// the leading ear, the pill's live pixels in the trailing one, sticky
-    /// while the pill shows; a click presses the pill and the system opens
-    /// its own expanded view. Each changed frame republishes the record.
     private var liveContent: LiveActivityContent?
 
     /// An iPhone Live Activity (2026-10-01): what its card says, read a
@@ -525,7 +521,8 @@ final class AppModel {
                 compactText: line.map { String($0.prefix(22)) },
                 symbolName: "iphone",
                 url: URL(string: "ledge://live-activity"),
-                score: score
+                score: score,
+                lines: score == nil ? content.lines : []
             )
         )
         publish()
@@ -951,14 +948,12 @@ final class AppModel {
                 tint: record.tint.map(Self.displayTint),
                 url: record.url,
                 parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
-                mirror: record.mirror.map { .init(png: $0.png, size: $0.size) },
-                leadingMirror: record.leadingMirror.map { .init(png: $0.png, size: $0.size) },
-                card: record.card.map { .init(png: $0.png, size: $0.size) },
                 score: record.score.map {
                     .init(home: .init(name: $0.home.name, value: $0.home.value, crest: $0.home.crest),
                           away: .init(name: $0.away.name, value: $0.away.value, crest: $0.away.crest),
                           status: $0.status, clock: $0.clock, title: $0.title)
-                }
+                },
+                lines: record.lines
             )
         }
         // `setActivities` sets the count itself — do not also call

@@ -216,25 +216,6 @@ public final class NotchController {
             }
         }
         public let parts: [Part]?
-        /// A system pill's pixels drawn live in the trailing ear at its
-        /// own size, capsule-clipped — an iPhone Live Activity as the menu
-        /// bar shows it (2026-10-01). Wins over `parts` and `compactText`.
-        public struct Mirror: Sendable, Equatable {
-            public let png: Data
-            public let size: CGSize
-
-            public init(png: Data, size: CGSize) {
-                self.png = png
-                self.size = size
-            }
-        }
-        public let mirror: Mirror?
-        /// The pill's leading slot for the leading ear, in place of the
-        /// glyph — the home team to `mirror`'s away team.
-        public let leadingMirror: Mirror?
-        /// The whole system card, for the open panel (`Panel.liveActivity`).
-        public let card: Mirror?
-
         /// A scoreline from an iPhone Live Activity (2026-10-01): a crest
         /// and a figure in each ear, and the card itself on hover.
         public struct Score: Sendable, Equatable {
@@ -264,6 +245,8 @@ public final class NotchController {
             }
         }
         public let score: Score?
+        /// What an activity that is not a match says, line by line.
+        public let lines: [String]
 
         public init(
             id: String,
@@ -276,10 +259,8 @@ public final class NotchController {
             tint: Tint? = nil,
             url: URL? = nil,
             parts: [Part]? = nil,
-            mirror: Mirror? = nil,
-            leadingMirror: Mirror? = nil,
-            card: Mirror? = nil,
-            score: Score? = nil
+            score: Score? = nil,
+            lines: [String] = []
         ) {
             self.id = id
             self.title = title
@@ -291,10 +272,8 @@ public final class NotchController {
             self.tint = tint
             self.url = url
             self.parts = parts
-            self.mirror = mirror
-            self.leadingMirror = leadingMirror
-            self.card = card
             self.score = score
+            self.lines = lines
         }
     }
 
@@ -351,8 +330,11 @@ public final class NotchController {
 
     /// The system card to open on hover, when the leading live activity
     /// has one.
-    public var hasCard: Bool {
-        isLiveActivityLeading && (activities.first?.card != nil || activities.first?.score != nil)
+    public var hasCard: Bool { isLiveActivityLeading && hasPanelContent }
+
+    private var hasPanelContent: Bool {
+        guard let first = activities.first else { return false }
+        return first.score != nil || !first.lines.isEmpty
     }
 
     /// The scoreline the ears are drawing, if any.
@@ -374,8 +356,8 @@ public final class NotchController {
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"
 
-    /// `AppModel` inserts the iPhone Live Activity mirror with this id
-    /// (2026-10-01): the phone glyph leads, the pill's pixels trail.
+    /// `AppModel` inserts the iPhone Live Activity with this id
+    /// (2026-10-01): a match's crests and figures, or the phone glyph.
     public static let liveActivityID = "live-activity"
 
     /// `AppModel` inserts the running timer/stopwatch with this id. The
@@ -544,13 +526,6 @@ public final class NotchController {
                 ceil(NSAttributedString(string: $0, attributes: [.font: font]).size().width)
             }
             return max(NotchMetrics.activityEarWidth, 20 + 5 + (figures.max() ?? 0) + 14)
-        }
-        let mirrored = max(activities.first?.mirror?.size.width ?? 0, activities.first?.leadingMirror?.size.width ?? 0)
-        if mirrored > 0 {
-            // The pill's slot at its own size, with 6 pt of air each side
-            // — the island's corner curves in beside it; never narrower
-            // than the glyph ear.
-            return max(NotchMetrics.activityEarWidth, ceil(mirrored) + 12)
         }
         if let parts = activities.first?.parts, !parts.isEmpty {
             // Readings: 10 pt medium, a glyph's ~14 pt where one is set,
@@ -762,22 +737,13 @@ public final class NotchController {
     public func setActivities(_ activities: [ActivityDisplay], overflow: Int) {
         let shapeBefore = parameters
         let blipBefore = leadingBlipKey
-        if activities.first?.mirror?.png != self.activities.first?.mirror?.png {
-            mirrorImage = activities.first?.mirror.flatMap { NSImage(data: $0.png) }
-        }
-        if activities.first?.leadingMirror?.png != self.activities.first?.leadingMirror?.png {
-            leadingMirrorImage = activities.first?.leadingMirror.flatMap { NSImage(data: $0.png) }
-        }
-        if activities.first?.card?.png != self.activities.first?.card?.png {
-            cardImage = activities.first?.card.flatMap { NSImage(data: $0.png) }
-        }
         if activities.first?.score?.home.crest != self.activities.first?.score?.home.crest {
             homeCrestImage = activities.first?.score?.home.crest.flatMap(NSImage.init(data:))
         }
         if activities.first?.score?.away.crest != self.activities.first?.score?.away.crest {
             awayCrestImage = activities.first?.score?.away.crest.flatMap(NSImage.init(data:))
         }
-        if panel == .liveActivity, !(activities.first?.id == Self.liveActivityID && activities.first?.card != nil) {
+        if panel == .liveActivity, !(activities.first?.id == Self.liveActivityID && hasPanelContent) {
             panel = .media
         }
         self.activities = activities
@@ -798,12 +764,8 @@ public final class NotchController {
     /// from its top edge and springs back on every change of this.
     public private(set) var blipPulse = 0
 
-    /// The leading activity's `mirror`, decoded once per frame — the
-    /// view must not decode a PNG on every body pass.
-    public private(set) var mirrorImage: NSImage?
-    public private(set) var leadingMirrorImage: NSImage?
-    public private(set) var cardImage: NSImage?
-    /// The scoreline's crests, decoded once per change.
+    /// The scoreline's crests, decoded once per change — the view must
+    /// not decode a PNG on every body pass.
     public private(set) var homeCrestImage: NSImage?
     public private(set) var awayCrestImage: NSImage?
 

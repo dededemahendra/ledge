@@ -753,58 +753,30 @@ private func someMedia() -> MediaPresentation {
     #expect(c.state == .activity, "a real blip over it keeps the island")
 }
 
-/// An iPhone Live Activity's pill (2026-10-01): the island stretches to
-/// the pill's own width plus air, the mirror is decoded once per frame,
-/// and the record is sticky with a link, so a click presses the pill.
+/// A scoreline from an iPhone Live Activity (2026-10-01): a crest and a
+/// figure in each ear, the island widened to fit the wider of the two,
+/// the crests decoded once per change, and a hover that opens the card
+/// ahead of the now-playing one.
 @MainActor
-@Test func aMirrorSizesTheEarToThePillAndDecodesOncePerFrame() {
+@Test func aScorelinePairsTheEarsAndOpensItsCardOnHover() {
     let c = makeController()
-    let png = NSBitmapImageRep(cgImage: solidImage(width: 92, height: 48)).representation(using: .png, properties: [:])!
-    let mirror = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 46, height: 24))
+    let crest = NSBitmapImageRep(cgImage: solidImage(width: 48, height: 48)).representation(using: .png, properties: [:])!
+    let score = NotchController.ActivityDisplay.Score(
+        home: .init(name: "Indonesia", value: "6", crest: crest),
+        away: .init(name: "Bangladesh", value: "1", crest: crest),
+        status: "HT", clock: "5:56", title: "Cup")
     c.setActivities([.init(id: "live-activity", title: "Live Activity", symbolName: "iphone",
-                           url: URL(string: "ledge://live-activity"), mirror: mirror)], overflow: 0)
-    #expect(c.state == .activity)
-    #expect(c.leadingEarWidth == 58)
-    #expect(c.parameters.width == 255 + 2 * (58 - NotchMetrics.activityEarWidth))
-    #expect(c.mirrorImage != nil)
-    #expect(c.linkURL == URL(string: "ledge://live-activity"))
-    let before = c.mirrorImage
-    c.setActivities([.init(id: "live-activity", title: "Live Activity", symbolName: "iphone", mirror: mirror)], overflow: 0)
-    #expect(c.mirrorImage === before, "the same frame is not decoded again")
-    c.setActivities([.init(id: "charging", title: "Charging", compactText: "37%")], overflow: 0)
-    #expect(c.mirrorImage == nil && c.leadingEarWidth == NotchMetrics.activityEarWidth)
-
-    // Split slots: a narrow home crest left, a wider away score right;
-    // both ears take the wider, never under the glyph ear.
-    let small = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 12, height: 24))
-    let wide = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 30, height: 24))
-    c.setActivities([.init(id: "live-activity", title: "Live Activity", mirror: wide, leadingMirror: small)], overflow: 0)
-    #expect(c.leadingEarWidth == 42 && c.leadingMirrorImage != nil)
-    c.setActivities([.init(id: "live-activity", title: "Live Activity", mirror: small, leadingMirror: small)], overflow: 0)
-    #expect(c.leadingEarWidth == NotchMetrics.activityEarWidth)
-}
-
-private func solidImage(width: Int, height: Int) -> CGImage {
-    let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-    context.setFillColor(CGColor(red: 0.1, green: 0.15, blue: 0.18, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-    return context.makeImage()!
-}
-
-/// The copied system card (2026-10-01): a crest-and-figure pair in each
-/// ear at activity size, and a hover opens the card as its own panel,
-/// ahead of the now-playing card.
-@MainActor
-@Test func aLiveActivityWithACardPairsTheEarsAndOpensTheCardOnHover() {
-    let c = makeController()
-    let png = NSBitmapImageRep(cgImage: solidImage(width: 92, height: 48)).representation(using: .png, properties: [:])!
-    let ear = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 40, height: 24))
-    let card = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 408, height: 120))
-    c.setActivities([.init(id: "live-activity", title: "Live Activity", mirror: ear, leadingMirror: ear, card: card)], overflow: 0)
+                           url: URL(string: "ledge://live-activity"), score: score)], overflow: 0)
     #expect(c.state == .activity && c.hasCard)
     #expect(c.parameters.height == c.metrics.notchRect.height, "the pairs live in the ears; the island keeps its height")
-    #expect(c.cardImage != nil)
+    #expect(c.leadingEarWidth > NotchMetrics.activityEarWidth, "a crest and a figure need more than a glyph")
+    #expect(c.homeCrestImage != nil && c.awayCrestImage != nil)
+    #expect(c.linkURL == URL(string: "ledge://live-activity"))
+
+    let before = c.homeCrestImage
+    c.setActivities([.init(id: "live-activity", title: "Live Activity", score: score)], overflow: 0)
+    #expect(c.homeCrestImage === before, "the same crest is not decoded again")
+
     c.setMedia(MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 100))
     c.setHovered(true)
     #expect(c.state == .expanded && c.panel == .liveActivity, "the card first, music a swipe away")
@@ -813,5 +785,24 @@ private func solidImage(width: Int, height: Int) -> CGImage {
     c.setHovered(false)
     #expect(c.panel == .media && c.state == .activity)
     c.setActivities([.init(id: "charging", title: "Charging", compactText: "37%")], overflow: 0)
-    #expect(!c.hasCard && c.cardImage == nil)
+    #expect(!c.hasCard && c.homeCrestImage == nil)
+}
+
+/// An activity that is not a match keeps the glyph and opens its lines.
+@MainActor
+@Test func aLiveActivityWithoutSidesOpensItsLines() {
+    let c = makeController()
+    c.setActivities([.init(id: "live-activity", title: "PGA Tour", compactText: "Round 1, In Progress",
+                           symbolName: "iphone", lines: ["PGA Tour", "Round 1, In Progress"])], overflow: 0)
+    #expect(c.hasCard && c.score == nil)
+    c.setHovered(true)
+    #expect(c.state == .expanded && c.panel == .liveActivity)
+}
+
+private func solidImage(width: Int, height: Int) -> CGImage {
+    let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    context.setFillColor(CGColor(red: 0.1, green: 0.15, blue: 0.18, alpha: 1))
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    return context.makeImage()!
 }

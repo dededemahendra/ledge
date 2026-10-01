@@ -11,16 +11,11 @@ public struct PillLocation: @unchecked Sendable {
     public let identifier: String
     /// Screen points, top-left origin, as Accessibility reports it.
     public let frame: CGRect
-    /// The compact slots inside the pill, left to right — the leading
-    /// and trailing views the phone's island also splits around its
-    /// camera (hosting groups under the item; 3 pt wide when empty).
-    public let slots: [CGRect]
     let element: AXUIElement?
 
-    public init(identifier: String, frame: CGRect, slots: [CGRect] = [], element: AXUIElement? = nil) {
+    public init(identifier: String, frame: CGRect, element: AXUIElement? = nil) {
         self.identifier = identifier
         self.frame = frame
-        self.slots = slots
         self.element = element
     }
 }
@@ -29,7 +24,7 @@ extension PillLocation: Equatable {
     /// The element is a handle, not state: two readings of the same pill
     /// at the same place are the same location.
     public static func == (lhs: PillLocation, rhs: PillLocation) -> Bool {
-        lhs.identifier == rhs.identifier && lhs.frame == rhs.frame && lhs.slots == rhs.slots
+        lhs.identifier == rhs.identifier && lhs.frame == rhs.frame
     }
 }
 
@@ -158,29 +153,13 @@ public enum PillLocator {
 
     private static func search(_ item: AXUIElement, depth: Int) -> PillLocation? {
         if let id = string(kAXIdentifierAttribute, of: item), isPill(identifier: id), let frame = frame(of: item) {
-            return PillLocation(identifier: id, frame: frame, slots: slots(of: item, in: frame), element: item)
+            return PillLocation(identifier: id, frame: frame, element: item)
         }
         guard depth < 2 else { return nil }
         for child in children(of: item) {
             if let found = search(child, depth: depth + 1) { return found }
         }
         return nil
-    }
-
-    /// The pill's compact slots: its children's (and grandchildren's)
-    /// frames narrower than the pill itself — the "Expanded" image that
-    /// covers the whole pill is not one — left to right, at most two.
-    private static func slots(of item: AXUIElement, in pill: CGRect) -> [CGRect] {
-        var found: [CGRect] = []
-        for child in children(of: item) {
-            for candidate in [child] + children(of: child) {
-                guard let frame = frame(of: candidate), frame.width < pill.width * 0.8,
-                      !found.contains(where: { abs($0.minX - frame.minX) < 1 })
-                else { continue }
-                found.append(frame)
-            }
-        }
-        return Array(found.sorted { $0.minX < $1.minX }.prefix(2))
     }
 
     private static func children(of element: AXUIElement) -> [AXUIElement] {

@@ -24,19 +24,6 @@ public struct ActivityPart: Sendable, Equatable {
     }
 }
 
-/// A system pill's pixels, mirrored (2026-10-01): an iPhone Live
-/// Activity as the menu bar draws it, PNG at the screen's scale, and its
-/// size in points — drawn at that size in the trailing ear.
-public struct ActivityMirror: Sendable, Equatable {
-    public let png: Data
-    public let size: CGSize
-
-    public init(png: Data, size: CGSize) {
-        self.png = png
-        self.size = size
-    }
-}
-
 /// A scoreline an iPhone Live Activity is running (2026-10-01): two
 /// sides with a crest and a figure, and whatever the card says between
 /// them — the period and a running clock.
@@ -99,17 +86,11 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// Several readings side by side in the trailing ear, instead of
     /// `compactText`; the island widens to fit them.
     public let parts: [ActivityPart]?
-    /// A live mirror of a system pill in the trailing ear, instead of
-    /// text — see `ActivityMirror`.
-    public let mirror: ActivityMirror?
-    /// Its counterpart in the leading ear, in place of the glyph — the
-    /// pill's leading slot (a home team) while `mirror` carries the
-    /// trailing one (the away team).
-    public let leadingMirror: ActivityMirror?
-    /// The whole system card, for the open panel.
-    public let card: ActivityMirror?
     /// A scoreline, when the activity is a match — see `ActivityScore`.
     public let score: ActivityScore?
+    /// What an activity that is not a match says, line by line — shown
+    /// in the open panel.
+    public let lines: [String]
 
     public init(
         id: String,
@@ -125,10 +106,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         tint: ActivityTint? = nil,
         url: URL? = nil,
         parts: [ActivityPart]? = nil,
-        mirror: ActivityMirror? = nil,
-        leadingMirror: ActivityMirror? = nil,
-        card: ActivityMirror? = nil,
-        score: ActivityScore? = nil
+        score: ActivityScore? = nil,
+        lines: [String] = []
     ) {
         self.id = id
         self.kind = kind
@@ -143,10 +122,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.tint = tint
         self.url = url
         self.parts = parts
-        self.mirror = mirror
-        self.leadingMirror = leadingMirror
-        self.card = card
         self.score = score
+        self.lines = lines
     }
 
     public var isSticky: Bool { ttl == nil }
