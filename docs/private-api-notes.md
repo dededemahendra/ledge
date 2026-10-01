@@ -210,11 +210,15 @@ captured as a window either.
 
 **What works: pixels.** `LiveActivityService` finds the pill through
 Accessibility once a second (`PillLocator`) and, with the Screen Recording
-grant, streams exactly its rectangle of the display through ScreenCaptureKit
-(`PillCapture`: `SCContentFilter(display:excludingApplications:)` with this
-app excluded, `sourceRect` = the AX frame relative to the display, width and
-height at the screen's scale, ten frames a second at most, frames only on
-change). Each changed frame is PNG-encoded and published as the record's
+grant, screenshots exactly its rectangle of the display through
+ScreenCaptureKit twice a second (`PillCapture`: `SCScreenshotManager` with
+`SCContentFilter(display:excludingApplications:)`, this app excluded,
+`sourceRect` = the AX frame relative to the display, width and height at the
+screen's scale). Not an `SCStream`: tried live, a stream plants the purple
+screen-recording capsule (and a window glyph) in the menu bar for as long as
+it runs, which shifts the pill ~85 pt left under the capture; single
+screenshots only light the privacy dot in the corner (observed 2026-10-01,
+same for `screencapture`). Each changed frame is PNG-encoded and published as the record's
 `mirror`; the island draws it at the pill's point size, capsule-clipped so the
 menu bar's material around the pill stays out. A click performs `AXPress` on
 the item, and the system opens its own expanded view under the menu bar. The

@@ -12,7 +12,8 @@ public enum LiveActivityEvent: Sendable, Equatable {
 
 /// An iPhone Live Activity mirrored from the menu bar (2026-10-01): once
 /// a second the pill is looked for through Accessibility; while it shows,
-/// `PillCapture` streams its pixels and every changed frame is an event.
+/// `PillCapture` screenshots it twice a second and every changed frame
+/// is an event.
 /// A click on the island presses the pill, and the system opens its own
 /// expanded view. Needs Accessibility (the media keys' grant) to find the
 /// pill and Screen Recording to read it; the first time a pill is seen

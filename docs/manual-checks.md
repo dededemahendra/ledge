@@ -1573,7 +1573,10 @@ asked (then relaunch): the island shows the phone glyph left and the pill's
 own pixels right, updating as the phone's does. Click it — the system's
 expanded view opens under the menu bar. End the activity on the phone — the
 island clears within a second. With music playing the activity leads; hover
-still opens the card. The capture is a 46×24 pt rectangle at most ten times a
-second; Activity Monitor should show nothing. Headless render checked with a
-captured pill; the capture pipeline checked from a script against the live
-menu bar (92×48 px frame of the empty pill the phone was showing).
+still opens the card. The capture is a 46×24 pt screenshot twice a second;
+Activity Monitor should show nothing, and the menu bar must show only the
+corner's privacy dot — not the purple recording capsule (the first build
+streamed, and the capsule pushed the pill 85 pt left; seen live and fixed).
+Checked live: the island showed the phone glyph and the pill's own pixels,
+following the pill when it moved. Headless render checked with a captured
+pill.

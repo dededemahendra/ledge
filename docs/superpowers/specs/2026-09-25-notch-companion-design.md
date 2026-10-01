@@ -1069,9 +1069,10 @@ activity's content, which it cannot read (see `docs/private-api-notes.md`).
 
 **How.** `LiveActivityService` polls `MenuBarAgent`'s extras bar through
 Accessibility once a second for an item whose identifier starts with
-`live-activity-pill-`; while one is there, `PillCapture` runs a
-ScreenCaptureKit stream over just that rectangle (frames only on change, ten
-a second at most) and every changed frame is a `LiveActivityEvent.showing`
+`live-activity-pill-`; while one is there, `PillCapture` screenshots just
+that rectangle through ScreenCaptureKit twice a second (a stream would plant
+the purple recording capsule in the menu bar and shift the pill) and every
+changed frame is a `LiveActivityEvent.showing`
 with the PNG and the point size. `AppModel` publishes it as a sticky
 `.liveActivity` record (priority 15) whose `mirror` the island draws through
 `NotchController.mirrorImage`, decoded once per frame. The service is off
