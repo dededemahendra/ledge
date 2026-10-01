@@ -950,9 +950,11 @@ public struct NotchRootView: View {
             } else if let compact = activity.compactText {
                 // A ticking clock must not bump every second; its digits
                 // still roll.
-                // The Clock's timer is orange end to end, as on the phone
-                // (2026-10-01): its digits take the record's tint too.
-                compactValue(compact, bump: activity.id != NotchController.timerActivityID, color: tintColor(for: activity.tint))
+                // Only the Clock's timer colours its digits (orange end to
+                // end, as on the phone); every other tinted record — the
+                // charging battery, say — keeps its figure white.
+                let isTimer = activity.id == NotchController.timerActivityID
+                compactValue(compact, bump: !isTimer, color: isTimer ? tintColor(for: activity.tint) : nil)
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {
