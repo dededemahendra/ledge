@@ -18,11 +18,11 @@ public enum PillKeyer {
 
     /// Below this distance from the fill (0…255 per channel, max over
     /// channels) a pixel is fill; above `opaque` it is content.
-    static let transparent = 14
-    static let opaque = 48
+    static let transparent = 20
+    static let opaque = 60
     /// Pixels inside the inset capsule that must be content for the frame
     /// to count as having any, as a fraction of the capsule.
-    static let contentFraction = 0.004
+    static let contentFraction = 0.015
 
     public static func key(_ image: CGImage) -> Result? {
         let width = image.width, height = image.height
@@ -34,7 +34,9 @@ public enum PillKeyer {
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
 
-        let inset = max(2.0, Double(height) * 0.06)
+        // Past the pill's own lighter rim stroke and its anti-aliasing:
+        // a tenth of the height, 4–5 px at 2x.
+        let inset = max(3.0, Double(height) * 0.1)
         let radius = Double(height) / 2 - inset
         func inside(_ x: Int, _ y: Int) -> Bool {
             let px = Double(x) + 0.5, py = Double(y) + 0.5
