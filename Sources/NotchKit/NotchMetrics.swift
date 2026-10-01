@@ -105,7 +105,10 @@ public struct NotchMetrics: Sendable, Equatable {
     public func expanded(outputRows: Int) -> NotchShapeParameters {
         let list = outputRows > 0 ? Self.outputListInset + CGFloat(outputRows) * Self.outputRowHeight : 0
         return NotchShapeParameters(
-            width: 390,
+            // 390 -> 356 (2026-10-01, user's call: "too wide"). The card's
+            // own content measures well under this; the width was simply
+            // generous.
+            width: 356,
             // 118 -> 140 during the media-player redesign: the richer card
             // (15pt rounded title, focal 26pt play button, scrub block with
             // live-drag affordance) measures ~97pt of ideal height, and 118's

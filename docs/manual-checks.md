@@ -1597,3 +1597,11 @@ chevron while all this runs, which is the one visible sign. End the activity
 on the phone — the island clears within a second and the card is closed and
 put back. Headless renders of both states checked; the reader checked against
 the real Accessibility tree of a football card and a golf card.
+
+## The open card, narrowed (2026-10-01)
+
+390 pt -> 356 pt at the user's call ("too wide"). Headless renders of all
+three panels checked at the new width: the now-playing card keeps its air
+around the artwork, title and control row; the calendar keeps its month grid
+and chips; the scoreline keeps both sides and the clock. The panel's ideal
+height still fits the 168 pt budget, which the render tests pin.

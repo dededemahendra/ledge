@@ -796,7 +796,7 @@ public final class NotchController {
         // A pin is a pin on the now-playing card (2026-09-29): when the
         // player quits or crashes and takes the card with it, the pin goes
         // too, so the island falls back to a blip, a peek or idle instead
-        // of holding a 390x168 slab with nothing in it. Only the card's
+        // of holding a 356x168 slab with nothing in it. Only the card's
         // DEPARTURE releases it — nil-to-nil is stream noise (a disallowed
         // source's diff, say) and must not unpin a blip's own detail panel.
         let cardWentAway = self.media != nil && media == nil
