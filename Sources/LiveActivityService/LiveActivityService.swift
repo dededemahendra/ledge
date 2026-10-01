@@ -41,6 +41,11 @@ public final class LiveActivityService {
     public private(set) var content: LiveActivityContent?
 
     private var enabled = true
+    /// Whether the menu bar's own pill is moved out of sight once the
+    /// island has the card. Where the pill was, so it can be put back.
+    private var hidesPill = true
+    private var pillHome: CGRect?
+    private var pillMoveWorks = true
     private var hasAskedForAccess = false
     private var timer: Timer?
     private var continuation: AsyncStream<LiveActivityEvent>.Continuation?
@@ -84,6 +89,52 @@ public final class LiveActivityService {
         if enabled { poll() } else { finish() }
     }
 
+    /// Whether to move the menu bar's own pill out of sight while the
+    /// island is showing the activity (2026-10-01, user's call). Turning
+    /// it off puts the pill straight back.
+    public func setHidesPill(_ hides: Bool) {
+        guard hidesPill != hides else { return }
+        hidesPill = hides
+        if !hides { restorePill() } else { parkPill() }
+    }
+
+    /// Moves the pill far off the menu bar, remembering where it was.
+    /// `MenuBarAgent` may simply refuse, in which case this is tried once
+    /// and then left alone.
+    private func parkPill() {
+        guard hidesPill, pillMoveWorks, let location, let element = location.pillElement else { return }
+        guard location.frame.minX < 10_000 else { return }   // already parked
+        if pillHome == nil { pillHome = location.frame }
+        guard PillLocator.move(element, to: CGPoint(x: 12_000, y: -8_000)) else {
+            pillMoveWorks = false
+            Self.log.notice("live activity: the menu bar will not move its pill")
+            return
+        }
+    }
+
+    private func restorePill() {
+        guard let home = pillHome, let element = location?.pillElement else { return }
+        PillLocator.move(element, to: home.origin)
+        pillHome = nil
+    }
+
+    #if DEBUG
+    /// Debug only (`ledge://probe/pill`): can the menu bar's pill itself
+    /// be moved out of sight, the way its card can?
+    public func probePill() async -> [String] {
+        guard let location, let element = location.pillElement else { return ["no pill"] }
+        var lines = ["pill at \(Int(location.frame.minX)),\(Int(location.frame.minY)) \(Int(location.frame.width))x\(Int(location.frame.height))"]
+        lines.append("settable position: \(PillLocator.isPositionSettable(element))")
+        lines.append("moved: \(PillLocator.move(element, to: CGPoint(x: 12_000, y: -8_000)))")
+        for round in 0..<4 {
+            try? await Task.sleep(for: .milliseconds(400))
+            let now = PillLocator.find()
+            lines.append("round \(round): \(now.map { "\(Int($0.frame.minX)),\(Int($0.frame.minY))" } ?? "gone")")
+        }
+        return lines
+    }
+    #endif
+
     /// Shows the system's own card where it belongs, for a few seconds —
     /// a click on the island. It is parked again afterwards.
     public func press() {
@@ -107,7 +158,7 @@ public final class LiveActivityService {
             finish()
             return
         }
-        if found != location {
+        if found != location, pillHome == nil || found.frame.minX < 10_000 {
             if location == nil {
                 Self.log.notice("live activity: pill at \(Int(found.frame.minX), privacy: .public),\(Int(found.frame.minY), privacy: .public)")
             }
@@ -123,6 +174,9 @@ public final class LiveActivityService {
             return
         }
         availability = .available
+        // Out of the way once the island has it — after the crests, which
+        // need the card to open where the system puts it.
+        if card != nil { parkPill() }
 
         // The card the island reads. Adopt one that is already open (our
         // own, after a relaunch), else open it.
@@ -230,9 +284,11 @@ public final class LiveActivityService {
     private func finish() {
         opening?.cancel()
         opening = nil
+        restorePill()
         closeCard()
         guard location != nil || content != nil else { return }
         location = nil
+        pillHome = nil
         content = nil
         crests = nil
         Self.log.notice("live activity: gone")

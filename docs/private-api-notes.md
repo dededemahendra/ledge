@@ -258,7 +258,14 @@ A click on the island moves the card back under the pill for eight seconds.
 The window is put back and pressed closed when the activity ends or the app
 quits; an already-open card (after a crash or relaunch) is adopted instead of
 pressed again. Note the pill shows its collapse chevron the whole time the
-card is held open.
+card is held open — which is why the island also tries to move the pill itself
+out of the menu bar (`AXPosition` on the `AXMenuBarItem`, after the crests are
+cut, since the card must open where the system puts it to be photographed). If
+`MenuBarAgent` refuses the move it is tried once and left alone, and the pill
+is put back where it was when the activity ends or the setting is turned off.
+Turning the pill off at the system level (`RemoteLiveActivitiesEnabled` in
+`com.apple.controlcenter`) is not an option for this feature: the pill is what
+opens the card, so without it there is nothing to read.
 
 Pixels are still needed for the crests only, and cannot be taken off-screen:
 `SCScreenshotManager` fails for a window that is not on screen, and
