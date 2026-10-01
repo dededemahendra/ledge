@@ -459,7 +459,13 @@ public final class NotchController {
             }
             return widths.reduce(0, +) + CGFloat(max(0, parts.count - 1)) * 7 + 16
         }
-        guard let text = activities.first?.compactText, text.count > 4 else { return NotchMetrics.activityEarWidth }
+        return earWidth(forText: activities.first?.compactText)
+    }
+
+    /// The ear a trailing text needs at `compactValue`'s 11 pt medium plus
+    /// breathing room; four characters or fewer leave the default.
+    func earWidth(forText text: String?) -> CGFloat {
+        guard let text, text.count > 4 else { return NotchMetrics.activityEarWidth }
         let width = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium)]).size().width
         return ceil(width) + 16
     }
@@ -524,7 +530,11 @@ public final class NotchController {
         case .hidden:
             return metrics.collapsed
         case .peek:
-            return upcoming != nil ? metrics.captioned(fitting: captionWidth(upcoming?.caption)) : metrics.peek
+            // Wide enough for the line AND for the countdown in the trailing
+            // ear (2026-10-01: "2h 20m" was cut at the 255 pt floor).
+            return upcoming != nil
+                ? metrics.captioned(fitting: max(captionWidth(upcoming?.caption), metrics.notchRect.width + 2 * earWidth(forText: upcoming?.compactText)))
+                : metrics.peek
         case .activity:
             // One size for every activity, however many are queued
             // (2026-09-29): the "grow down when crowded" two-slot layout
@@ -532,7 +542,9 @@ public final class NotchController {
             // own the island alone. The one thing that still grows the
             // compact island is a song-change caption, and only while
             // media itself leads.
-            return hasCaption ? metrics.captioned(fitting: captionWidth(caption)) : metrics.oneActivity(earWidth: leadingEarWidth)
+            return hasCaption
+                ? metrics.captioned(fitting: max(captionWidth(caption), metrics.notchRect.width + 2 * leadingEarWidth))
+                : metrics.oneActivity(earWidth: leadingEarWidth)
         case .expanded:
             return metrics.expanded(outputRows: panel == .media && isOutputPickerOpen ? outputs.count : 0)
         }

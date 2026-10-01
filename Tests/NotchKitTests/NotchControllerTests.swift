@@ -718,3 +718,19 @@ private func someMedia() -> MediaPresentation {
     c.setTucked(false)
     #expect(c.parameters == c.metrics.oneActivity)
 }
+
+/// The captioned island must also fit its ears (2026-10-01: a "2h 20m"
+/// countdown was cut at the 255 pt floor): a short line with a long
+/// trailing text widens for the text.
+@MainActor
+@Test func theCaptionIslandAlsoFitsItsTrailingText() {
+    let c = makeController()
+    c.setUpcoming(UpcomingEvent(title: "Report", compactText: "2h 20m", caption: "Report · 20:00", url: nil))
+    c.setHovered(true)
+    #expect(c.isPreviewingUpcoming)
+    let needed = c.metrics.notchRect.width + 2 * c.earWidth(forText: "2h 20m")
+    #expect(c.parameters.width >= needed)
+    #expect(c.parameters.width > NotchMetrics.captionedMinimumWidth)
+    c.setUpcoming(UpcomingEvent(title: "Report", compactText: "42m", caption: "Report · 20:00", url: nil))
+    #expect(c.parameters.width == NotchMetrics.captionedMinimumWidth, "a short countdown fits the default ear")
+}
