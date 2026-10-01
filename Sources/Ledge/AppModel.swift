@@ -244,7 +244,9 @@ final class AppModel {
         chargingShown = (symbol, text)
         queue.insert(ActivityRecord(
             id: NotchController.chargingActivityID, kind: .charging, insertedAt: Date(), ttl: nil,
-            title: latest.isCharged ? "Charged" : "Charging", compactText: text, symbolName: symbol
+            title: latest.isCharged ? "Charged" : "Charging", compactText: text, symbolName: symbol,
+            // Green on the battery alone (user's call): the figure stays white.
+            tint: .positive
         ))
         publish()
     }
