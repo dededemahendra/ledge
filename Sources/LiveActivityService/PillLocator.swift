@@ -35,8 +35,8 @@ extension PillLocation: Equatable {
 
 @MainActor
 public enum PillLocator {
-    public static let host = "com.apple.MenuBarAgent"
-    public static let identifierPrefix = "live-activity-pill-"
+    public nonisolated static let host = "com.apple.MenuBarAgent"
+    public nonisolated static let identifierPrefix = "live-activity-pill-"
 
     public static var isTrusted: Bool { AXIsProcessTrusted() }
 

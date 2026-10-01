@@ -74,6 +74,10 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// pill's leading slot (a home team) while `mirror` carries the
     /// trailing one (the away team).
     public let leadingMirror: ActivityMirror?
+    /// A picture for the caption row under the notch — a match's score
+    /// — and the whole card for the open panel.
+    public let captionMirror: ActivityMirror?
+    public let card: ActivityMirror?
 
     public init(
         id: String,
@@ -90,7 +94,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         url: URL? = nil,
         parts: [ActivityPart]? = nil,
         mirror: ActivityMirror? = nil,
-        leadingMirror: ActivityMirror? = nil
+        leadingMirror: ActivityMirror? = nil,
+        captionMirror: ActivityMirror? = nil,
+        card: ActivityMirror? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -107,6 +113,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.parts = parts
         self.mirror = mirror
         self.leadingMirror = leadingMirror
+        self.captionMirror = captionMirror
+        self.card = card
     }
 
     public var isSticky: Bool { ttl == nil }

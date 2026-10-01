@@ -1,5 +1,6 @@
 import AppKit
 import OSLog
+@preconcurrency import ScreenCaptureKit
 import ActivityKit
 
 public enum LiveActivityEvent: Sendable, Equatable {
@@ -62,6 +63,45 @@ public final class LiveActivityService {
         guard self.enabled != enabled else { return }
         self.enabled = enabled
         if enabled { poll() } else { endCapture(); availability = .available }
+    }
+
+    /// Copies the system's card (see `CardPeek`): presses the pill, waits
+    /// for the popover, captures its window, presses again to close it.
+    /// `nil` when there is no pill, no grant, or the popover never came.
+    public private(set) var isPeeking = false
+
+    public func peek() async -> CardFrame? {
+        guard let location, hasScreenAccess, !isPeeking else { return nil }
+        isPeeking = true
+        defer { isPeeking = false }
+        guard PillLocator.press(location) else { return nil }
+        let scale = CaptureGeometry.scale(at: CGPoint(x: location.frame.midX, y: location.frame.midY))
+        let pill = location.frame
+        var window: SCWindow?
+        let clock = ContinuousClock()
+        let start = clock.now
+        while window == nil, clock.now - start < CardPeek.timeout {
+            try? await Task.sleep(for: CardPeek.step)
+            window = await CardPeek.popover(below: pill)
+        }
+        guard let window else {
+            Self.log.notice("live activity: no card came up")
+            return nil
+        }
+        var frame: CardFrame?
+        do {
+            let image = try await CardPeek.capture(window, scale: scale)
+            frame = CardCropper.frame(from: image, scale: scale)
+        } catch {
+            Self.log.notice("live activity: card capture failed — \(error.localizedDescription, privacy: .public)")
+        }
+        // Close it: the press toggles. Re-read the pill, which may have
+        // moved while the card was up.
+        if let current = PillLocator.find() { PillLocator.press(current) } else { PillLocator.press(location) }
+        if let frame {
+            Self.log.notice("live activity: card \(Int(frame.whole.size.width), privacy: .public)x\(Int(frame.whole.size.height), privacy: .public) pt")
+        }
+        return frame
     }
 
     /// Opens the system's expanded view of the activity.

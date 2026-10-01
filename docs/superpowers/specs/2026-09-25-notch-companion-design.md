@@ -1082,6 +1082,17 @@ without the Settings toggle, asks for Screen Recording once when a pill is
 first seen, and reports `.needsPermission("Screen Recording")` until granted
 — the Permissions pane and the menu both say so.
 
+**Peek and copy (user's call, 2026-10-01).** For an app the Mac cannot
+render, the pill stays blank and the activity lives only in the system card
+that pressing the pill opens. The island then peeks: `LiveActivityService.
+peek()` presses the pill, captures the card's window the moment it is on
+screen and presses again to close it — a flash of about a fifth of a second
+— once when the blank pill arrives and again on each rest on the island. The
+card's left and right thirds go to the ears as team capsules, its middle
+under the notch as the score (`captionMirror`), and the whole card is the
+hover's own panel (`Panel.liveActivity`, ahead of the now-playing card, a
+swipe away from it). Between peeks the score is as of the last look.
+
 **Overflow pip.** The "+N" count in the trailing ear now shows only when the
 leading activity leaves that ear empty: a Clock timer's clock or a Live
 Activity's pill over music and charging keeps its ear.

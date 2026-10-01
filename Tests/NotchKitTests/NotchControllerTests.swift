@@ -791,3 +791,28 @@ private func solidImage(width: Int, height: Int) -> CGImage {
     context.fill(CGRect(x: 0, y: 0, width: width, height: height))
     return context.makeImage()!
 }
+
+/// The copied system card (2026-10-01): its score sits under the notch
+/// at activity size, and a hover opens the card as its own panel, ahead
+/// of the now-playing card.
+@MainActor
+@Test func aLiveActivityWithACardGrowsForTheScoreAndOpensItOnHover() {
+    let c = makeController()
+    let png = NSBitmapImageRep(cgImage: solidImage(width: 92, height: 48)).representation(using: .png, properties: [:])!
+    let ear = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 40, height: 24))
+    let score = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 57, height: 22))
+    let card = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 408, height: 120))
+    c.setActivities([.init(id: "live-activity", title: "Live Activity", mirror: ear, leadingMirror: ear, captionMirror: score, card: card)], overflow: 0)
+    #expect(c.state == .activity && c.hasCaption && c.hasCard)
+    #expect(c.parameters.height == c.metrics.notchRect.height + NotchMetrics.captionRowHeight)
+    #expect(c.captionMirrorImage != nil && c.cardImage != nil)
+    c.setMedia(MediaPresentation(title: "Song", artist: nil, artwork: nil, isPlaying: true, elapsed: 0, duration: 100))
+    c.setHovered(true)
+    #expect(c.state == .expanded && c.panel == .liveActivity, "the card first, music a swipe away")
+    #expect(c.availablePanels == [.liveActivity, .media])
+    #expect(c.swipe(.next) && c.panel == .media)
+    c.setHovered(false)
+    #expect(c.panel == .media && c.state == .activity)
+    c.setActivities([.init(id: "charging", title: "Charging", compactText: "37%")], overflow: 0)
+    #expect(!c.hasCard && c.cardImage == nil)
+}

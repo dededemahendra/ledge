@@ -232,6 +232,10 @@ public final class NotchController {
         /// The pill's leading slot for the leading ear, in place of the
         /// glyph — the home team to `mirror`'s away team.
         public let leadingMirror: Mirror?
+        /// A picture for the caption row — a match's score — and the
+        /// whole system card for the open panel (`Panel.liveActivity`).
+        public let captionMirror: Mirror?
+        public let card: Mirror?
 
         public init(
             id: String,
@@ -245,7 +249,9 @@ public final class NotchController {
             url: URL? = nil,
             parts: [Part]? = nil,
             mirror: Mirror? = nil,
-            leadingMirror: Mirror? = nil
+            leadingMirror: Mirror? = nil,
+            captionMirror: Mirror? = nil,
+            card: Mirror? = nil
         ) {
             self.id = id
             self.title = title
@@ -259,6 +265,8 @@ public final class NotchController {
             self.parts = parts
             self.mirror = mirror
             self.leadingMirror = leadingMirror
+            self.captionMirror = captionMirror
+            self.card = card
         }
     }
 
@@ -306,7 +314,17 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". Any other blip
     /// pre-empting the island takes it whole.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading)
+        state == .activity && ((caption != nil && (isMediaLeading || isCalendarLeading)) || activities.first?.captionMirror != nil)
+    }
+
+    public var isLiveActivityLeading: Bool {
+        activities.first?.id == Self.liveActivityID
+    }
+
+    /// The system card to open on hover, when the leading live activity
+    /// has one.
+    public var hasCard: Bool {
+        isLiveActivityLeading && activities.first?.card != nil
     }
 
     /// `AppModel` inserts the Focus blip with this id.
@@ -357,6 +375,8 @@ public final class NotchController {
     /// "Up next" list. A two-finger swipe moves between the ones available.
     public enum Panel: Sendable, Equatable {
         case media, calendar
+        /// The iPhone Live Activity's own card, copied (2026-10-01).
+        case liveActivity
     }
 
     public private(set) var panel: Panel = .media
@@ -378,6 +398,7 @@ public final class NotchController {
     /// The modes there are right now, in swipe order.
     public var availablePanels: [Panel] {
         var panels: [Panel] = []
+        if hasCard { panels.append(.liveActivity) }
         if media != nil { panels.append(.media) }
         if calendarMode != nil { panels.append(.calendar) }
         return panels
@@ -591,6 +612,8 @@ public final class NotchController {
 
     public func setHovered(_ hovered: Bool) {
         isHovered = hovered
+        // A live activity's card is what its hover opens.
+        if hovered, hasCard, !isPinnedOpen { panel = .liveActivity }
         // Leaving puts the card back on now-playing for next time, unless
         // it is pinned where it is.
         if !hovered, !isPinnedOpen { panel = .media }
@@ -702,6 +725,15 @@ public final class NotchController {
         if activities.first?.leadingMirror?.png != self.activities.first?.leadingMirror?.png {
             leadingMirrorImage = activities.first?.leadingMirror.flatMap { NSImage(data: $0.png) }
         }
+        if activities.first?.captionMirror?.png != self.activities.first?.captionMirror?.png {
+            captionMirrorImage = activities.first?.captionMirror.flatMap { NSImage(data: $0.png) }
+        }
+        if activities.first?.card?.png != self.activities.first?.card?.png {
+            cardImage = activities.first?.card.flatMap { NSImage(data: $0.png) }
+        }
+        if panel == .liveActivity, !(activities.first?.id == Self.liveActivityID && activities.first?.card != nil) {
+            panel = .media
+        }
         self.activities = activities
         self.overflowCount = max(0, overflow)
         setActivityCount(activities.count + max(0, overflow))
@@ -724,6 +756,8 @@ public final class NotchController {
     /// view must not decode a PNG on every body pass.
     public private(set) var mirrorImage: NSImage?
     public private(set) var leadingMirrorImage: NSImage?
+    public private(set) var captionMirrorImage: NSImage?
+    public private(set) var cardImage: NSImage?
 
     /// Identity of the leading blip, if the leading activity is one.
     /// Title included so plug → unplug (same id, new title) pulses again.
@@ -793,6 +827,8 @@ public final class NotchController {
             state = .expanded
         } else if isHovered, panel == .calendar, calendarMode != nil {
             // The calendar mode, swiped open from the preview.
+            state = .expanded
+        } else if isHovered, panel == .liveActivity, hasCard {
             state = .expanded
         } else if activityCount > 0, !(isHovered && onlyChargingIsShowing && upcoming != nil) {
             state = .activity

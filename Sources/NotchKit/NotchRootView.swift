@@ -534,7 +534,15 @@ public struct NotchRootView: View {
             // sharpens it over the spring (the root's `.animation(value:
             // parameters)` is the transaction). Before this the card was
             // simply sliced by the moving clip mask on the way out.
-            if let caption = controller.captionText {
+            if controller.hasCaption, let activity = controller.activities.first, let mirror = activity.captionMirror {
+                // A score under the notch (2026-10-01): the middle of the
+                // system card, centred, at caption height.
+                pillMirror(mirror, image: controller.captionMirrorImage)
+                    .frame(width: parameters.width, height: parameters.height - notch.height, alignment: .top)
+                    .padding(.top, 1)
+                    .id("caption-mirror")
+                    .transition(BlurReplaceTransition(configuration: .downUp).combined(with: OffsetTransition(CGSize(width: 0, height: 6))))
+            } else if let caption = controller.captionText {
                 // Song-change or meeting caption (see `NotchController.
                 // caption`), or the previewed next event on hover
                 // (`NotchController.upcoming`): one line under the hole,
@@ -839,7 +847,7 @@ public struct NotchRootView: View {
     /// upstream so only the phone's glyphs and text land on the island;
     /// the capsule clip is a second guard. Frames replace in place, no
     /// transition — it is a live picture.
-    private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror, image: NSImage?) -> some View {
+    private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror, image: NSImage?, clipped: Bool = true) -> some View {
         Group {
             if let image {
                 Image(nsImage: image)
@@ -850,7 +858,7 @@ public struct NotchRootView: View {
             }
         }
         .frame(width: mirror.size.width, height: mirror.size.height)
-        .clipShape(Capsule())
+        .clipShape(clipped ? AnyShape(Capsule()) : AnyShape(Rectangle()))
     }
 
     private func compactValue(_ compact: String, bump: Bool = true, color: Color? = nil) -> some View {
@@ -1063,7 +1071,19 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var detailRow: some View {
-        if controller.state == .expanded, controller.panel == .calendar, let data = controller.calendarMode {
+        if controller.state == .expanded, controller.panel == .liveActivity, controller.hasCard,
+           let card = controller.activities.first?.card {
+            // The system's own card for the iPhone Live Activity, copied
+            // (2026-10-01): fitted to the panel, its corners kept.
+            pillMirror(card, image: controller.cardImage, clipped: false)
+                .scaleEffect(min(1, (controller.parameters.width - 24) / max(1, card.size.width)), anchor: .top)
+                .frame(width: controller.parameters.width - 24, height: min(card.size.height, controller.parameters.height - controller.metrics.notchRect.height - 16), alignment: .top)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .padding(.top, 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .id("live-activity")
+                .transition(panelTransition)
+        } else if controller.state == .expanded, controller.panel == .calendar, let data = controller.calendarMode {
             // The calendar mode (2026-09-30).
             CalendarPanelView(
                 data: data, contentColor: contentColor,

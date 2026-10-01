@@ -217,6 +217,7 @@ final class AppModel {
                 self?.refreshUpcoming()
                 self?.refreshTimer()
                 self?.refreshCharging()
+                self?.refreshCardOnHover()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -482,37 +483,91 @@ final class AppModel {
     /// the leading ear, the pill's live pixels in the trailing one, sticky
     /// while the pill shows; a click presses the pill and the system opens
     /// its own expanded view. Each changed frame republishes the record.
+    private var livePill: PillFrame?
+    private var liveCard: CardFrame?
+    private var peekTask: Task<Void, Never>?
+    private var peekedThisHover = false
+
     private func handle(_ event: LiveActivityEvent) {
         switch event {
         case .showing(let frame):
             guard settings.showsLiveActivities else { return }
-            // The two compact slots either side of the notch, as the
-            // phone's island splits them (a home team left, the away team
-            // right); the whole pill in the trailing ear when the slots
-            // are not reported; nothing but the phone glyph when the pill
-            // is blank.
-            func mirror(_ image: PillImage?) -> ActivityMirror? {
-                guard let image, image.hasContent else { return nil }
-                return ActivityMirror(png: image.png, size: image.size)
-            }
-            let split = frame.leading != nil || frame.trailing != nil
-            queue.insert(
-                ActivityRecord(
-                    id: NotchController.liveActivityID,
-                    kind: .liveActivity,
-                    insertedAt: Date(),
-                    ttl: nil,
-                    title: "Live Activity",
-                    symbolName: "iphone",
-                    url: URL(string: "ledge://live-activity"),
-                    mirror: split ? mirror(frame.trailing) : mirror(frame.whole),
-                    leadingMirror: split ? mirror(frame.leading) : nil
-                )
-            )
+            let isNew = livePill == nil
+            livePill = frame
+            publishLiveActivity()
+            // A blank pill on arrival: peek once for the card, so the
+            // teams and score are there before any hover.
+            if isNew, liveCard == nil, !frame.whole.hasContent { peekCard() }
         case .ended:
+            livePill = nil
+            liveCard = nil
+            peekTask?.cancel()
+            peekTask = nil
             queue.remove(kind: .liveActivity)
+            publish()
         }
+    }
+
+    /// The island's record for the activity (2026-10-01): the pill's two
+    /// compact slots either side of the notch when the Mac draws them;
+    /// otherwise the copied card's teams in the ears, its score under the
+    /// notch and the card itself on hover; the phone glyph alone when
+    /// there is neither.
+    private func publishLiveActivity() {
+        guard let frame = livePill else { return }
+        func mirror(_ image: PillImage?) -> ActivityMirror? {
+            guard let image, image.hasContent else { return nil }
+            return ActivityMirror(png: image.png, size: image.size)
+        }
+        let split = frame.leading != nil || frame.trailing != nil
+        var leading = split ? mirror(frame.leading) : nil
+        var trailing = split ? mirror(frame.trailing) : mirror(frame.whole)
+        var caption: ActivityMirror?
+        if let card = liveCard, leading == nil, trailing == nil {
+            leading = mirror(card.leading)
+            trailing = mirror(card.trailing)
+            caption = mirror(card.center)
+        }
+        queue.insert(
+            ActivityRecord(
+                id: NotchController.liveActivityID,
+                kind: .liveActivity,
+                insertedAt: Date(),
+                ttl: nil,
+                title: "Live Activity",
+                symbolName: "iphone",
+                url: URL(string: "ledge://live-activity"),
+                mirror: trailing,
+                leadingMirror: leading,
+                captionMirror: caption,
+                card: liveCard.flatMap { mirror($0.whole) }
+            )
+        )
         publish()
+    }
+
+    /// Peek and copy (user's call, 2026-10-01): the system card flashes
+    /// for a fifth of a second and the island keeps its picture. Once
+    /// when a blank pill arrives, and again on each rest on the island.
+    private func peekCard() {
+        guard peekTask == nil, settings.showsLiveActivities else { return }
+        peekTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.peekTask = nil }
+            if let card = await self.liveActivities.peek(), self.livePill != nil {
+                self.liveCard = card
+                self.publishLiveActivity()
+            }
+        }
+    }
+
+    /// On the tick: a rest on the island refreshes the card once per rest.
+    private func refreshCardOnHover() {
+        let controller = presenter.controller
+        guard controller.isHovered else { peekedThisHover = false; return }
+        guard !peekedThisHover, controller.isLiveActivityLeading, livePill != nil else { return }
+        peekedThisHover = true
+        peekCard()
     }
 
     /// Stands in for "open the Calendar (or Reminders) app" on an item
@@ -617,6 +672,13 @@ final class AppModel {
     func openURL(_ url: URL) {
         if url.scheme == "ledge", url.host() == "settings" {
             onOpenSettings?()
+            return
+        }
+        // Opens the system's expanded view of the iPhone Live Activity
+        // (also what a click on the island does) — for Shortcuts and
+        // the shell.
+        if url.scheme == "ledge", url.host() == "live-activity" {
+            liveActivities.press()
             return
         }
         #if DEBUG
@@ -929,7 +991,9 @@ final class AppModel {
                 url: record.url,
                 parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
                 mirror: record.mirror.map { .init(png: $0.png, size: $0.size) },
-                leadingMirror: record.leadingMirror.map { .init(png: $0.png, size: $0.size) }
+                leadingMirror: record.leadingMirror.map { .init(png: $0.png, size: $0.size) },
+                captionMirror: record.captionMirror.map { .init(png: $0.png, size: $0.size) },
+                card: record.card.map { .init(png: $0.png, size: $0.size) }
             )
         }
         // `setActivities` sets the count itself — do not also call

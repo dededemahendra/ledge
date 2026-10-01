@@ -1580,3 +1580,15 @@ streamed, and the capsule pushed the pill 85 pt left; seen live and fixed).
 Checked live: the island showed the phone glyph and the pill's own pixels,
 following the pill when it moved. Headless render checked with a captured
 pill.
+
+## Live score, peek and copy (2026-10-01)
+
+With a match activity on the phone (pill blank on the Mac): on arrival the
+system card flashes once under the menu bar and the island shows the home
+team's flag in a capsule left, the away team's right, and the score under
+the notch. Rest on the island — the card flashes again and the island opens
+on the card itself (flags, score, clock); swipe for the now-playing card.
+Click — the system's own card. Headless renders of the resting and open
+island checked against a capture of the real card (Indonesia 0–0
+Bangladesh); the popover's window identified live (MenuBarAgent, layer 101,
+408×960) and gone once closed.

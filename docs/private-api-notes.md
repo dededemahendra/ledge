@@ -234,6 +234,19 @@ menu bar. The
 first time a pill is seen without the grant, `CGRequestScreenCaptureAccess`
 asks once; the grant takes effect for a new process, so relaunch after it.
 
+**The card (2026-10-01).** Pressing the pill makes `MenuBarAgent` a popover
+window (layer 101, ~408×960 pt hanging from the pill's bottom edge, the card
+drawn in its top ~120 pt, the rest transparent) and the next press destroys
+it; a new window id each time, nothing while closed. The card is the phone's
+own render — for a football match, flags, score and clock. `CardPeek` finds
+that window through `SCShareableContent` (owner `com.apple.MenuBarAgent`, on
+screen, just below the pill, wider than it), captures it with
+`SCContentFilter(desktopIndependentWindow:)`, and `CardCropper` trims it to
+its opaque bounds and slices it 30/40/30 across, top 62 % — the teams for the
+ears, the score for the caption row — keeping the whole for the open panel.
+The peek takes about a fifth of a second and the system card flashes for it;
+once when a blank pill arrives, then on each rest on the island.
+
 ## Focus state (2026-09-29)
 
 `~/Library/DoNotDisturb/DB/{Assertions,ModeConfigurations}.json` are behind
