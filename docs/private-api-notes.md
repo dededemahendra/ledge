@@ -196,6 +196,31 @@ The only readable surface is Accessibility: `MenuBarAgent`'s
 extras bar (-25212). `ledge://probe/menubar` dumps the tree to the log
 (`MenuBarProbe`) so a live activity's shape can be learned once one shows.
 
+**Observed (2026-10-01, phone paired).** The pill is an `AXMenuBarItem`
+directly under `MenuBarAgent`'s extras bar, identifier
+`live-activity-pill-com.apple.chrono.WidgetRenderer-Activities`, description
+"Live Activity", frame 46×24 pt at y=4. Its subtree is two 3×33 `AXGroup`
+(`AXHostingView`) children and, at times, an `AXImage` described "Expanded"
+(47×27) — no text, no value, seven levels deep. The activity's content is not
+readable through Accessibility at all; Control Center's `CompanionPaired` was
+still false while the pill showed, so that flag is stale too. Menu bar
+extras are not separate windows on macOS 27 (`CGWindowListCopyWindowInfo`
+lists one Window Server "Menubar" window, 1470×33), so the pill cannot be
+captured as a window either.
+
+**What works: pixels.** `LiveActivityService` finds the pill through
+Accessibility once a second (`PillLocator`) and, with the Screen Recording
+grant, streams exactly its rectangle of the display through ScreenCaptureKit
+(`PillCapture`: `SCContentFilter(display:excludingApplications:)` with this
+app excluded, `sourceRect` = the AX frame relative to the display, width and
+height at the screen's scale, ten frames a second at most, frames only on
+change). Each changed frame is PNG-encoded and published as the record's
+`mirror`; the island draws it at the pill's point size, capsule-clipped so the
+menu bar's material around the pill stays out. A click performs `AXPress` on
+the item, and the system opens its own expanded view under the menu bar. The
+first time a pill is seen without the grant, `CGRequestScreenCaptureAccess`
+asks once; the grant takes effect for a new process, so relaunch after it.
+
 ## Focus state (2026-09-29)
 
 `~/Library/DoNotDisturb/DB/{Assertions,ModeConfigurations}.json` are behind

@@ -1056,3 +1056,29 @@ calendar's colour (`MeetingEvent.color` from `EKCalendar.cgColor`, through
 red over the grid — weekday letters bold with the weekend dimmed, busy days in
 red instead of dotted, today on a white disc. `CalendarModeData` gained the
 weekday title, day number, short month and weekend columns.
+
+## iPhone Live Activity mirror (2026-10-01)
+
+**What.** A paired iPhone's Live Activity, as the Mac's menu bar shows it,
+mirrored into the island: the phone glyph in the leading ear, the pill's own
+pixels in the trailing one at its own size (46×24 pt), the island stretched
+to fit; sticky while the pill shows, above music (the phone's island too gives
+a new activity the stage) and below a Clock timer. A click presses the pill
+and the system opens its expanded view — the island does not redraw the
+activity's content, which it cannot read (see `docs/private-api-notes.md`).
+
+**How.** `LiveActivityService` polls `MenuBarAgent`'s extras bar through
+Accessibility once a second for an item whose identifier starts with
+`live-activity-pill-`; while one is there, `PillCapture` runs a
+ScreenCaptureKit stream over just that rectangle (frames only on change, ten
+a second at most) and every changed frame is a `LiveActivityEvent.showing`
+with the PNG and the point size. `AppModel` publishes it as a sticky
+`.liveActivity` record (priority 15) whose `mirror` the island draws through
+`NotchController.mirrorImage`, decoded once per frame. The service is off
+without the Settings toggle, asks for Screen Recording once when a pill is
+first seen, and reports `.needsPermission("Screen Recording")` until granted
+— the Permissions pane and the menu both say so.
+
+**Overflow pip.** The "+N" count in the trailing ear now shows only when the
+leading activity leaves that ear empty: a Clock timer's clock or a Live
+Activity's pill over music and charging keeps its ear.

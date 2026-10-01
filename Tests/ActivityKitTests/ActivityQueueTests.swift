@@ -27,12 +27,14 @@ private func record(
     #expect(ActivityKind.device.priority == 50)
     #expect(ActivityKind.notification.priority == 40)
     #expect(ActivityKind.media.priority == 10)
+    #expect(ActivityKind.liveActivity.priority == 15, "above music, below a Clock timer")
 
     #expect(ActivityKind.hud.defaultTTL == 1.5)
     #expect(ActivityKind.power.defaultTTL == 3)
     #expect(ActivityKind.device.defaultTTL == 3)
     #expect(ActivityKind.notification.defaultTTL == 5)
     #expect(ActivityKind.media.defaultTTL == nil, "media is sticky")
+    #expect(ActivityKind.liveActivity.defaultTTL == nil, "a live activity stays while its pill does")
 }
 
 @Test func emptyQueueShowsNothing() {

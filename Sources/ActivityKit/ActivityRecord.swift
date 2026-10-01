@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// A colour meaning for a glyph — the island is white-on-black everywhere
@@ -20,6 +21,19 @@ public struct ActivityPart: Sendable, Equatable {
     public init(symbolName: String?, text: String) {
         self.symbolName = symbolName
         self.text = text
+    }
+}
+
+/// A system pill's pixels, mirrored (2026-10-01): an iPhone Live
+/// Activity as the menu bar draws it, PNG at the screen's scale, and its
+/// size in points — drawn at that size in the trailing ear.
+public struct ActivityMirror: Sendable, Equatable {
+    public let png: Data
+    public let size: CGSize
+
+    public init(png: Data, size: CGSize) {
+        self.png = png
+        self.size = size
     }
 }
 
@@ -53,6 +67,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// Several readings side by side in the trailing ear, instead of
     /// `compactText`; the island widens to fit them.
     public let parts: [ActivityPart]?
+    /// A live mirror of a system pill in the trailing ear, instead of
+    /// text — see `ActivityMirror`.
+    public let mirror: ActivityMirror?
 
     public init(
         id: String,
@@ -67,7 +84,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         artwork: Data? = nil,
         tint: ActivityTint? = nil,
         url: URL? = nil,
-        parts: [ActivityPart]? = nil
+        parts: [ActivityPart]? = nil,
+        mirror: ActivityMirror? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -82,6 +100,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.tint = tint
         self.url = url
         self.parts = parts
+        self.mirror = mirror
     }
 
     public var isSticky: Bool { ttl == nil }

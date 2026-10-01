@@ -1564,3 +1564,16 @@ Plug in: the green blip for 3 s as before, then a white bolt battery with the
 live percentage stays on the notch (priority 5, under everything); music takes
 the island over it; hovering with nothing playing still shows the next-item
 preview; full → plain full battery; unplug → gone. Judge live over a charge.
+
+## iPhone Live Activity (2026-10-01)
+
+With the iPhone paired and an activity running (a phone timer, a delivery,
+a score), the menu bar shows a pill at the right. Grant Screen Recording when
+asked (then relaunch): the island shows the phone glyph left and the pill's
+own pixels right, updating as the phone's does. Click it — the system's
+expanded view opens under the menu bar. End the activity on the phone — the
+island clears within a second. With music playing the activity leads; hover
+still opens the card. The capture is a 46×24 pt rectangle at most ten times a
+second; Activity Monitor should show nothing. Headless render checked with a
+captured pill; the capture pipeline checked from a script against the live
+menu bar (92×48 px frame of the empty pill the phone was showing).

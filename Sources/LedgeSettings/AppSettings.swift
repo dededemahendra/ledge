@@ -20,6 +20,7 @@ public final class AppSettings {
         public static let showsReminders = "showsReminders"
         public static let showsFocus = "showsFocus"
         public static let showsClockTimers = "showsClockTimers"
+        public static let showsLiveActivities = "showsLiveActivities"
         public static let mediaSources = "mediaSources"
         public static let calendarLeadMinutes = "calendarLeadMinutes"
         public static let disabledCalendarIDs = "disabledCalendarIDs"
@@ -60,6 +61,7 @@ public final class AppSettings {
     public var showsReminders: Bool { didSet { save(showsReminders, Key.showsReminders) } }
     public var showsFocus: Bool { didSet { save(showsFocus, Key.showsFocus) } }
     public var showsClockTimers: Bool { didSet { save(showsClockTimers, Key.showsClockTimers) } }
+    public var showsLiveActivities: Bool { didSet { save(showsLiveActivities, Key.showsLiveActivities) } }
     /// Enabled music apps' bundle identifiers.
     public var mediaSources: Set<String> { didSet { save(Array(mediaSources).sorted(), Key.mediaSources) } }
     public var calendarLeadMinutes: Int { didSet { save(calendarLeadMinutes, Key.calendarLeadMinutes) } }
@@ -80,6 +82,7 @@ public final class AppSettings {
         showsReminders = defaults.object(forKey: Key.showsReminders) as? Bool ?? true
         showsFocus = defaults.object(forKey: Key.showsFocus) as? Bool ?? true
         showsClockTimers = defaults.object(forKey: Key.showsClockTimers) as? Bool ?? true
+        showsLiveActivities = defaults.object(forKey: Key.showsLiveActivities) as? Bool ?? true
         mediaSources = (defaults.object(forKey: Key.mediaSources) as? [String]).map(Set.init)
             ?? Set(Self.knownMediaSources.map(\.id))
         calendarLeadMinutes = defaults.object(forKey: Key.calendarLeadMinutes) as? Int ?? 5

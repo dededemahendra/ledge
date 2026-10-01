@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import AppKit
 @testable import NotchKit
 
 @MainActor
@@ -750,4 +751,34 @@ private func someMedia() -> MediaPresentation {
     c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"), .init(id: "charging", title: "Charging", compactText: "37%", symbolName: "battery.100percent.bolt")], overflow: 0)
     c.setHovered(true)
     #expect(c.state == .activity, "a real blip over it keeps the island")
+}
+
+/// An iPhone Live Activity's pill (2026-10-01): the island stretches to
+/// the pill's own width plus air, the mirror is decoded once per frame,
+/// and the record is sticky with a link, so a click presses the pill.
+@MainActor
+@Test func aMirrorSizesTheEarToThePillAndDecodesOncePerFrame() {
+    let c = makeController()
+    let png = NSBitmapImageRep(cgImage: solidImage(width: 92, height: 48)).representation(using: .png, properties: [:])!
+    let mirror = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 46, height: 24))
+    c.setActivities([.init(id: "live-activity", title: "Live Activity", symbolName: "iphone",
+                           url: URL(string: "ledge://live-activity"), mirror: mirror)], overflow: 0)
+    #expect(c.state == .activity)
+    #expect(c.leadingEarWidth == 58)
+    #expect(c.parameters.width == 255 + 2 * (58 - NotchMetrics.activityEarWidth))
+    #expect(c.mirrorImage != nil)
+    #expect(c.linkURL == URL(string: "ledge://live-activity"))
+    let before = c.mirrorImage
+    c.setActivities([.init(id: "live-activity", title: "Live Activity", symbolName: "iphone", mirror: mirror)], overflow: 0)
+    #expect(c.mirrorImage === before, "the same frame is not decoded again")
+    c.setActivities([.init(id: "charging", title: "Charging", compactText: "37%")], overflow: 0)
+    #expect(c.mirrorImage == nil && c.leadingEarWidth == NotchMetrics.activityEarWidth)
+}
+
+private func solidImage(width: Int, height: Int) -> CGImage {
+    let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    context.setFillColor(CGColor(red: 0.1, green: 0.15, blue: 0.18, alpha: 1))
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    return context.makeImage()!
 }

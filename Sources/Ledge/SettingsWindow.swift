@@ -231,6 +231,13 @@ private struct IslandSettings: View {
                 Text("What happens on the Mac")
             }
             Section {
+                Toggle("Live Activities", isOn: bind(\.showsLiveActivities))
+            } header: {
+                Text("From the iPhone")
+            } footer: {
+                Text("The pill the menu bar shows for an iPhone Live Activity, mirrored into the island; click it to open. Needs Screen Recording.")
+            }
+            Section {
                 Toggle("Calendar events", isOn: bind(\.showsCalendarEvents))
                 Toggle("Reminders with a time", isOn: bind(\.showsReminders))
             } header: {

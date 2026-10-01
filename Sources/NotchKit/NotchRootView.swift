@@ -821,6 +821,33 @@ public struct NotchRootView: View {
         .fixedSize()
     }
 
+    /// Whether the leading activity has something of its own for the
+    /// trailing ear — a mirror, readings, a value, or music's output glyph.
+    private var leadingActivityFillsTrailingEar: Bool {
+        guard let first = controller.activities.first else { return false }
+        if first.mirror != nil || first.compactText != nil { return true }
+        if let parts = first.parts, !parts.isEmpty { return true }
+        return first.id == Self.mediaActivityID && controller.media != nil && controller.state != .expanded
+    }
+
+    /// A system pill's pixels at its own size (2026-10-01): the iPhone
+    /// Live Activity as the menu bar draws it, clipped to its capsule so
+    /// the menu bar's material around it stays out of the island. Frames
+    /// replace in place, no transition — it is a live picture.
+    private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror) -> some View {
+        Group {
+            if let image = controller.mirrorImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: mirror.size.width, height: mirror.size.height)
+        .clipShape(Capsule())
+    }
+
     private func compactValue(_ compact: String, bump: Bool = true, color: Color? = nil) -> some View {
         Text(compact)
             .font(.system(size: 11, weight: .medium))
@@ -940,12 +967,18 @@ public struct NotchRootView: View {
             // its percentage beats the overflow pip, which would otherwise
             // replace it the moment music was playing behind a volume press.
             compactValue(compact)
-        } else if controller.overflowCount > 0 {
+        } else if controller.overflowCount > 0, !leadingActivityFillsTrailingEar {
+            // The "+N" pip only where the leading activity leaves the ear
+            // empty (2026-10-01): a Clock timer's clock or a Live
+            // Activity's pill over music and charging must not give way
+            // to a count of what is queued behind them.
             Text("+\(controller.overflowCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
         } else if let activity = controller.activities.first {
-            if let parts = activity.parts, !parts.isEmpty {
+            if let mirror = activity.mirror {
+                pillMirror(mirror)
+            } else if let parts = activity.parts, !parts.isEmpty {
                 readings(parts)
             } else if let compact = activity.compactText {
                 // A ticking clock must not bump every second; its digits

@@ -44,7 +44,7 @@ enum MenuBarProbe {
     }
 
     private static func describe(_ element: AXUIElement, depth: Int, into lines: inout [String]) {
-        guard depth <= 3 else { return }
+        guard depth <= 7 else { return }
         var parts: [String] = []
         for (label, attribute) in [("role", kAXRoleAttribute), ("sub", kAXSubroleAttribute), ("id", kAXIdentifierAttribute),
                                    ("title", kAXTitleAttribute), ("desc", kAXDescriptionAttribute), ("value", kAXValueAttribute),

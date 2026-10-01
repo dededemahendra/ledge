@@ -9,6 +9,7 @@ import DeviceService
 import CalendarService
 import TimerService
 import FocusService
+import LiveActivityService
 import LedgeSettings
 import OSLog
 
@@ -26,6 +27,7 @@ final class AppModel {
     private let device = DeviceService()
     private let calendar = CalendarService()
     private let focus = FocusService()
+    private let liveActivities = LiveActivityService()
     private let favorites = MusicFavorites()
 
     private var queue = ActivityQueue()
@@ -56,6 +58,8 @@ final class AppModel {
     var deviceStatus: String { device.availability.statusText }
     var calendarStatus: String { calendar.availability.statusText }
     var focusStatus: String { focus.availability.statusText }
+    var liveActivityStatus: String { liveActivities.availability.statusText }
+    private var hasScreenAccessText: String { liveActivities.hasScreenAccess ? "screen" : "no-screen" }
 
     /// What the menu should say — only problems (2026-09-29, minimal menu).
     /// A service that is fine contributes nothing. The Accessibility grant
@@ -87,6 +91,13 @@ final class AppModel {
         if case .needsPermission = focus.detail {
             issues.append(Issue(text: "Focus needs Full Disk Access for its icon, colour and name…", fix: {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+                    NSWorkspace.shared.open(url)
+                }
+            }))
+        }
+        if settings.showsLiveActivities, case .needsPermission(let what) = liveActivities.availability, what == "Screen Recording" {
+            issues.append(Issue(text: "Live Activities need Screen Recording…", fix: {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                     NSWorkspace.shared.open(url)
                 }
             }))
@@ -181,6 +192,13 @@ final class AppModel {
             }
         })
 
+        let liveActivityStream = liveActivities.start()
+        tasks.append(Task { [weak self] in
+            for await event in liveActivityStream {
+                self?.handle(event)
+            }
+        })
+
         presenter.controller.onIntent = { [weak self] intent in
             self?.handle(intent)
         }
@@ -211,6 +229,7 @@ final class AppModel {
         pruneTimer?.invalidate()
         pruneTimer = nil
         hud.stop()
+        liveActivities.stop()
         power.stop()
         media.stop()
         device.stop()
@@ -256,6 +275,11 @@ final class AppModel {
     /// else is a `guard` where the event lands.
     private func applySettings() {
         hud.setSuppressStockOSD(settings.showsVolumeBrightness)
+        liveActivities.setEnabled(settings.showsLiveActivities)
+        if !settings.showsLiveActivities, queue.ordered.contains(where: { $0.kind == .liveActivity }) {
+            queue.remove(kind: .liveActivity)
+            publish()
+        }
         presenter.setHoverDwell(settings.hoverDwell)
         calendar.setLeadTime(TimeInterval(settings.calendarLeadMinutes * 60))
         calendar.setDisabledCalendars(settings.disabledCalendarIDs)
@@ -287,6 +311,9 @@ final class AppModel {
             PermissionRow(id: "fda", name: "Full Disk Access",
                           detail: "A Focus's own icon, colour and name. Without it: the moon and On/Off.",
                           isGranted: focus.detail.isAvailable, settingsURL: pane("Privacy_AllFiles")),
+            PermissionRow(id: "screen", name: "Screen Recording",
+                          detail: "Mirrors an iPhone Live Activity's pill from the menu bar into the island.",
+                          isGranted: liveActivities.hasScreenAccess, settingsURL: pane("Privacy_ScreenCapture")),
         ]
     }
 
@@ -451,6 +478,32 @@ final class AppModel {
         publish()
     }
 
+    /// The iPhone Live Activity mirror (2026-10-01): the phone glyph in
+    /// the leading ear, the pill's live pixels in the trailing one, sticky
+    /// while the pill shows; a click presses the pill and the system opens
+    /// its own expanded view. Each changed frame republishes the record.
+    private func handle(_ event: LiveActivityEvent) {
+        switch event {
+        case .showing(let frame):
+            guard settings.showsLiveActivities else { return }
+            queue.insert(
+                ActivityRecord(
+                    id: NotchController.liveActivityID,
+                    kind: .liveActivity,
+                    insertedAt: Date(),
+                    ttl: nil,
+                    title: "Live Activity",
+                    symbolName: "iphone",
+                    url: URL(string: "ledge://live-activity"),
+                    mirror: ActivityMirror(png: frame.png, size: frame.size)
+                )
+            )
+        case .ended:
+            queue.remove(kind: .liveActivity)
+        }
+        publish()
+    }
+
     /// Stands in for "open the Calendar (or Reminders) app" on an item
     /// without a call link; never handed to the system as a URL.
     private static func openAppURL(for kind: MeetingEvent.Kind) -> URL {
@@ -522,6 +575,10 @@ final class AppModel {
     /// deep link — the item's app. `ledge://calendar|reminders` are this
     /// model's own stand-ins for "the app", never handed to the system.
     private func open(_ url: URL) {
+        if url.scheme == "ledge", url.host() == "live-activity" {
+            liveActivities.press()
+            return
+        }
         let appFor: [String: String] = [
             "ledge": url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal",
             "ical": "com.apple.iCal",
@@ -791,7 +848,7 @@ final class AppModel {
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }
 
-        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus, focusStatus, focus.detail.statusText].joined(separator: "|")
+        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus, focusStatus, focus.detail.statusText, liveActivityStatus, hasScreenAccessText].joined(separator: "|")
         if fingerprint != statusFingerprint {
             statusFingerprint = fingerprint
             onStatusChange?()
@@ -824,6 +881,7 @@ final class AppModel {
             presenter.setUpcoming(nil)
         }
         if !focus.availability.isAvailable { queue.remove(kind: .focus) }
+        if !liveActivities.availability.isAvailable { queue.remove(kind: .liveActivity) }
         if !power.availability.isAvailable { queue.remove(kind: .charging) }
         if !media.availability.isAvailable {
             queue.remove(kind: .media)
@@ -858,7 +916,8 @@ final class AppModel {
                 artwork: record.artwork,
                 tint: record.tint.map(Self.displayTint),
                 url: record.url,
-                parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) }
+                parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
+                mirror: record.mirror.map { .init(png: $0.png, size: $0.size) }
             )
         }
         // `setActivities` sets the count itself — do not also call

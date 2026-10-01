@@ -216,6 +216,19 @@ public final class NotchController {
             }
         }
         public let parts: [Part]?
+        /// A system pill's pixels drawn live in the trailing ear at its
+        /// own size, capsule-clipped — an iPhone Live Activity as the menu
+        /// bar shows it (2026-10-01). Wins over `parts` and `compactText`.
+        public struct Mirror: Sendable, Equatable {
+            public let png: Data
+            public let size: CGSize
+
+            public init(png: Data, size: CGSize) {
+                self.png = png
+                self.size = size
+            }
+        }
+        public let mirror: Mirror?
 
         public init(
             id: String,
@@ -227,7 +240,8 @@ public final class NotchController {
             artwork: Data? = nil,
             tint: Tint? = nil,
             url: URL? = nil,
-            parts: [Part]? = nil
+            parts: [Part]? = nil,
+            mirror: Mirror? = nil
         ) {
             self.id = id
             self.title = title
@@ -239,6 +253,7 @@ public final class NotchController {
             self.tint = tint
             self.url = url
             self.parts = parts
+            self.mirror = mirror
         }
     }
 
@@ -302,6 +317,10 @@ public final class NotchController {
 
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"
+
+    /// `AppModel` inserts the iPhone Live Activity mirror with this id
+    /// (2026-10-01): the phone glyph leads, the pill's pixels trail.
+    public static let liveActivityID = "live-activity"
 
     /// `AppModel` inserts the running timer/stopwatch with this id. The
     /// view draws its countdown as a ring (`barFill`) and keeps its digits
@@ -457,6 +476,11 @@ public final class NotchController {
     /// `compactValue` draws it, plus breathing room. Four characters or
     /// fewer — every percentage, "Now", "Off" — leave the default.
     public var leadingEarWidth: CGFloat {
+        if let mirror = activities.first?.mirror {
+            // The pill at its own size, with 6 pt of air each side — the
+            // island's corner curves in beside it.
+            return ceil(mirror.size.width) + 12
+        }
         if let parts = activities.first?.parts, !parts.isEmpty {
             // Readings: 10 pt medium, a glyph's ~14 pt where one is set,
             // 2 pt inside a reading and 7 pt between them, as `readings`
@@ -665,6 +689,9 @@ public final class NotchController {
     public func setActivities(_ activities: [ActivityDisplay], overflow: Int) {
         let shapeBefore = parameters
         let blipBefore = leadingBlipKey
+        if activities.first?.mirror?.png != self.activities.first?.mirror?.png {
+            mirrorImage = activities.first?.mirror.flatMap { NSImage(data: $0.png) }
+        }
         self.activities = activities
         self.overflowCount = max(0, overflow)
         setActivityCount(activities.count + max(0, overflow))
@@ -682,6 +709,10 @@ public final class NotchController {
     /// size, so nothing moved). `NotchRootView` scales the island up ~5%
     /// from its top edge and springs back on every change of this.
     public private(set) var blipPulse = 0
+
+    /// The leading activity's `mirror`, decoded once per frame — the
+    /// view must not decode a PNG on every body pass.
+    public private(set) var mirrorImage: NSImage?
 
     /// Identity of the leading blip, if the leading activity is one.
     /// Title included so plug → unplug (same id, new title) pulses again.

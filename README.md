@@ -16,6 +16,7 @@ run anywhere else either.
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00–22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
+| An iPhone Live Activity (paired iPhone, macOS 26+) | the phone glyph left and the menu bar's pill mirrored pixel for pixel right, live while it runs; click to open the system's expanded view. Needs Screen Recording |
 | A Focus turns on or off | with Full Disk Access granted: the Focus's own symbol in its own colour left and its name right (the island stretches to fit), "Off" with the symbol uncoloured, 3 s; without it: the moon and On/Off |
 | An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
@@ -77,7 +78,7 @@ the menu says so when both are refused.
 The menu bar icon's "Settings…" (or `open ledge://settings`) opens a window in
 System Settings' idiom: a sidebar of sections, grouped forms. General (launch at
 login, how long the cursor rests before the island opens, the song-change
-caption), Island (which blips show: keys, battery, devices, Focus, Clock timers,
+caption), Island (which blips show: keys, battery, devices, Focus, Clock timers, Live Activities,
 calendar events, reminders), Media (which music apps the island follows),
 Calendar (how many minutes before an event, and which calendars and reminder
 lists to follow — every one the Mac has, grouped by account with its colour; a
