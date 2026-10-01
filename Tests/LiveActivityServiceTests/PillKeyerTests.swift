@@ -42,3 +42,9 @@ private func pixel(_ image: CGImage, _ x: Int, _ y: Int) -> (r: UInt8, g: UInt8,
     #expect(!keyed.hasContent)
     #expect(pixel(keyed.image, 46, 24).a == 0)
 }
+
+@Test func slicesKnowWhetherTheyHoldAnything() {
+    let keyed = PillKeyer.key(pill(withMark: true))!.image
+    #expect(PillKeyer.hasContent(keyed.cropping(to: CGRect(x: 30, y: 0, width: 32, height: 48))!), "the mark's slice")
+    #expect(!PillKeyer.hasContent(keyed.cropping(to: CGRect(x: 6, y: 0, width: 6, height: 48))!), "an empty 3 pt slot")
+}

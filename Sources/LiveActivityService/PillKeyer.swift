@@ -24,6 +24,22 @@ public enum PillKeyer {
     /// to count as having any, as a fraction of the capsule.
     static let contentFraction = 0.015
 
+    /// Whether a keyed image (or a slice of one) has anything drawn in
+    /// it: enough opaque pixels to be a glyph or a digit, not rim dust.
+    public static func hasContent(_ image: CGImage) -> Bool {
+        let width = image.width, height = image.height
+        guard width > 0, height > 0,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = context.data
+        else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        var opaque = 0
+        for i in stride(from: 3, to: width * height * 4, by: 4) where pixels[i] > 127 { opaque += 1 }
+        return opaque >= max(8, Int(Double(width * height) * contentFraction))
+    }
+
     public static func key(_ image: CGImage) -> Result? {
         let width = image.width, height = image.height
         guard width > 4, height > 4,

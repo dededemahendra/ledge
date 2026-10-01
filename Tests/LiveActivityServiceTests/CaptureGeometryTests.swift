@@ -30,3 +30,20 @@ import Foundation
     #expect(a == b)
     #expect(a != moved, "a moved pill restarts the capture over the new rectangle")
 }
+
+@Test func slotsAreClippedToThePillAndScaled() {
+    let pill = CGRect(x: 973, y: 4, width: 46, height: 24)
+    #expect(CaptureGeometry.sliceRect(slot: CGRect(x: 988, y: 0, width: 3, height: 33), inPill: pill, scale: 2)
+            == CGRect(x: 30, y: 0, width: 6, height: 48), "a slot spans the menu bar's height; only the pill's part counts")
+    #expect(CaptureGeometry.sliceRect(slot: CGRect(x: 1000, y: 0, width: 16, height: 33), inPill: pill, scale: 2)
+            == CGRect(x: 54, y: 0, width: 32, height: 48))
+    #expect(CaptureGeometry.sliceRect(slot: CGRect(x: 1100, y: 0, width: 3, height: 33), inPill: pill, scale: 2) == nil)
+}
+
+@Test func aLocationWithDifferentSlotsIsADifferentLocation() {
+    let empty = PillLocation(identifier: "live-activity-pill-x", frame: CGRect(x: 973, y: 4, width: 46, height: 24),
+                             slots: [CGRect(x: 988, y: 0, width: 3, height: 33)])
+    let filled = PillLocation(identifier: "live-activity-pill-x", frame: CGRect(x: 973, y: 4, width: 46, height: 24),
+                              slots: [CGRect(x: 980, y: 0, width: 16, height: 33)])
+    #expect(empty != filled, "content arriving in a slot re-slices the capture")
+}

@@ -107,9 +107,10 @@ public final class LiveActivityService {
         self.capture = capture
         let scale = CaptureGeometry.scale(at: CGPoint(x: found.frame.midX, y: found.frame.midY))
         let frame = found.frame
+        let slots = found.slots
         chain {
             do {
-                try await capture.capture(frame: frame, scale: scale)
+                try await capture.capture(frame: frame, slots: slots, scale: scale)
             } catch {
                 Self.log.notice("live activity: capture failed — \(error.localizedDescription, privacy: .public)")
             }

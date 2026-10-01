@@ -229,6 +229,9 @@ public final class NotchController {
             }
         }
         public let mirror: Mirror?
+        /// The pill's leading slot for the leading ear, in place of the
+        /// glyph — the home team to `mirror`'s away team.
+        public let leadingMirror: Mirror?
 
         public init(
             id: String,
@@ -241,7 +244,8 @@ public final class NotchController {
             tint: Tint? = nil,
             url: URL? = nil,
             parts: [Part]? = nil,
-            mirror: Mirror? = nil
+            mirror: Mirror? = nil,
+            leadingMirror: Mirror? = nil
         ) {
             self.id = id
             self.title = title
@@ -254,6 +258,7 @@ public final class NotchController {
             self.url = url
             self.parts = parts
             self.mirror = mirror
+            self.leadingMirror = leadingMirror
         }
     }
 
@@ -476,10 +481,12 @@ public final class NotchController {
     /// `compactValue` draws it, plus breathing room. Four characters or
     /// fewer — every percentage, "Now", "Off" — leave the default.
     public var leadingEarWidth: CGFloat {
-        if let mirror = activities.first?.mirror {
-            // The pill at its own size, with 6 pt of air each side — the
-            // island's corner curves in beside it.
-            return ceil(mirror.size.width) + 12
+        let mirrored = max(activities.first?.mirror?.size.width ?? 0, activities.first?.leadingMirror?.size.width ?? 0)
+        if mirrored > 0 {
+            // The pill's slot at its own size, with 6 pt of air each side
+            // — the island's corner curves in beside it; never narrower
+            // than the glyph ear.
+            return max(NotchMetrics.activityEarWidth, ceil(mirrored) + 12)
         }
         if let parts = activities.first?.parts, !parts.isEmpty {
             // Readings: 10 pt medium, a glyph's ~14 pt where one is set,
@@ -692,6 +699,9 @@ public final class NotchController {
         if activities.first?.mirror?.png != self.activities.first?.mirror?.png {
             mirrorImage = activities.first?.mirror.flatMap { NSImage(data: $0.png) }
         }
+        if activities.first?.leadingMirror?.png != self.activities.first?.leadingMirror?.png {
+            leadingMirrorImage = activities.first?.leadingMirror.flatMap { NSImage(data: $0.png) }
+        }
         self.activities = activities
         self.overflowCount = max(0, overflow)
         setActivityCount(activities.count + max(0, overflow))
@@ -713,6 +723,7 @@ public final class NotchController {
     /// The leading activity's `mirror`, decoded once per frame — the
     /// view must not decode a PNG on every body pass.
     public private(set) var mirrorImage: NSImage?
+    public private(set) var leadingMirrorImage: NSImage?
 
     /// Identity of the leading blip, if the leading activity is one.
     /// Title included so plug → unplug (same id, new title) pulses again.

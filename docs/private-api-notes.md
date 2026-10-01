@@ -220,8 +220,17 @@ it runs, which shifts the pill ~85 pt left under the capture; single
 screenshots only light the privacy dot in the corner (observed 2026-10-01,
 same for `screencapture`). Each changed frame is PNG-encoded and published as the record's
 `mirror`; the island draws it at the pill's point size, capsule-clipped so the
-menu bar's material around the pill stays out. A click performs `AXPress` on
-the item, and the system opens its own expanded view under the menu bar. The
+menu bar's material around the pill stays out. The two hosting groups are the pill's
+compact slots — the leading and trailing views the phone's island splits
+around its camera — so when Accessibility reports them, the keyed capture is
+sliced at their frames and each slice goes to its own ear, left and right of
+the notch (a home team's crest and score left, the away team's right); the
+whole pill goes to the trailing ear only when no slots are reported. Observed
+2026-10-01 with a third-party activity running: both slots stayed 3 pt wide
+and the pill blank — the Mac drew nothing for it, so there was nothing to
+mirror; the island shows the phone glyph alone then. A click performs
+`AXPress` on the item, and the system opens its own expanded view under the
+menu bar. The
 first time a pill is seen without the grant, `CGRequestScreenCaptureAccess`
 asks once; the grant takes effect for a new process, so relaunch after it.
 

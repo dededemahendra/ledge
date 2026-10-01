@@ -684,6 +684,10 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: media.title
                 )
+        } else if let activity = controller.activities.first, let mirror = activity.leadingMirror {
+            // The pill's leading slot (2026-10-01): a home team's crest
+            // and score where the phone glyph would be.
+            pillMirror(mirror, image: controller.leadingMirrorImage)
         } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
@@ -825,7 +829,7 @@ public struct NotchRootView: View {
     /// trailing ear — a mirror, readings, a value, or music's output glyph.
     private var leadingActivityFillsTrailingEar: Bool {
         guard let first = controller.activities.first else { return false }
-        if first.mirror != nil || first.compactText != nil { return true }
+        if first.mirror != nil || first.leadingMirror != nil || first.compactText != nil { return true }
         if let parts = first.parts, !parts.isEmpty { return true }
         return first.id == Self.mediaActivityID && controller.media != nil && controller.state != .expanded
     }
@@ -835,9 +839,9 @@ public struct NotchRootView: View {
     /// upstream so only the phone's glyphs and text land on the island;
     /// the capsule clip is a second guard. Frames replace in place, no
     /// transition — it is a live picture.
-    private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror) -> some View {
+    private func pillMirror(_ mirror: NotchController.ActivityDisplay.Mirror, image: NSImage?) -> some View {
         Group {
-            if let image = controller.mirrorImage {
+            if let image {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
@@ -978,7 +982,7 @@ public struct NotchRootView: View {
                 .monospacedDigit()
         } else if let activity = controller.activities.first {
             if let mirror = activity.mirror {
-                pillMirror(mirror)
+                pillMirror(mirror, image: controller.mirrorImage)
             } else if let parts = activity.parts, !parts.isEmpty {
                 readings(parts)
             } else if let compact = activity.compactText {

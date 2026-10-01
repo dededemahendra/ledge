@@ -773,6 +773,15 @@ private func someMedia() -> MediaPresentation {
     #expect(c.mirrorImage === before, "the same frame is not decoded again")
     c.setActivities([.init(id: "charging", title: "Charging", compactText: "37%")], overflow: 0)
     #expect(c.mirrorImage == nil && c.leadingEarWidth == NotchMetrics.activityEarWidth)
+
+    // Split slots: a narrow home crest left, a wider away score right;
+    // both ears take the wider, never under the glyph ear.
+    let small = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 12, height: 24))
+    let wide = NotchController.ActivityDisplay.Mirror(png: png, size: CGSize(width: 30, height: 24))
+    c.setActivities([.init(id: "live-activity", title: "Live Activity", mirror: wide, leadingMirror: small)], overflow: 0)
+    #expect(c.leadingEarWidth == 42 && c.leadingMirrorImage != nil)
+    c.setActivities([.init(id: "live-activity", title: "Live Activity", mirror: small, leadingMirror: small)], overflow: 0)
+    #expect(c.leadingEarWidth == NotchMetrics.activityEarWidth)
 }
 
 private func solidImage(width: Int, height: Int) -> CGImage {

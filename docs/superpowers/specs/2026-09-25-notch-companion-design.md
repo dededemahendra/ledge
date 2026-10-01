@@ -1060,9 +1060,11 @@ weekday title, day number, short month and weekend columns.
 ## iPhone Live Activity mirror (2026-10-01)
 
 **What.** A paired iPhone's Live Activity, as the Mac's menu bar shows it,
-mirrored into the island: the phone glyph in the leading ear, the pill's own
-pixels in the trailing one at its own size (46×24 pt), the island stretched
-to fit; sticky while the pill shows, above music (the phone's island too gives
+mirrored into the island: the pill's two compact slots either side of the
+notch as the phone's island splits them — a home team's crest and score
+left, the away team's right — each at its own size with the pill's capsule
+fill keyed out, the island stretched to fit; the phone glyph leads when the
+leading slot is blank, and alone when the whole pill is; sticky while the pill shows, above music (the phone's island too gives
 a new activity the stage) and below a Clock timer. A click presses the pill
 and the system opens its expanded view — the island does not redraw the
 activity's content, which it cannot read (see `docs/private-api-notes.md`).

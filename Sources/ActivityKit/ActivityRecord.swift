@@ -70,6 +70,10 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// A live mirror of a system pill in the trailing ear, instead of
     /// text — see `ActivityMirror`.
     public let mirror: ActivityMirror?
+    /// Its counterpart in the leading ear, in place of the glyph — the
+    /// pill's leading slot (a home team) while `mirror` carries the
+    /// trailing one (the away team).
+    public let leadingMirror: ActivityMirror?
 
     public init(
         id: String,
@@ -85,7 +89,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         tint: ActivityTint? = nil,
         url: URL? = nil,
         parts: [ActivityPart]? = nil,
-        mirror: ActivityMirror? = nil
+        mirror: ActivityMirror? = nil,
+        leadingMirror: ActivityMirror? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -101,6 +106,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.url = url
         self.parts = parts
         self.mirror = mirror
+        self.leadingMirror = leadingMirror
     }
 
     public var isSticky: Bool { ttl == nil }

@@ -486,6 +486,16 @@ final class AppModel {
         switch event {
         case .showing(let frame):
             guard settings.showsLiveActivities else { return }
+            // The two compact slots either side of the notch, as the
+            // phone's island splits them (a home team left, the away team
+            // right); the whole pill in the trailing ear when the slots
+            // are not reported; nothing but the phone glyph when the pill
+            // is blank.
+            func mirror(_ image: PillImage?) -> ActivityMirror? {
+                guard let image, image.hasContent else { return nil }
+                return ActivityMirror(png: image.png, size: image.size)
+            }
+            let split = frame.leading != nil || frame.trailing != nil
             queue.insert(
                 ActivityRecord(
                     id: NotchController.liveActivityID,
@@ -495,9 +505,8 @@ final class AppModel {
                     title: "Live Activity",
                     symbolName: "iphone",
                     url: URL(string: "ledge://live-activity"),
-                    // An empty pill mirrors as nothing: the phone glyph
-                    // alone says an activity is running.
-                    mirror: frame.hasContent ? ActivityMirror(png: frame.png, size: frame.size) : nil
+                    mirror: split ? mirror(frame.trailing) : mirror(frame.whole),
+                    leadingMirror: split ? mirror(frame.leading) : nil
                 )
             )
         case .ended:
@@ -919,7 +928,8 @@ final class AppModel {
                 tint: record.tint.map(Self.displayTint),
                 url: record.url,
                 parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
-                mirror: record.mirror.map { .init(png: $0.png, size: $0.size) }
+                mirror: record.mirror.map { .init(png: $0.png, size: $0.size) },
+                leadingMirror: record.leadingMirror.map { .init(png: $0.png, size: $0.size) }
             )
         }
         // `setActivities` sets the count itself — do not also call
