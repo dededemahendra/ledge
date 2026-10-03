@@ -12,8 +12,6 @@ public struct PillLocation: @unchecked Sendable {
     /// Screen points, top-left origin, as Accessibility reports it.
     public let frame: CGRect
     let element: AXUIElement?
-    /// The pill itself, for anything that needs the element.
-    public var pillElement: AXUIElement? { element }
 
     public init(identifier: String, frame: CGRect, element: AXUIElement? = nil) {
         self.identifier = identifier
@@ -68,13 +66,6 @@ public enum PillLocator {
               let items = windows as? [AXUIElement]
         else { return nil }
         return items.first { string(kAXIdentifierAttribute, of: $0) == "live-activity-expanded" }
-    }
-
-    /// Whether an element will take a new position at all.
-    public static func isPositionSettable(_ element: AXUIElement) -> Bool {
-        var settable: DarwinBoolean = false
-        guard AXUIElementIsAttributeSettable(element, kAXPositionAttribute as CFString, &settable) == .success else { return false }
-        return settable.boolValue
     }
 
     /// Tries to move a window; `false` when the app will not have it.

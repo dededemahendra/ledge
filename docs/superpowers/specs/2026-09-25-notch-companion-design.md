@@ -1096,7 +1096,9 @@ call: "like music player"), with each crest flying on its own
 figures with the period and the clock between them. It is the island's own
 drawing, not a picture, so the clock keeps time. Anything that is not a match keeps the phone glyph
 and shows the card's state line in the trailing ear. A click puts the system's
-own card back under the pill for a few seconds.
+own card back under the pill for a few seconds. The menu bar's pill stays
+where it is: macOS will not let it be moved, and trying once a second
+dismissed the card and made it blink (2026-10-03).
 
 **Overflow pip.** The "+N" count in the trailing ear now shows only when the
 leading activity leaves that ear empty: a Clock timer's clock or a Live

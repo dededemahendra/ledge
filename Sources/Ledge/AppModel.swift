@@ -278,7 +278,6 @@ final class AppModel {
     private func applySettings() {
         hud.setSuppressStockOSD(settings.showsVolumeBrightness)
         liveActivities.setEnabled(settings.showsLiveActivities)
-        liveActivities.setHidesPill(settings.hidesLiveActivityPill)
         if !settings.showsLiveActivities, queue.ordered.contains(where: { $0.kind == .liveActivity }) {
             queue.remove(kind: .liveActivity)
             publish()
@@ -649,16 +648,6 @@ final class AppModel {
             let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
             onSnapshotSettings?(dir)
             Self.log.notice("probe: settings panes to \(dir.path, privacy: .public)")
-            return
-        }
-        if url.scheme == "ledge", url.host() == "probe", url.path() == "/pill" {
-            let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            Task { @MainActor in
-                let lines = await self.liveActivities.probePill()
-                try? lines.joined(separator: "\n").write(to: dir.appending(path: "pill-probe.txt"), atomically: true, encoding: .utf8)
-                Self.log.notice("probe: pill written")
-            }
             return
         }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/menubar" {

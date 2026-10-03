@@ -60,7 +60,9 @@ public enum CardCropper {
 /// Finds and captures the card's window while it is up.
 enum CardPeek {
     static let timeout: Duration = .milliseconds(800)
-    static let step: Duration = .milliseconds(30)
+    /// Checked this often while the card comes up: the sooner it is
+    /// found, the sooner it is parked, and the less of it is ever seen.
+    static let step: Duration = .milliseconds(8)
 
     /// The card's window: `MenuBarAgent`'s, on screen, hanging below the
     /// pill and wider than it.

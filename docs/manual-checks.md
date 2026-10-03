@@ -1619,3 +1619,14 @@ show cancels that. To check: play something in a music app, then start a video
 in a browser; the card should sit still, and should go once the music app
 itself stops. The rejected source is logged at debug with its identifier
 private.
+
+## The card blinking near the menu bar (2026-10-03)
+
+Reported as a glitch blip. The log showed the card being dismissed and opened
+again every 1-3 seconds, each reopen showing it for a moment. The cause was
+the attempt to hide the menu bar pill: `AXPosition` never moved it, but
+writing it on every poll kept dismissing the card. The attempt and its setting
+are gone. To check: with an activity running, `log show --predicate
+'subsystem == "com.dedemahendra.ledge"' | grep 'card dismissed'` should be
+quiet, and the island should sit still. The pill stays in the menu bar; that
+is a macOS limitation, not a setting.

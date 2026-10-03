@@ -232,8 +232,6 @@ private struct IslandSettings: View {
             }
             Section {
                 Toggle("Live Activities", isOn: bind(\.showsLiveActivities))
-                Toggle("Take the menu bar's pill out of the way", isOn: bind(\.hidesLiveActivityPill))
-                    .disabled(!settings.showsLiveActivities)
             } header: {
                 Text("From the iPhone")
             } footer: {

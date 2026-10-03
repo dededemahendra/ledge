@@ -14,7 +14,7 @@ private func fresh() -> (AppSettings, UserDefaults) {
 @Test func everythingIsOnByDefaultAsTheAppBehavedBeforeSettings() {
     let (s, _) = fresh()
     #expect(s.launchAtLogin && s.showsSongCaption && s.showsVolumeBrightness && s.showsCapsLock && s.showsBattery)
-    #expect(s.showsDevices && s.showsCalendarEvents && s.showsReminders && s.showsFocus && s.showsClockTimers && s.showsLiveActivities && s.hidesLiveActivityPill)
+    #expect(s.showsDevices && s.showsCalendarEvents && s.showsReminders && s.showsFocus && s.showsClockTimers && s.showsLiveActivities)
     #expect(s.hoverDwell == 0.2)
     #expect(s.calendarLeadMinutes == 5)
     #expect(s.mediaSources == Set(AppSettings.knownMediaSources.map(\.id)))

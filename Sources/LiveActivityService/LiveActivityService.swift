@@ -41,11 +41,10 @@ public final class LiveActivityService {
     public private(set) var content: LiveActivityContent?
 
     private var enabled = true
-    /// Whether the menu bar's own pill is moved out of sight once the
-    /// island has the card. Where the pill was, so it can be put back.
-    private var hidesPill = true
-    private var pillHome: CGRect?
-    private var pillMoveWorks = true
+    /// How long to wait before opening the card again after it has been
+    /// closed, and when it was last opened — see `reopen`.
+    private var reopenDelay: Duration = .zero
+    private var openedAt: ContinuousClock.Instant?
     private var hasAskedForAccess = false
     private var timer: Timer?
     private var continuation: AsyncStream<LiveActivityEvent>.Continuation?
@@ -89,52 +88,6 @@ public final class LiveActivityService {
         if enabled { poll() } else { finish() }
     }
 
-    /// Whether to move the menu bar's own pill out of sight while the
-    /// island is showing the activity (2026-10-01, user's call). Turning
-    /// it off puts the pill straight back.
-    public func setHidesPill(_ hides: Bool) {
-        guard hidesPill != hides else { return }
-        hidesPill = hides
-        if !hides { restorePill() } else { parkPill() }
-    }
-
-    /// Moves the pill far off the menu bar, remembering where it was.
-    /// `MenuBarAgent` may simply refuse, in which case this is tried once
-    /// and then left alone.
-    private func parkPill() {
-        guard hidesPill, pillMoveWorks, let location, let element = location.pillElement else { return }
-        guard location.frame.minX < 10_000 else { return }   // already parked
-        if pillHome == nil { pillHome = location.frame }
-        guard PillLocator.move(element, to: CGPoint(x: 12_000, y: -8_000)) else {
-            pillMoveWorks = false
-            Self.log.notice("live activity: the menu bar will not move its pill")
-            return
-        }
-    }
-
-    private func restorePill() {
-        guard let home = pillHome, let element = location?.pillElement else { return }
-        PillLocator.move(element, to: home.origin)
-        pillHome = nil
-    }
-
-    #if DEBUG
-    /// Debug only (`ledge://probe/pill`): can the menu bar's pill itself
-    /// be moved out of sight, the way its card can?
-    public func probePill() async -> [String] {
-        guard let location, let element = location.pillElement else { return ["no pill"] }
-        var lines = ["pill at \(Int(location.frame.minX)),\(Int(location.frame.minY)) \(Int(location.frame.width))x\(Int(location.frame.height))"]
-        lines.append("settable position: \(PillLocator.isPositionSettable(element))")
-        lines.append("moved: \(PillLocator.move(element, to: CGPoint(x: 12_000, y: -8_000)))")
-        for round in 0..<4 {
-            try? await Task.sleep(for: .milliseconds(400))
-            let now = PillLocator.find()
-            lines.append("round \(round): \(now.map { "\(Int($0.frame.minX)),\(Int($0.frame.minY))" } ?? "gone")")
-        }
-        return lines
-    }
-    #endif
-
     /// Shows the system's own card where it belongs, for a few seconds —
     /// a click on the island. It is parked again afterwards.
     public func press() {
@@ -158,7 +111,7 @@ public final class LiveActivityService {
             finish()
             return
         }
-        if found != location, pillHome == nil || found.frame.minX < 10_000 {
+        if found != location {
             if location == nil {
                 Self.log.notice("live activity: pill at \(Int(found.frame.minX), privacy: .public),\(Int(found.frame.minY), privacy: .public)")
             }
@@ -174,9 +127,6 @@ public final class LiveActivityService {
             return
         }
         availability = .available
-        // Out of the way once the island has it — after the crests, which
-        // need the card to open where the system puts it.
-        if card != nil { parkPill() }
 
         // The card the island reads. Adopt one that is already open (our
         // own, after a relaunch), else open it.
@@ -189,10 +139,8 @@ public final class LiveActivityService {
         }
         // Gone — the system closed it, or the user did.
         guard PillLocator.expandedWindow() != nil else {
-            Self.log.notice("live activity: card closed, opening again")
             self.card = nil
-            crests = nil
-            open()
+            reopen()
             return
         }
         // Park it again once the user has had their look.
@@ -209,8 +157,34 @@ public final class LiveActivityService {
 
     private func adopt(_ window: AXUIElement) {
         card = window
+        openedAt = ContinuousClock().now
         PillLocator.move(window, to: Self.parking)
-        Self.log.notice("live activity: reading the card")
+        if content == nil { Self.log.notice("live activity: reading the card") }
+    }
+
+    /// The card closed under us — the system dismisses this popover on
+    /// all sorts of outside events. Opening it again shows it for the
+    /// blink it takes to park it, so a dismissal storm must not become a
+    /// strobe (2026-10-03, user's report): each close that follows hard
+    /// on an open doubles the wait, up to ten seconds, and a card that
+    /// survives a while earns the wait back.
+    private func reopen() {
+        let now = ContinuousClock().now
+        if let openedAt, now - openedAt < .seconds(15) {
+            reopenDelay = reopenDelay == .zero ? .seconds(1) : min(reopenDelay * 2, .seconds(10))
+            Self.log.notice("live activity: card dismissed quickly; waiting \(self.reopenDelay.components.seconds, privacy: .public)s")
+        } else {
+            reopenDelay = .zero
+        }
+        openedAt = nil
+        guard opening == nil else { return }
+        let wait = reopenDelay
+        opening = Task { @MainActor [weak self] in
+            if wait > .zero { try? await Task.sleep(for: wait) }
+            guard !Task.isCancelled, let self else { return }
+            self.opening = nil
+            self.open()
+        }
     }
 
     /// Presses the pill, waits for the card, takes the one picture the
@@ -284,11 +258,11 @@ public final class LiveActivityService {
     private func finish() {
         opening?.cancel()
         opening = nil
-        restorePill()
+        reopenDelay = .zero
+        openedAt = nil
         closeCard()
         guard location != nil || content != nil else { return }
         location = nil
-        pillHome = nil
         content = nil
         crests = nil
         Self.log.notice("live activity: gone")

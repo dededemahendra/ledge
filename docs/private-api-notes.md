@@ -257,15 +257,22 @@ activity arrives, nothing after that, and a score that keeps up by itself.
 A click on the island moves the card back under the pill for eight seconds.
 The window is put back and pressed closed when the activity ends or the app
 quits; an already-open card (after a crash or relaunch) is adopted instead of
-pressed again. Note the pill shows its collapse chevron the whole time the
-card is held open — which is why the island also tries to move the pill itself
-out of the menu bar (`AXPosition` on the `AXMenuBarItem`, after the crests are
-cut, since the card must open where the system puts it to be photographed). If
-`MenuBarAgent` refuses the move it is tried once and left alone, and the pill
-is put back where it was when the activity ends or the setting is turned off.
-Turning the pill off at the system level (`RemoteLiveActivitiesEnabled` in
-`com.apple.controlcenter`) is not an option for this feature: the pill is what
-opens the card, so without it there is nothing to read.
+pressed again. Note the pill shows its collapse chevron the whole time the card is held open.
+
+**The pill itself cannot be moved (2026-10-03).** `AXPosition` on the
+`AXMenuBarItem` reports success and the pill does not budge — but writing it
+once a second, as an attempt to hide the pill did, dismissed the card over and
+over: closes went from one every 20-90 s to one every 1-3 s, and each reopen
+shows the card for the blink it takes to park it. Do not write to the pill.
+Turning it off at the system level (`RemoteLiveActivitiesEnabled` in
+`com.apple.controlcenter`) is not an option either: the pill is what opens the
+card, so without it there is nothing to read. The pill stays in the menu bar.
+
+The card is dismissed by the system on all sorts of outside events, so each
+reopen that follows hard on an open doubles the wait before the next, to a
+ten-second ceiling, and a card that survives fifteen seconds earns the wait
+back. The window is looked for every 8 ms while it comes up, so it is parked
+as soon as it exists.
 
 Pixels are still needed for the crests only, and cannot be taken off-screen:
 `SCScreenshotManager` fails for a window that is not on screen, and
