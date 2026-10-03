@@ -36,6 +36,15 @@ public struct LiveActivityContent: Sendable, Equatable {
 
     public var isMatch: Bool { home != nil && away != nil }
 
+    /// The one line the island shows in its trailing ear when the card is
+    /// not a match: its state if it has one, else its title. Kept to a
+    /// handful of words, cut at a word and never left hanging on a comma
+    /// (2026-10-03: an F1 session read "Leader: M. Verstappen," — cut
+    /// mid-sentence, punctuation and all).
+    public var compactLine: String? {
+        CardReader.shorten(status ?? title ?? lines.first)
+    }
+
     public init(home: Side? = nil, away: Side? = nil, status: String? = nil, clock: String? = nil,
                 title: String? = nil, lines: [String] = []) {
         self.home = home
@@ -116,6 +125,32 @@ public enum CardReader {
             title: titleLine(rest, cardSize: cardSize),
             lines: lines
         )
+    }
+
+    /// At most this many characters in the trailing ear.
+    static let compactLimit = 20
+
+    /// Cuts a line to the ear: whole words, no trailing punctuation, and
+    /// an ellipsis only where something was actually dropped.
+    static func shorten(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let tidy = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !tidy.isEmpty else { return nil }
+        func trimmed(_ value: String) -> String {
+            var out = value
+            while let last = out.last, last.isPunctuation || last.isWhitespace { out.removeLast() }
+            return out
+        }
+        guard tidy.count > compactLimit else { return trimmed(tidy) }
+        var kept = ""
+        for word in tidy.split(separator: " ", omittingEmptySubsequences: true) {
+            let next = kept.isEmpty ? String(word) : kept + " " + word
+            if next.count > compactLimit { break }
+            kept = next
+        }
+        // One very long word: cut it rather than show nothing.
+        if kept.isEmpty { kept = String(tidy.prefix(compactLimit)) }
+        return trimmed(kept) + "…"
     }
 
     /// The clock, if the card is running one.

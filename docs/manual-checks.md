@@ -1630,3 +1630,15 @@ are gone. To check: with an activity running, `log show --predicate
 'subsystem == "com.dedemahendra.ledge"' | grep 'card dismissed'` should be
 quiet, and the island should sit still. The pill stays in the menu bar; that
 is a macOS limitation, not a setting.
+
+## Fitting the island to an F1 session (2026-10-03)
+
+Asked to polish it, but the session had ended and its card only exists while
+the activity runs, so there was nothing to read. What was visible from the
+island beforehand: the trailing ear said "Leader: M. Verstappen," — the state
+line cut at 22 characters, mid-sentence, comma and all. That cut is now made
+at a word with no trailing punctuation and an ellipsis only where something
+was dropped. Any card the island has no shape of its own for now writes its
+parts to `~/Library/Logs/Ledge/card-shape.txt` the first time it is seen, so
+the next session records itself and the island can be fitted to it properly:
+positions, session, leader, whatever the card actually carries.

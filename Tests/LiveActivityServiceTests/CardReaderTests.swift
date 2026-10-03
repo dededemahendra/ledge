@@ -64,3 +64,24 @@ private let cardSize = CGSize(width: 408, height: 122)
     #expect(content.clock == "5:56")
     #expect(content.status == nil, "the away figure sat here calling itself the period")
 }
+
+/// The trailing ear's line for a card that is not a match: whole words,
+/// no dangling punctuation, an ellipsis only where something was cut.
+@Test func theCompactLineIsCutAtAWordAndNotLeftHanging() {
+    #expect(CardReader.shorten("Leader: M. Verstappen, 1:20.123") == "Leader: M…",
+            "an F1 session used to read \"Leader: M. Verstappen,\"")
+    #expect(CardReader.shorten("Round 1, In Progress") == "Round 1, In Progress", "it fits, so it is left alone")
+    #expect(CardReader.shorten("Out for delivery today") == "Out for delivery…")
+    #expect(CardReader.shorten("HT") == "HT")
+    #expect(CardReader.shorten("  spaced out.  ") == "spaced out")
+    #expect(CardReader.shorten("Supercalifragilisticexpialidocious") == "Supercalifragilistic…", "one long word is cut")
+    #expect(CardReader.shorten(nil) == nil && CardReader.shorten("   ") == nil)
+}
+
+@Test func aCardWithoutSidesOffersItsStateAsTheCompactLine() {
+    let content = CardReader.read([
+        .init(kind: .text, text: "PGA Tour · Bank of Utah Championship", frame: CGRect(x: 20, y: 20, width: 368, height: 14)),
+        .init(kind: .text, text: "Round 1, In Progress", frame: CGRect(x: 120, y: 60, width: 168, height: 14)),
+    ], cardSize: cardSize)
+    #expect(content.compactLine == "Round 1, In Progress")
+}

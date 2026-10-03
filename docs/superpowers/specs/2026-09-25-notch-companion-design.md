@@ -1095,7 +1095,10 @@ call: "like music player"), with each crest flying on its own
 `matchedGeometryEffect`; the open card then carries both crests, names and
 figures with the period and the clock between them. It is the island's own
 drawing, not a picture, so the clock keeps time. Anything that is not a match keeps the phone glyph
-and shows the card's state line in the trailing ear. A click puts the system's
+and shows the card's state line in the trailing ear, cut at a word and never
+left hanging on punctuation (`CardReader.compactLine`); the first time such a
+card is seen its shape is written to `~/Library/Logs/Ledge/card-shape.txt`, so
+the island can be fitted to that kind of activity later. A click puts the system's
 own card back under the pill for a few seconds. The menu bar's pill stays
 where it is: macOS will not let it be moved, and trying once a second
 dismissed the card and made it blink (2026-10-03).

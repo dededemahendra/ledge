@@ -514,7 +514,7 @@ final class AppModel {
         }
         // Not a match: the island says what state the card is in, in the
         // trailing ear, and keeps the phone glyph.
-        let line = score == nil ? (content.status ?? content.title ?? content.lines.first) : nil
+        let line = score == nil ? content.compactLine : nil
         queue.insert(
             ActivityRecord(
                 id: NotchController.liveActivityID,
@@ -522,7 +522,7 @@ final class AppModel {
                 insertedAt: Date(),
                 ttl: nil,
                 title: content.title ?? "Live Activity",
-                compactText: line.map { String($0.prefix(22)) },
+                compactText: line,
                 symbolName: "iphone",
                 url: URL(string: "ledge://live-activity"),
                 score: score,
@@ -648,6 +648,14 @@ final class AppModel {
             let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
             onSnapshotSettings?(dir)
             Self.log.notice("probe: settings panes to \(dir.path, privacy: .public)")
+            return
+        }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/card" {
+            let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try? liveActivities.probeCard().joined(separator: "\n")
+                .write(to: dir.appending(path: "card-probe.txt"), atomically: true, encoding: .utf8)
+            Self.log.notice("probe: card written")
             return
         }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/menubar" {

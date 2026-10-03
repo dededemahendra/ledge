@@ -88,6 +88,26 @@ public final class LiveActivityService {
         if enabled { poll() } else { finish() }
     }
 
+    #if DEBUG
+    /// Debug only (`ledge://probe/card`): what the open card says, as the
+    /// reader sees it — every element with its place in the card, and
+    /// what that was understood to mean. For fitting the island to a kind
+    /// of activity that has not been seen before.
+    public func probeCard() -> [String] {
+        guard let card, let read = PillLocator.cardContent(of: card) else { return ["no card"] }
+        var lines = ["card \(Int(read.size.width))x\(Int(read.size.height)) pt, \(read.elements.count) parts"]
+        for element in read.elements.sorted(by: { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) }) {
+            lines.append("  \(element.kind == .image ? "image" : " text") \(Int(element.frame.minX)),\(Int(element.frame.minY)) \(Int(element.frame.width))x\(Int(element.frame.height))  \(element.text)")
+        }
+        let parsed = CardReader.read(read.elements, cardSize: read.size)
+        lines.append("match: \(parsed.isMatch)")
+        lines.append("home: \(parsed.home?.name ?? "-") \(parsed.home?.value ?? "-")")
+        lines.append("away: \(parsed.away?.name ?? "-") \(parsed.away?.value ?? "-")")
+        lines.append("status: \(parsed.status ?? "-") | clock: \(parsed.clock ?? "-") | title: \(parsed.title ?? "-")")
+        return lines
+    }
+    #endif
+
     /// Shows the system's own card where it belongs, for a few seconds —
     /// a click on the island. It is parked again afterwards.
     public func press() {
@@ -248,9 +268,25 @@ public final class LiveActivityService {
         guard parsed != content else { return }
         if content == nil {
             Self.log.notice("live activity: \(parsed.isMatch ? "a match" : "a card", privacy: .public) with \(read.elements.count, privacy: .public) parts")
+            if !parsed.isMatch { recordShape(read) }
         }
         content = parsed
         continuation?.yield(.showing(parsed))
+    }
+
+    /// An activity the island has no shape of its own for writes down
+    /// what its card looks like, so the island can be fitted to it later
+    /// (2026-10-03: an F1 session showed only a cut sentence, and the
+    /// session was over before its card could be read). The newest one
+    /// only, in the user's own log folder, never the shared system log.
+    private func recordShape(_ read: (size: CGSize, elements: [CardElement])) {
+        var lines = ["\(Date().formatted(.iso8601)) — card \(Int(read.size.width))x\(Int(read.size.height)) pt, \(read.elements.count) parts"]
+        for element in read.elements.sorted(by: { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) }) {
+            lines.append("  \(element.kind == .image ? "image" : " text") \(Int(element.frame.minX)),\(Int(element.frame.minY)) \(Int(element.frame.width))x\(Int(element.frame.height))  \(element.text)")
+        }
+        let directory = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? lines.joined(separator: "\n").write(to: directory.appending(path: "card-shape.txt"), atomically: true, encoding: .utf8)
     }
 
     /// The activity has gone, or the island has been switched off: give
