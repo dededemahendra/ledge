@@ -235,7 +235,7 @@ private struct IslandSettings: View {
             } header: {
                 Text("From the iPhone")
             } footer: {
-                Text("A match shows its crests and score around the notch and keeps up by the second; hover for the card. Needs Screen Recording for the crests.")
+                Text("A match shows its crests and score around the notch and keeps up by the second; hover for the card. Needs Screen Recording for the crests. While this is on, the system's own card is held open out of sight, so the menu bar's pill shows its collapse arrow; switching it off gives the card back.")
             }
             Section {
                 Toggle("Calendar events", isOn: bind(\.showsCalendarEvents))
