@@ -108,6 +108,10 @@ public final class LiveActivityService {
     }
     #endif
 
+    /// How long the system's own card stays put once it has been asked
+    /// for — from the island or from the menu bar's pill.
+    static let showDuration: TimeInterval = 8
+
     /// Shows the system's own card where it belongs, for a few seconds —
     /// a click on the island. It is parked again afterwards.
     public func press() {
@@ -115,8 +119,8 @@ public final class LiveActivityService {
             if let location { PillLocator.press(location) }
             return
         }
-        PillLocator.move(card, to: CGPoint(x: location.frame.midX - 204, y: location.frame.maxY))
-        showUntil = Date().addingTimeInterval(8)
+        PillLocator.move(card, to: CGPoint(x: location.frame.midX - 178, y: location.frame.maxY))
+        showUntil = Date().addingTimeInterval(Self.showDuration)
     }
 
     private func poll() {
@@ -163,14 +167,23 @@ public final class LiveActivityService {
             reopen()
             return
         }
-        // Park it again once the user has had their look.
+        // Where the card is now decides what to do with it. Parked
+        // already: leave it alone — writing a position it already has is
+        // what made the pill fight the island once before. On screen when
+        // the island did not put it there: the user pressed the pill
+        // themselves, and pulling it away from under them was the glitch
+        // they reported (2026-10-05) — the pill looked dead because every
+        // press was undone within the second. It stays for a few seconds,
+        // then goes back out of sight.
+        let onScreen = PillLocator.position(of: card).map { $0.minX < Self.parking.x / 2 } ?? false
         if let until = showUntil {
             if Date() >= until {
                 showUntil = nil
                 PillLocator.move(card, to: Self.parking)
             }
-        } else {
-            PillLocator.move(card, to: Self.parking)
+        } else if onScreen {
+            showUntil = Date().addingTimeInterval(Self.showDuration)
+            Self.log.notice("live activity: the card was opened from the menu bar; leaving it a moment")
         }
         read(card)
     }

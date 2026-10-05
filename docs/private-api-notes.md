@@ -268,6 +268,19 @@ Turning it off at the system level (`RemoteLiveActivitiesEnabled` in
 `com.apple.controlcenter`) is not an option either: the pill is what opens the
 card, so without it there is nothing to read. The pill stays in the menu bar.
 
+The card's position is read before it is moved, and it is only moved when it
+is not already parked: writing a position a thing already has is what made the
+pill fight the island. If the card is found on screen when the island did not
+put it there, the user pressed the pill, and it is left where it is for eight
+seconds — before that, every press of the pill was undone within the second
+and the pill looked dead (2026-10-05).
+
+Note also that the pill's own compact view is drawn by the activity's app, and
+for an app the Mac cannot render it is simply an empty capsule — brightened
+captures show nothing inside it, and it was already empty before this app ever
+touched it. That is not something the island can fix, and the pill cannot be
+moved or hidden.
+
 The card is dismissed by the system on all sorts of outside events, so each
 reopen that follows hard on an open doubles the wait before the next, to a
 ten-second ceiling, and a card that survives fifteen seconds earns the wait

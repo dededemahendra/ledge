@@ -68,6 +68,9 @@ public enum PillLocator {
         return items.first { string(kAXIdentifierAttribute, of: $0) == "live-activity-expanded" }
     }
 
+    /// Where a window is now, in screen points.
+    public static func position(of window: AXUIElement) -> CGRect? { frame(of: window) }
+
     /// Tries to move a window; `false` when the app will not have it.
     @discardableResult
     public static func move(_ window: AXUIElement, to point: CGPoint) -> Bool {

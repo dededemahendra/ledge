@@ -1642,3 +1642,17 @@ was dropped. Any card the island has no shape of its own for now writes its
 parts to `~/Library/Logs/Ledge/card-shape.txt` the first time it is seen, so
 the next session records itself and the island can be fitted to it properly:
 positions, session, leader, whatever the card actually carries.
+
+## The pill looking dead (2026-10-05)
+
+Reported as a glitch on the menu bar pill. Two separate things. The pill is an
+empty black capsule because macOS draws nothing in it for that activity's app:
+a brightened capture shows an outline and nothing inside, the same capsule was
+there before the island ever pressed it, and it stays empty with the app
+stopped and no card open. Nothing the island can do about that.
+
+The island's own fault was that pressing the pill did nothing: the system
+opened its card and the island moved it off screen within the second. The card
+is now left where the user put it for eight seconds. To check: with an
+activity running, click the pill — the system's card should appear under it
+and stay a few seconds, then go. Clicking the island should do the same.
