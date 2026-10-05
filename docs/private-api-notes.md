@@ -281,13 +281,19 @@ captures show nothing inside it, and it was already empty before this app ever
 touched it. That is not something the island can fix, and the pill cannot be
 moved or hidden.
 
-The card is dismissed by the system on all sorts of outside events, and a
-press can also bring nothing up at all — the press toggles, so one aimed at a
-card the island had lost track of closes it instead. Both disappointments
-double the wait before the next press, to a ten-second ceiling, and a card
-that survives fifteen seconds earns the wait back. The once-a-second poll is
-the only thing that ever presses, and it checks that gate first; without it,
-a failed press was retried every second and the pill flashed on and off. The window is looked for every 8 ms while it comes up, so it is parked
+**Presses are rationed (2026-10-05, final).** Any click anywhere dismisses the
+card, so it is dismissed constantly in normal use, and every reopen shows it
+for the blink it takes to park — which is what the pill's "random glitch"
+was. Reopening at once, however gently backed off, could not fix that: the
+cure is to stop reopening. After a dismissal the island keeps what it last
+read and leaves the menu bar alone for ninety seconds; a press that brings
+nothing up waits twenty. A rest on the island asks for a fresh reading right
+away, once per rest, which is the one moment the user is looking at the
+activity rather than the menu bar. The once-a-second poll is the only thing
+that ever presses the pill, and it checks that gate first.
+
+So the figures are live while the card happens to be open, and as of the last
+reading otherwise, with a rest on the island always bringing them up to date. The window is looked for every 8 ms while it comes up, so it is parked
 as soon as it exists.
 
 Pixels are still needed for the crests only, and cannot be taken off-screen:

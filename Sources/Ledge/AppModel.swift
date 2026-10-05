@@ -217,6 +217,7 @@ final class AppModel {
                 self?.refreshUpcoming()
                 self?.refreshTimer()
                 self?.refreshCharging()
+                self?.refreshLiveActivityOnHover()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -500,6 +501,23 @@ final class AppModel {
             queue.remove(kind: .liveActivity)
             publish()
         }
+    }
+
+    /// A rest on the island asks the activity's card for a fresh reading,
+    /// once per rest (2026-10-05). Between rests the island keeps what it
+    /// last read: opening that card shows it for a blink, and doing it
+    /// every time a click dismissed it made the menu bar flicker all day.
+    private var hasAskedThisHover = false
+
+    private func refreshLiveActivityOnHover() {
+        let controller = presenter.controller
+        guard controller.isHovered, controller.isLiveActivityLeading else {
+            hasAskedThisHover = false
+            return
+        }
+        guard !hasAskedThisHover else { return }
+        hasAskedThisHover = true
+        liveActivities.refresh()
     }
 
     private func publishLiveActivity() {
