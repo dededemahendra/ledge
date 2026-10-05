@@ -41,9 +41,10 @@ public final class LiveActivityService {
     public private(set) var content: LiveActivityContent?
 
     private var enabled = true
-    /// How long to wait before opening the card again after it has been
-    /// closed, and when it was last opened — see `reopen`.
+    /// When the island may next press the pill, and how long it waits
+    /// after a disappointment — see `backOff`.
     private var reopenDelay: Duration = .zero
+    private var nextAttempt: ContinuousClock.Instant?
     private var openedAt: ContinuousClock.Instant?
     private var hasAskedForAccess = false
     private var timer: Timer?
@@ -158,7 +159,8 @@ public final class LiveActivityService {
             adopt(existing)
         }
         guard let card else {
-            if opening == nil { open() }
+            let due = nextAttempt.map { ContinuousClock().now >= $0 } ?? true
+            if opening == nil, due { open() }
             return
         }
         // Gone — the system closed it, or the user did.
@@ -191,6 +193,8 @@ public final class LiveActivityService {
     private func adopt(_ window: AXUIElement) {
         card = window
         openedAt = ContinuousClock().now
+        reopenDelay = .zero
+        nextAttempt = nil
         PillLocator.move(window, to: Self.parking)
         if content == nil { Self.log.notice("live activity: reading the card") }
     }
@@ -202,22 +206,22 @@ public final class LiveActivityService {
     /// on an open doubles the wait, up to ten seconds, and a card that
     /// survives a while earns the wait back.
     private func reopen() {
-        let now = ContinuousClock().now
-        if let openedAt, now - openedAt < .seconds(15) {
-            reopenDelay = reopenDelay == .zero ? .seconds(1) : min(reopenDelay * 2, .seconds(10))
+        if let openedAt, ContinuousClock().now - openedAt < .seconds(15) {
+            backOff()
             Self.log.notice("live activity: card dismissed quickly; waiting \(self.reopenDelay.components.seconds, privacy: .public)s")
         } else {
             reopenDelay = .zero
+            nextAttempt = nil
         }
         openedAt = nil
-        guard opening == nil else { return }
-        let wait = reopenDelay
-        opening = Task { @MainActor [weak self] in
-            if wait > .zero { try? await Task.sleep(for: wait) }
-            guard !Task.isCancelled, let self else { return }
-            self.opening = nil
-            self.open()
-        }
+    }
+
+    /// Doubles the wait before the next press, to a ten-second ceiling.
+    /// The poll is the only thing that presses, so this is simply a gate
+    /// it checks — no timers, nothing to cancel.
+    private func backOff() {
+        reopenDelay = reopenDelay == .zero ? .seconds(1) : min(reopenDelay * 2, .seconds(10))
+        nextAttempt = ContinuousClock().now + reopenDelay
     }
 
     /// Presses the pill, waits for the card, takes the one picture the
@@ -236,7 +240,11 @@ public final class LiveActivityService {
                 window = PillLocator.expandedWindow()
             }
             guard let window else {
-                Self.log.notice("live activity: the card did not come up")
+                // The press may have closed a card the island had lost
+                // track of. Either way, pressing again at once would make
+                // the pill flash on and off (2026-10-05).
+                self.backOff()
+                Self.log.notice("live activity: the card did not come up; waiting \(self.reopenDelay.components.seconds, privacy: .public)s")
                 return
             }
             await self.photograph(window, at: location)
@@ -308,6 +316,7 @@ public final class LiveActivityService {
         opening?.cancel()
         opening = nil
         reopenDelay = .zero
+        nextAttempt = nil
         openedAt = nil
         closeCard()
         guard location != nil || content != nil else { return }

@@ -281,10 +281,13 @@ captures show nothing inside it, and it was already empty before this app ever
 touched it. That is not something the island can fix, and the pill cannot be
 moved or hidden.
 
-The card is dismissed by the system on all sorts of outside events, so each
-reopen that follows hard on an open doubles the wait before the next, to a
-ten-second ceiling, and a card that survives fifteen seconds earns the wait
-back. The window is looked for every 8 ms while it comes up, so it is parked
+The card is dismissed by the system on all sorts of outside events, and a
+press can also bring nothing up at all — the press toggles, so one aimed at a
+card the island had lost track of closes it instead. Both disappointments
+double the wait before the next press, to a ten-second ceiling, and a card
+that survives fifteen seconds earns the wait back. The once-a-second poll is
+the only thing that ever presses, and it checks that gate first; without it,
+a failed press was retried every second and the pill flashed on and off. The window is looked for every 8 ms while it comes up, so it is parked
 as soon as it exists.
 
 Pixels are still needed for the crests only, and cannot be taken off-screen:
