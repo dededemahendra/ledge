@@ -1667,4 +1667,6 @@ variable value and always draws itself full, so the fill is clipped instead:
 the cell runs from 0.156 to 0.733 of the symbol's width, measured off the
 rendered symbol. Headless renders checked at 10, 37 and 90 per cent charging,
 at 100 charged (full green, no bolt) and at 8 low (a red sliver). The figure
-beside it stays white.
+beside it stays white. The battery is drawn at 16 pt rather than the 13 pt the
+ear's other glyphs use: it is a wide, low shape, and at 13 it sat under the
+figure beside it instead of level with it (user's call).

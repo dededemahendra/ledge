@@ -865,10 +865,16 @@ public struct NotchRootView: View {
     /// (checked 2026-10-06, green from 0.156 to 0.733).
     private static let batteryCellStart: CGFloat = 0.156
     private static let batteryCellSpan: CGFloat = 0.578
+    /// Bigger than the ear's other glyphs (2026-10-06, user's call): a
+    /// battery is wide and low, so at the 13 pt the rest use it sat well
+    /// under the figure beside it. At 16 its cell stands as tall as the
+    /// digits do. The bolt follows the same size.
+    private static let batterySize: CGFloat = 16
+    private static let batteryBoltRatio: CGFloat = 0.46
 
     private func batteryGlyph(level: Double, fill: Color, bolt: Bool) -> some View {
         let level = min(1, max(0, level))
-        let glyph = Font.system(size: 13, weight: .medium)
+        let glyph = Font.system(size: Self.batterySize, weight: .medium)
         return Image(systemName: "battery.100percent")
             .symbolRenderingMode(.palette)
             .foregroundStyle(.clear, contentColor.opacity(0.45))
@@ -888,7 +894,7 @@ public struct NotchRootView: View {
             .overlay {
                 if bolt {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 6, weight: .black))
+                        .font(.system(size: Self.batterySize * Self.batteryBoltRatio, weight: .black))
                         .foregroundStyle(contentColor)
                 }
             }
