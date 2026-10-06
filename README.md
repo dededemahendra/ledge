@@ -21,7 +21,7 @@ run anywhere else either.
 | An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
 | Volume or brightness key | glyph left, percentage right, 1.5 s |
 | Caps Lock | caps lock glyph, "On"/"Off", 1.5 s |
-| Charger in/out, low or full battery | battery glyph left (bolt while charging, plug when held on AC; green charging, red low), percentage right, 3 s |
+| Charger in/out, low or full battery | a battery filled to its charge, green on the charger with a white bolt across it and red when low, percentage right in white, 3 s |
 | Audio output changes | the device's glyph left (AirPods, AirPods Pro, Max, Beats, other buds, headphones…); for buds the left, right and case charge side by side with their own glyphs, otherwise one figure when the device reports one, 3 s |
 
 Browsers and everything else that MediaRemote reports are ignored on purpose

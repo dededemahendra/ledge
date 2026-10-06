@@ -736,6 +736,16 @@ public struct NotchRootView: View {
                     .animation(controller.reduceMotion ? nil : .linear(duration: 0.25), value: fill)
             }
             .frame(width: 14, height: 14)
+        } else if let activity = controller.activities.first, let symbol = activity.symbolName,
+                  symbol.hasPrefix("battery."), let level = activity.barFill {
+            // A battery the way the phone draws one (2026-10-06, user's
+            // call): the cell filled to the charge in the state's own
+            // colour — green on the charger, red when low — with a dim
+            // rim, and a white bolt across it while it is charging. The
+            // flat symbol tinted end to end read as a green outline, not
+            // as a battery with something in it.
+            batteryGlyph(level: level, fill: tintColor(for: activity.tint) ?? contentColor,
+                         bolt: symbol.contains(".bolt"))
         } else if let activity = controller.activities.first, let symbol = activity.symbolName {
             // `variableValue` lights the symbol's own level layers (speaker
             // waves, sun rays) from `barFill` — the macOS-OSD way to show a
@@ -843,6 +853,46 @@ public struct NotchRootView: View {
         if first.score != nil || first.compactText != nil { return true }
         if let parts = first.parts, !parts.isEmpty { return true }
         return first.id == Self.mediaActivityID && controller.media != nil && controller.state != .expanded
+    }
+
+    /// The charging battery: the cell filled to its level, the rim held
+    /// back, and the bolt laid over it in the island's own white. Sized
+    /// from the ear's glyph size so it sits with the other blips.
+    /// Where the cell's inside begins and how far it runs, as fractions
+    /// of the symbol's width. Measured off the rendered symbol rather
+    /// than guessed: `battery.100percent` ignores a variable value and
+    /// always draws itself full, so the fill is clipped here instead
+    /// (checked 2026-10-06, green from 0.156 to 0.733).
+    private static let batteryCellStart: CGFloat = 0.156
+    private static let batteryCellSpan: CGFloat = 0.578
+
+    private func batteryGlyph(level: Double, fill: Color, bolt: Bool) -> some View {
+        let level = min(1, max(0, level))
+        let glyph = Font.system(size: 13, weight: .medium)
+        return Image(systemName: "battery.100percent")
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(.clear, contentColor.opacity(0.45))
+            .font(glyph)
+            .overlay {
+                GeometryReader { proxy in
+                    Image(systemName: "battery.100percent")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(fill, .clear)
+                        .font(glyph)
+                        .mask(alignment: .leading) {
+                            Rectangle()
+                                .frame(width: proxy.size.width * (Self.batteryCellStart + Self.batteryCellSpan * level))
+                        }
+                }
+            }
+            .overlay {
+                if bolt {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 6, weight: .black))
+                        .foregroundStyle(contentColor)
+                }
+            }
+            .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: level)
     }
 
     /// One side of a scoreline in an ear (2026-10-01): the crest outward,

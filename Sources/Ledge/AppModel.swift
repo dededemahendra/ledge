@@ -267,6 +267,8 @@ final class AppModel {
         queue.insert(ActivityRecord(
             id: NotchController.chargingActivityID, kind: .charging, insertedAt: Date(), ttl: nil,
             title: latest.isCharged ? "Charged" : "Charging", compactText: text, symbolName: symbol,
+            // The battery fills to the charge, as the phone's does.
+            barFill: Double(latest.percent) / 100,
             // Green on the battery alone (user's call): the figure stays white.
             tint: .positive
         ))

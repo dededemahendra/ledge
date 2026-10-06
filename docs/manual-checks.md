@@ -1656,3 +1656,15 @@ opened its card and the island moved it off screen within the second. The card
 is now left where the user put it for eight seconds. To check: with an
 activity running, click the pill — the system's card should appear under it
 and stay a few seconds, then go. Clicking the island should do the same.
+
+## The charging battery, filled (2026-10-06)
+
+The flat symbol tinted green read as a green outline rather than a battery
+with charge in it (user, with the iOS 27 indicator as the reference). The cell
+is now filled to the charge in the state's colour, the rim held back, and a
+white bolt laid over it while charging. `battery.100percent` ignores a
+variable value and always draws itself full, so the fill is clipped instead:
+the cell runs from 0.156 to 0.733 of the symbol's width, measured off the
+rendered symbol. Headless renders checked at 10, 37 and 90 per cent charging,
+at 100 charged (full green, no bolt) and at 8 low (a red sliver). The figure
+beside it stays white.
