@@ -12,7 +12,7 @@ import EventKit
     timed.dueDateComponents = DateComponents(year: 2026, month: 9, day: 30, hour: 6, minute: 0)
     let item = MeetingEvent(ekReminder: timed)
     #expect(item?.kind == .reminder)
-    #expect(item?.symbolName == "checklist")
+    #expect(item?.symbolName == "circle", "Reminders' own ring, not a list icon")
     #expect(item?.title == "Exercise")
     let due = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 30, hour: 6, minute: 0))!
     #expect(item?.start == due)

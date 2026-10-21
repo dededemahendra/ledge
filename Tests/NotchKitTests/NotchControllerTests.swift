@@ -637,7 +637,7 @@ private func someMedia() -> MediaPresentation {
 @MainActor
 @Test func aSwipeMovesBetweenTheCardsModesAndOpensTheCalendarFromThePreview() {
     let c = makeController()
-    let item = UpcomingEvent(title: "Standup", compactText: "42m", caption: "Standup · 10:00", when: "10:00–10:15", url: nil)
+    let item = UpcomingEvent(title: "Standup", compactText: "42m", caption: "Standup · 10:00", time: "10:00", url: nil)
     c.setMedia(someMedia())
     c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
     c.setHovered(true)

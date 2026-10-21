@@ -99,6 +99,20 @@ private struct RenderedImage {
         p.a > 200 && p.r < 40 && p.g < 40 && p.b < 40
     }
 
+    /// Visits every pixel where blue dominates: an item's own colour in a
+    /// test (pure blue), which the content colour (red) and the island's
+    /// grey never make. For checking where that colour lands (2026-10-21).
+    func forEachBluePixel(_ body: (_ point: CGPoint) -> Void) {
+        for py in 0..<height {
+            for px in 0..<width {
+                let p = pixel(atPixelX: px, pixelY: py)
+                if p.a > 10, Int(p.b) - Int(max(p.r, p.g)) > 15 {
+                    body(CGPoint(x: CGFloat(px) / scale, y: CGFloat(py) / scale))
+                }
+            }
+        }
+    }
+
     /// Visits every pixel in canvas-point coordinates (i.e. with `scale`
     /// divided back out). Always exhaustive — every assertion in this file
     /// needs the full scan, not just the first hit.
@@ -710,7 +724,7 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
     controller.setCalendarMode(CalendarModeData(
         now: Date(), calendar: Calendar.current, markedDays: [1, 15, 30],
-        items: (1...3).map { UpcomingEvent(title: "Item \($0)", compactText: "\($0)h", caption: "Item \($0) · 1\($0):00", when: "1\($0):00–1\($0):30", url: nil) }
+        items: (1...3).map { UpcomingEvent(title: "Item \($0)", compactText: "\($0)h", caption: "Item \($0) · 1\($0):00", time: "1\($0):00", url: nil) }
     ))
     controller.setHovered(true)
     #expect(controller.swipe(.next) && controller.panel == .calendar)
@@ -865,4 +879,84 @@ private func renderPill(_ controller: NotchController) -> PillCheck {
     #expect(abs(maxX - expected.maxX) < tolerance, "\(maxX) vs \(expected)")
     #expect(abs(minY - 4) < tolerance, "the fill floats 4 pt below the top: \(minY)")
     #expect(abs(maxY - expected.maxY) < tolerance, "\(maxY) vs \(expected)")
+}
+
+// MARK: - Reminders, Apple's way (2026-10-21)
+
+@MainActor
+private let reminderScreens: [(name: String, metrics: NotchMetrics)] = [
+    ("MacBook", NotchMetrics(notchRect: testNotchRect)),
+    ("MacBook, scaled", NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 208, height: 37))),
+    ("pill", NotchMetrics(notchRect: pillHole, isVirtual: true)),
+]
+
+/// The content of the row of ears, either side of the middle, and the
+/// island's body (its width without a MacBook island's outer fillets,
+/// which flare past it at the top edge), in canvas points.
+@MainActor
+private func earContentBounds(_ controller: NotchController) -> (leading: CGRect, trailing: CGRect, island: CGRect) {
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let parameters = controller.parameters
+    let row = CGRect(x: canvas.midX - parameters.width / 2, y: parameters.topInset,
+                     width: parameters.width, height: controller.metrics.notchRect.height)
+    let island = row
+    var leading = CGRect.null, trailing = CGRect.null
+    RenderedImage(controller).forEachPixel { point, isContent, _ in
+        guard isContent, row.contains(point) else { return }
+        let box = CGRect(origin: point, size: CGSize(width: 0.5, height: 0.5))
+        if point.x < canvas.midX { leading = leading.union(box) } else { trailing = trailing.union(box) }
+    }
+    return (leading, trailing, island)
+}
+
+/// A long title widens the island for its caption; the ears keep a
+/// one-activity ear's 38 pt at the outer ends, instead of drifting in
+/// towards the notch with the extra width.
+@MainActor
+@Test func aLongCaptionKeepsTheEarsAtTheOuterEnds() {
+    for (name, metrics) in reminderScreens {
+        let c = NotchController(metrics: metrics, reduceMotion: true)
+        let title = "Call the plumber about the kitchen sink"
+        c.setActivities([.init(id: NotchController.calendarActivityID, title: title, compactText: "Now",
+                               symbolName: "circle", url: URL(string: "ledge://reminders"))], overflow: 0)
+        c.setCaption("\(title) · 14:00")
+        #expect(c.hasCaption)
+        #expect(c.parameters.width > metrics.oneActivity.width + 20, "\(name): the caption should widen the island")
+        let slot = NotchMetrics.activityEarWidth
+        let r = earContentBounds(c)
+        let leadingInset = r.leading.midX - r.island.minX, trailingInset = r.island.maxX - r.trailing.midX
+        #expect(abs(leadingInset - slot / 2) < 1.5, "\(name): the ring sits \(leadingInset) pt in, want \(slot / 2)")
+        #expect(abs(trailingInset - slot / 2) < 1.5, "\(name): \"Now\" sits \(trailingInset) pt in, want \(slot / 2)")
+        #expect(r.island.maxX - r.trailing.maxX >= 6, "\(name): \"Now\" ends \(r.island.maxX - r.trailing.maxX) pt from the edge")
+    }
+}
+
+/// Today's items as widget rows: a reminder is its list's colour only in
+/// its ring, with no filled chip behind the row; an event only in its bar.
+@MainActor
+@Test func aCardRowCarriesItsColourOnlyInItsRingOrBar() {
+    let blue = UpcomingEvent.Tint(red: 0, green: 0, blue: 1)
+    let items = [
+        UpcomingEvent(title: "Call the plumber", symbolName: "circle", compactText: "42m", caption: "", time: "14:00",
+                      url: nil, tint: blue, kind: .reminder),
+        UpcomingEvent(title: "Design review", compactText: "1h", caption: "", time: "15:00",
+                      url: nil, tint: blue, kind: .event),
+    ]
+    for (name, metrics) in reminderScreens {
+        let c = NotchController(metrics: metrics, reduceMotion: true)
+        c.setCalendarMode(CalendarModeData(now: Date(), calendar: .current, markedDays: [], items: items))
+        c.setUpcoming(items[0])
+        c.setHovered(true)
+        #expect(c.swipe(.next) && c.panel == .calendar)
+        let island = NotchShape(c.parameters).path(in: CGRect(origin: .zero, size: NotchMetrics.canvasSize)).boundingRect
+        var bounds = CGRect.null
+        var count = 0
+        RenderedImage(c).forEachBluePixel { point in
+            count += 1
+            bounds = bounds.union(CGRect(origin: point, size: CGSize(width: 0.5, height: 0.5)))
+        }
+        #expect(count > 20, "\(name): the ring and the bar did not render in the item's colour")
+        #expect(bounds.width <= 14, "\(name): the colour spans \(bounds.width) pt, a chip's width, not a ring's")
+        #expect(bounds.minX >= island.minX + 12 && bounds.maxX < island.midX, "\(name): the colour sits at \(bounds), not at the rows' leading edge")
+    }
 }

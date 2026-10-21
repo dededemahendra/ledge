@@ -10,6 +10,9 @@ public enum ActivityTint: Sendable, Equatable {
     /// One of Apple's system colours by its name ("systemIndigoColor",
     /// "indigo"): a Focus's own tint (2026-09-30).
     case system(String)
+    /// The item's own colour, the way its app draws it: a reminder's list
+    /// (2026-10-21).
+    case color(red: Double, green: Double, blue: Double)
 }
 
 /// One reading among several in a blip's trailing ear — a bud's or a

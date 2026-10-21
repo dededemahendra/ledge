@@ -75,3 +75,22 @@ private func event(_ id: String = "standup", startingIn seconds: TimeInterval, l
     #expect(event(startingIn: 9 * 3600 + 40 * 60).countdownText(at: t0) == "10h", "…to the nearest")
     #expect(event(startingIn: -60).countdownText(at: t0) == "Now")
 }
+
+/// A row in the card (2026-10-21): the start time alone, "Now" only for an
+/// event under way, and a reminder past due keeps its time (drawn red).
+@Test func aRowShowsTheStartTimeAndTellsUnderWayFromPastDue() {
+    let gb = Locale(identifier: "en_GB"), utc = TimeZone(identifier: "UTC")!
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let e = MeetingEvent(id: "x", title: "Design review", start: start, end: start + 3600, joinURL: nil)
+    #expect(e.startTimeText(locale: gb, timeZone: utc) == "22:13", "the start alone, not the span")
+    #expect(!e.isUnderWay(at: start - 60))
+    #expect(e.isUnderWay(at: start + 60))
+    #expect(!e.isUnderWay(at: start + 3600), "over at its end")
+    #expect(!e.isPastDue(at: start + 60), "an event is under way, never overdue")
+
+    let reminder = MeetingEvent(id: "r", kind: .reminder, title: "Wake Up!", start: start, end: start + MeetingEvent.reminderWindow, joinURL: nil)
+    #expect(reminder.startTimeText(locale: gb, timeZone: utc) == "22:13")
+    #expect(!reminder.isPastDue(at: start - 60))
+    #expect(reminder.isPastDue(at: start), "due is overdue from its own minute, as in Reminders")
+    #expect(!reminder.isUnderWay(at: start + 60), "a reminder is never under way")
+}

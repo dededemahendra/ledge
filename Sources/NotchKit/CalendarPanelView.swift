@@ -1,10 +1,17 @@
 import SwiftUI
 
+extension Color {
+    /// Calendar's red, softer than the system red (2026-10-01, user's
+    /// call: "too hard"): pulled a little toward white, for the card's
+    /// month and busy days and an overdue reminder's time.
+    static var calendarRed: Color { Color(nsColor: .systemRed).mix(with: .white, by: 0.2) }
+}
+
 /// The calendar mode of the open card (2026-09-30, after the reference
 /// app): the weekday and a big day number on the left with today's items
-/// as chips in their calendars' colours, and this month as a grid on the
-/// right — the month's name in red, weekends dimmed, busy days in red,
-/// today on a white disc. Each chip opens its item.
+/// listed under it, and this month as a grid on the right — the month's
+/// name in red, weekends dimmed, busy days in red, today on a white disc.
+/// Each row opens its item.
 struct CalendarPanelView: View {
     let data: CalendarModeData
     let contentColor: Color
@@ -12,11 +19,9 @@ struct CalendarPanelView: View {
     let emit: (NotchIntent) -> Void
 
     private let cell = CGSize(width: 22, height: 16)
-    /// Softer than the system red (2026-10-01, user's call: "too hard"):
-    /// pulled a little toward white, used at less than full strength.
-    private var accent: Color { Color(nsColor: .systemRed).mix(with: .white, by: 0.2) }
+    private var accent: Color { .calendarRed }
 
-    /// The reveal (2026-09-30): the date first, then the chips one by one,
+    /// The reveal (2026-09-30): the date first, then the rows one by one,
     /// then the grid row by row — each rising 6 pt as it fades in, on the
     /// mode's own spring. Spelled-out `State`, as elsewhere here.
     private var _revealed: State<Bool> = State(initialValue: false)
@@ -60,9 +65,9 @@ struct CalendarPanelView: View {
                 .monospacedDigit()
                 .foregroundStyle(contentColor.opacity(0.95))
                 .frame(height: 32), order: 0)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(data.items.prefix(3).enumerated()), id: \.offset) { index, item in
-                    reveal(chip(item), order: 1 + index)
+                    reveal(row(item), order: 1 + index)
                 }
             }
             .padding(.top, 4)
@@ -70,26 +75,50 @@ struct CalendarPanelView: View {
         .frame(width: 168, alignment: .leading)
     }
 
-    private func chip(_ item: UpcomingEvent) -> some View {
-        let color = item.tint.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? contentColor
-        return Button {
+    /// One of today's items as Apple's Reminders and Calendar widgets list
+    /// them (2026-10-21, user's call, in place of tinted chips): the
+    /// item's mark, its title, and its time at the trailing edge, red once
+    /// a reminder is overdue. The item's colour is in the mark alone.
+    private func row(_ item: UpcomingEvent) -> some View {
+        Button {
             if let url = item.url { emit(.open(url)) }
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: item.symbolName)
-                    .font(.system(size: 9, weight: .medium))
+            HStack(spacing: 6) {
+                mark(item)
                 Text(item.title)
                     .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(contentColor.opacity(0.92))
                     .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(item.time)
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                    .foregroundStyle(item.isPastDue ? accent : contentColor.opacity(0.5))
+                    .fixedSize()
             }
-            .foregroundStyle(color.mix(with: .white, by: 0.55))
-            .padding(.horizontal, 8)
             .frame(height: 20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(ListRowButtonStyle(reduceMotion: reduceMotion))
+    }
+
+    /// A reminder's hollow ring in its list's colour, or an event's bar in
+    /// its calendar's; without one, the system grey the ear's ring uses.
+    /// Both in an 11 pt column, so the titles line up.
+    @ViewBuilder private func mark(_ item: UpcomingEvent) -> some View {
+        let color = item.tint.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? Color(nsColor: .systemGray)
+        switch item.kind {
+        case .reminder:
+            Circle()
+                .strokeBorder(color, lineWidth: 1.5)
+                .frame(width: 11, height: 11)
+        case .event:
+            Capsule()
+                .fill(color)
+                .frame(width: 3, height: 13)
+                .frame(width: 11)
+        }
     }
 
     private var grid: some View {

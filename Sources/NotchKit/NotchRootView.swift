@@ -185,11 +185,18 @@ private struct IslandEarsRow<Leading: View, Trailing: View>: View {
     let key: String
     let animation: Animation
     let reduceMotion: Bool
+    /// Where a wider island keeps its ears (2026-10-21): each side's
+    /// content in a slot this wide at the island's OUTER end, rather than
+    /// centred in an ear that grew with the caption under it. `nil`
+    /// centres in the whole ear, which is right wherever the ear is sized
+    /// to its content (a Focus's name, a pair of bud readings).
+    let edgeSlot: CGFloat?
     let leading: Leading
     let trailing: Trailing
 
     init(
         target: NotchShapeParameters, notch: CGRect, key: String, animation: Animation, reduceMotion: Bool,
+        edgeSlot: CGFloat? = nil,
         @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing
     ) {
         self.target = target
@@ -197,6 +204,7 @@ private struct IslandEarsRow<Leading: View, Trailing: View>: View {
         self.key = key
         self.animation = animation
         self.reduceMotion = reduceMotion
+        self.edgeSlot = edgeSlot
         self.leading = leading()
         self.trailing = trailing()
     }
@@ -226,16 +234,19 @@ private struct IslandEarsRow<Leading: View, Trailing: View>: View {
     var body: some View {
         let width = live?.width ?? target.width
         let ear = max(0, (width - notch.width) / 2)
+        let slot = min(ear, edgeSlot ?? ear)
         HStack(spacing: 0) {
             ZStack { leading }
                 .id(key)
                 .transition(earTransition(towardsHole: 1))
-                .frame(width: ear, height: notch.height)
+                .frame(width: slot, height: notch.height)
+                .frame(width: ear, alignment: .leading)
             Color.clear.frame(width: notch.width, height: notch.height)   // the hole
             ZStack { trailing }
                 .id(key)
                 .transition(earTransition(towardsHole: -1))
-                .frame(width: ear, height: notch.height)
+                .frame(width: slot, height: notch.height)
+                .frame(width: ear, alignment: .trailing)
         }
         .animation(animation, value: key)
         .frame(width: width, height: notch.height)
@@ -549,6 +560,11 @@ public struct NotchRootView: View {
                 key: earContentKey,
                 animation: NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                 reduceMotion: controller.reduceMotion,
+                // A long caption widens the island under the ears; they
+                // keep a one-activity ear's 38 pt at the ends, as the
+                // Dynamic Island keeps its own (2026-10-21). On a MacBook
+                // they drifted up to 43 pt in towards the notch.
+                edgeSlot: controller.captionText == nil ? nil : NotchMetrics.activityEarWidth,
                 leading: { leadingEar },
                 trailing: { trailingEar }
             )
@@ -604,22 +620,46 @@ public struct NotchRootView: View {
         case .positive?:          return Color(nsColor: .systemGreen)
         case .warning?:           return Color(nsColor: .systemRed)
         case .system(let name)?:  return SystemTint.color(named: name).map { Color(nsColor: $0) }
+        case let .color(red, green, blue)?: return Color(red: red, green: green, blue: blue)
         case nil:                 return nil
         }
     }
 
+    /// A reminder's ring in its list's colour, grey for a list without one
+    /// (2026-10-21); `nil`, white, for an event's calendar glyph and under
+    /// the render test hook.
+    private func ringColor(for upcoming: UpcomingEvent) -> Color? {
+        guard upcoming.kind == .reminder else { return nil }
+        return tintColor(for: upcoming.tint.map { .color(red: $0.red, green: $0.green, blue: $0.blue) } ?? .system("gray"))
+    }
+
+    /// An overdue reminder's time, in the calendar card's red, as Reminders
+    /// marks one (2026-10-21). Never under the render test hook.
+    private var pastDueColor: Color? {
+        #if DEBUG
+        if NotchRenderTestHook.contentColor != nil { return nil }
+        #endif
+        return .calendarRed
+    }
+
     /// "Title · Artist": the title carries the weight, the artist sits back.
     /// Left-aligned like the reference, under the artwork's ear. One line,
-    /// tail-truncated; the caption row is 26pt, the text 11pt.
+    /// tail-truncated; the caption row is 26pt, the text 11pt. A previewed
+    /// reminder that is overdue has its time in red. Split at the LAST
+    /// separator, so a title with " · " in it stays whole (2026-10-21).
     private func captionRow(_ caption: String) -> some View {
-        let parts = caption.components(separatedBy: " · ")
-        let title = parts.first ?? caption
-        let artist = parts.dropFirst().joined(separator: " · ")
+        let split = caption.range(of: " · ", options: .backwards)
+        let title = split.map { String(caption[..<$0.lowerBound]) } ?? caption
+        let artist = split.map { String(caption[$0.upperBound...]) } ?? ""
+        let overdue = controller.isPreviewingUpcoming && controller.upcoming?.isPastDue == true
         return HStack(spacing: 0) {
             (Text(title).font(.system(size: 11, weight: .semibold))
-             + Text(artist.isEmpty ? "" : " · \(artist)")
+             + Text(artist.isEmpty ? "" : " · ")
                 .font(.system(size: 11, weight: .regular))
-                .foregroundStyle(contentColor.opacity(0.6)))
+                .foregroundStyle(contentColor.opacity(0.6))
+             + Text(artist)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle((overdue ? pastDueColor : nil) ?? contentColor.opacity(0.6)))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
@@ -686,9 +726,11 @@ public struct NotchRootView: View {
     @ViewBuilder private var leadingEar: some View {
         if controller.isPreviewingUpcoming, let upcoming = controller.upcoming {
             // The next event or reminder on hover (`NotchController.
-            // upcoming`): its glyph, same size and weight as a blip's.
+            // upcoming`): its glyph, same size and weight as a blip's, a
+            // reminder's ring in its list's colour.
             Image(systemName: upcoming.symbolName)
                 .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(ringColor(for: upcoming) ?? contentColor)
         } else if let hint = controller.skipHint, controller.media != nil, controller.state != .expanded {
             // Swipe-to-skip feedback (`NotchController.skipHint`): the skip
             // glyph takes the artwork's place for a beat. The ear key
@@ -1056,8 +1098,9 @@ public struct NotchRootView: View {
     /// battery keeps glyph + `87%`, having no `barFill` to prefer.
     @ViewBuilder private var trailingEar: some View {
         if controller.isPreviewingUpcoming, let upcoming = controller.upcoming {
-            // The next event's countdown — "42m", "2h 10m", "Now".
-            compactValue(upcoming.compactText)
+            // The next event's countdown — "42m", "2h 10m", "Now" — red
+            // once a reminder is overdue.
+            compactValue(upcoming.compactText, color: upcoming.isPastDue ? pastDueColor : nil)
         } else if controller.isDeviceLeading, controller.media != nil, controller.state != .expanded,
            let activity = controller.activities.first {
             // The device's icon in place of the visualizer bars

@@ -422,6 +422,7 @@ final class AppModel {
                 title: reminder.event.title,
                 compactText: reminder.compactText,
                 symbolName: reminder.event.symbolName,
+                tint: Self.ringTint(for: reminder.event),
                 url: reminder.event.joinURL ?? reminder.event.detailURL ?? Self.openAppURL(for: reminder.event.kind)
             )
         )
@@ -520,6 +521,19 @@ final class AppModel {
         publish()
     }
 
+    /// A reminder's ring in its list's colour (2026-10-21), grey for a
+    /// list without one, the way Reminders draws it. An event's calendar
+    /// glyph stays white.
+    private static func ringTint(for event: MeetingEvent) -> ActivityTint? {
+        guard event.kind == .reminder else { return nil }
+        return event.color.map(\.visibleOnBlack).map { .color(red: $0.red, green: $0.green, blue: $0.blue) } ?? .system("gray")
+    }
+
+    /// The same colour for the hover preview and the card's rows.
+    private static func itemTint(for event: MeetingEvent) -> UpcomingEvent.Tint? {
+        event.color.map(\.visibleOnBlack).map { UpcomingEvent.Tint(red: $0.red, green: $0.green, blue: $0.blue) }
+    }
+
     /// Stands in for "open the Calendar (or Reminders) app" on an item
     /// without a call link; never handed to the system as a URL.
     private static func openAppURL(for kind: MeetingEvent.Kind) -> URL {
@@ -537,7 +551,7 @@ final class AppModel {
     /// refreshed on the 250 ms tick so the countdown stays honest while the
     /// cursor rests. The caption's time formatting is cached per event.
     private var upcomingCaption: (id: String, day: Date, text: String)?
-    private var agendaTexts: [String: (day: Date, caption: String, when: String)] = [:]
+    private var agendaTexts: [String: (day: Date, caption: String, time: String)] = [:]
 
     private func refreshUpcoming() {
         let now = Date()
@@ -550,14 +564,16 @@ final class AppModel {
                 .prefix(3)
                 .map { event -> UpcomingEvent in
                     if agendaTexts[event.id]?.day != day {
-                        agendaTexts[event.id] = (day, event.captionText(at: now), event.whenText(at: now))
+                        agendaTexts[event.id] = (day, event.captionText(at: now), event.startTimeText())
                     }
                     let texts = agendaTexts[event.id]!
                     return UpcomingEvent(
                         title: event.title, symbolName: event.symbolName, compactText: event.countdownText(at: now),
-                        caption: texts.caption, when: texts.when,
+                        caption: texts.caption, time: event.isUnderWay(at: now) ? "Now" : texts.time,
                         url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind),
-                        tint: event.color.map { UpcomingEvent.Tint(red: $0.red, green: $0.green, blue: $0.blue) }
+                        tint: Self.itemTint(for: event),
+                        kind: event.kind == .reminder ? .reminder : .event,
+                        isPastDue: event.isPastDue(at: now)
                     )
                 }
             var marks: Set<Int> = []
@@ -582,7 +598,10 @@ final class AppModel {
             symbolName: event.symbolName,
             compactText: event.countdownText(at: now),
             caption: upcomingCaption?.text ?? event.title,
-            url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind)
+            url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind),
+            tint: Self.itemTint(for: event),
+            kind: event.kind == .reminder ? .reminder : .event,
+            isPastDue: event.isPastDue(at: now)
         ))
     }
 
@@ -967,6 +986,7 @@ final class AppModel {
         case .positive:           return .positive
         case .warning:            return .warning
         case .system(let name):   return .system(name)
+        case let .color(red, green, blue): return .color(red: red, green: green, blue: blue)
         }
     }
 

@@ -29,7 +29,8 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
     /// lands on the event, not on the app's last view. `nil` for an
     /// unsaved item.
     public let detailURL: URL?
-    /// The calendar's or list's colour, for the card's chips.
+    /// The calendar's or list's colour: a row's bar or ring in the card,
+    /// and a reminder's ring in the ear.
     public let color: CalendarInfo.RGB?
 
     /// How long a due reminder stays "Now" (it has no duration of its own).
@@ -46,10 +47,24 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         self.color = color
     }
 
-    /// The leading ear's glyph: the calendar for an event, the checklist
-    /// for a reminder — Reminders' own idiom.
+    /// The leading ear's glyph: the calendar for an event, and for a
+    /// reminder the hollow ring Reminders draws beside every item, in the
+    /// list's colour (2026-10-21, user's call: the checklist read as a
+    /// generic list icon).
     public var symbolName: String {
-        kind == .event ? "calendar" : "checklist"
+        kind == .event ? "calendar" : "circle"
+    }
+
+    /// An event between its start and its end: a row says "Now" for it.
+    /// A reminder is never under way; it is due, then overdue.
+    public func isUnderWay(at now: Date) -> Bool {
+        kind == .event && start <= now && now < end
+    }
+
+    /// A reminder whose time has come, which Reminders marks in red from
+    /// its own minute on. It stays listed for `reminderWindow` after.
+    public func isPastDue(at now: Date) -> Bool {
+        kind == .reminder && start <= now
     }
 
     /// Time to the start for an ear, as precise as it is near: whole
@@ -77,6 +92,16 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         at now: Date = Date(), locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent
     ) -> String {
         "\(title) · \(whenText(at: now, locale: locale, timeZone: timeZone))"
+    }
+
+    /// The start time alone, for a row in the card: "22:13".
+    public func startTimeText(locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent) -> String {
+        let time = DateFormatter()
+        time.locale = locale
+        time.timeZone = timeZone
+        time.timeStyle = .short
+        time.dateStyle = .none
+        return time.string(from: start)
     }
 
     /// The time alone: "21:00–22:00", "06:15", "Tomorrow 09:00–10:00",

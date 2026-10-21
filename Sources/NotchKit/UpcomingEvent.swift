@@ -15,28 +15,42 @@ public struct UpcomingEvent: Sendable, Equatable {
         }
     }
 
+    /// An event draws a bar in its calendar's colour in the card; a
+    /// reminder draws Reminders' ring in its list's, in the ear too
+    /// (2026-10-21).
+    public enum Kind: Sendable, Equatable {
+        case event, reminder
+    }
+
     public let title: String
-    /// The calendar's colour, for the card's chips; `nil` draws white.
+    public let kind: Kind
+    /// The calendar's or list's colour; `nil` draws a neutral grey.
     public let tint: Tint?
-    /// Leading ear: "calendar" for an event, "checklist" for a reminder.
+    /// Leading ear: "calendar" for an event, "circle" for a reminder.
     public let symbolName: String
     /// Trailing ear: "42m", "2h 10m", "Now".
     public let compactText: String
     /// The caption line: "Title · 14:00".
     public let caption: String
-    /// The time alone, for a list row: "14:00–14:30", "Tomorrow at 06:15".
-    public let when: String
+    /// A card row's time: the start, "14:00", or "Now" for an event under
+    /// way.
+    public let time: String
+    /// A reminder whose time has passed: its time is drawn red, as
+    /// Reminders draws it.
+    public let isPastDue: Bool
     /// What a click opens: the join link, or the app model's open-Calendar
     /// stand-in.
     public let url: URL?
 
-    public init(title: String, symbolName: String = "calendar", compactText: String, caption: String, when: String = "", url: URL?, tint: Tint? = nil) {
+    public init(title: String, symbolName: String = "calendar", compactText: String, caption: String, time: String = "", url: URL?, tint: Tint? = nil, kind: Kind = .event, isPastDue: Bool = false) {
         self.title = title
+        self.kind = kind
         self.tint = tint
         self.symbolName = symbolName
         self.compactText = compactText
         self.caption = caption
-        self.when = when
+        self.time = time
+        self.isPastDue = isPastDue
         self.url = url
     }
 }

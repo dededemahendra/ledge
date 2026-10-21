@@ -198,6 +198,8 @@ public final class NotchController {
             case positive, warning
             /// An Apple system colour by name — see `SystemTint`.
             case system(String)
+            /// The item's own colour: a reminder's list (2026-10-21).
+            case color(red: Double, green: Double, blue: Double)
         }
         public let tint: Tint?
         /// What a click on the blip opens while it shows — see
