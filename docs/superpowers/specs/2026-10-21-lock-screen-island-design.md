@@ -50,7 +50,8 @@ Notch adopted for its lock screen in October 2025.
 ## Scope
 
 - In: the window's space, lock and unlock without hiding, look-only behaviour
-  while locked, hover on the lock screen, the setting, the fallback.
+  while locked, a live check of hover on the lock screen, the setting, the
+  fallback.
 - Not in scope: controls on the lock screen (media or otherwise); a
   different look while locked; hiding titles while locked; fast user
   switching; the login window before anyone has logged in.
@@ -71,8 +72,11 @@ other private-framework bridges (`docs/private-api-notes.md`):
 
 `NotchPresenter` makes one `SkyLightSpace` at start and calls `adopt` on every
 `NotchWindow` it builds in `rebuildForCurrentScreen()` (launch, a display
-change, the lid opening or closing), right after creating it. With no space
-(`nil`), the window stays an ordinary window, exactly as today.
+change, the lid opening or closing), right after creating it, and again each
+time `syncWindowToVisibility()` orders the window back in after it was out:
+the island orders its window out whenever it hides, and whether a window
+ordered back in keeps its space is not known, so it is put back every time.
+With no space (`nil`), the window stays an ordinary window, exactly as today.
 
 `NotchWindow.setLocked` and its `CGShieldingWindowLevel() + 1` level go: they
 were the 2026-09-28 attempt and never drew on the lock screen. The window keeps
@@ -127,17 +131,22 @@ While `controller.isLocked`:
 
 ## Hover on the lock screen
 
-The island finds the pointer with a global `.mouseMoved` monitor
-(`NotchPresenter.updateHover()`). Whether macOS feeds a global monitor while
-the lock screen is up is unknown; the probe's window got pointer events through
-its own tracking area.
+The island finds the pointer two ways, both in `NotchPresenter`: a global
+`.mouseMoved` monitor (`updateHover()`), and polling, since
+`reevaluateHover()` reads `NSEvent.mouseLocation` on every 250 ms tick and
+when a dwell timer fires. Whether macOS feeds the monitor, or updates the
+pointer's location, while the lock screen is up is unknown.
 
-The plan's first task checks both live, with logging. If the global monitor is
-silent while locked, the island's content view gets a tracking area
-(`.mouseEnteredAndExited`, `.mouseMoved`, `.activeAlways`) whose events call
-the same `updateHover()`, so the island's own shape still decides what counts
-as hovering. If neither reaches Ledge while locked, the island shows on the
-lock screen but its card cannot be opened there, which is still look-only.
+A tracking area on the window would not help: the window ignores mouse events
+until the pointer is already on the island (`NotchWindow.setAcceptsMouse`), so
+it would never see the pointer arrive. (The probe's panel took mouse events
+all the time, which is why its tracking area fired.)
+
+So nothing is added for hover. The live check in the plan's last task finds
+out whether hover opens the card on the lock screen. If it does not, the
+island still shows everything while locked and its card cannot be opened
+there, which is still look-only; another source for the pointer would be a
+later change.
 
 ## Edge cases
 
@@ -196,4 +205,4 @@ Written first, as everywhere in this repo.
 | A macOS update removes or changes the SkyLight calls | Symbols resolved at launch; missing means today's behaviour. A changed signature cannot be detected and would show as the island missing from the lock screen, found by the live check after an update |
 | The island above every system overlay, all the time | The user's call (approach B); the live check looks at Spotlight, full-screen video and the screen saver |
 | Meeting and reminder titles readable at a locked Mac | The user's call; the switch turns the whole lock-screen island off |
-| Hover not reaching Ledge while locked | Tracking-area fallback; at worst the card does not open while locked |
+| Hover not reaching Ledge while locked | Checked live; at worst the card does not open while locked |
