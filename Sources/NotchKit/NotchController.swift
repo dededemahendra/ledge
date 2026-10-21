@@ -427,6 +427,9 @@ public final class NotchController {
     /// At the last mode a swipe is taken and nothing moves: a swipe on the
     /// card never skips a track by accident.
     public func swipe(_ direction: SwipeToSkipTracker.Direction) -> Bool {
+        // Look only on the lock screen (2026-10-21): taken by nobody, and
+        // the presenter skips no track while locked either.
+        guard !isLocked else { return false }
         let panels = availablePanels
         if state == .expanded, panels.count > 1, let index = panels.firstIndex(of: panel) {
             let target = direction == .next ? index + 1 : index - 1
@@ -665,12 +668,12 @@ public final class NotchController {
         recomputeState()
     }
 
-    /// The screen is locked (`loginwindow` owns it). Spec §7: lock-screen
-    /// mode is display-only — with media playing the panel shows the
-    /// now-playing card without its controls (`NotchRootView` reads this
-    /// flag to strip them), since a panel above the lock shield can render
-    /// but cannot reliably take clicks. Charging/HUD/device activities keep
-    /// appearing in the ears exactly as when unlocked.
+    /// The screen is locked (`loginwindow` owns it). Look only (2026-10-21,
+    /// user's call): everything shows as unlocked and hover opens the card,
+    /// the now-playing one without its controls (`NotchRootView` reads this
+    /// flag to strip them), but nothing can be operated: `tap()`, `click()`
+    /// and `swipe(_:)` do nothing, `linkURL` is `nil` and `emit(_:)` drops
+    /// every intent.
     public private(set) var isLocked = false
 
     public func setLocked(_ locked: Bool) {
@@ -687,7 +690,7 @@ public final class NotchController {
     /// `recomputeState()`'s first line returned early on `.expanded`
     /// forever after — hover permanently inert).
     public func click() {
-        guard metrics.notchRect.width > 0, media != nil else { return }
+        guard !isLocked, metrics.notchRect.width > 0, media != nil else { return }
         isPinnedOpen = true
         state = .expanded
     }
@@ -705,6 +708,8 @@ public final class NotchController {
     ///   click on an empty peek or on a lone blip must not open an empty
     ///   slab (2026-09-29: nor the old title-and-bar list around the blip).
     public func tap() {
+        // Look only on the lock screen (2026-10-21): nothing is a button.
+        guard !isLocked else { return }
         if state == .expanded {
             if isPinnedOpen { dismiss() }
             return
@@ -727,7 +732,7 @@ public final class NotchController {
     /// content on press and show the link pointer — the island only
     /// looks like a button when it is one.
     public var linkURL: URL? {
-        guard state != .expanded else { return nil }
+        guard state != .expanded, !isLocked else { return nil }
         if isPreviewingUpcoming { return upcoming?.url }
         return activities.first?.url
     }
@@ -840,6 +845,10 @@ public final class NotchController {
     /// view layer (`MediaPanelView`, `NotchRootView`'s ears) can call it
     /// without knowing who — if anyone — is listening.
     public func emit(_ intent: NotchIntent) {
+        // The one gate for the card's buttons on the lock screen
+        // (2026-10-21): play/pause, skip, the scrubber, the star, the
+        // outputs, a calendar row, the Live Activity's press.
+        guard !isLocked else { return }
         onIntent?(intent)
     }
 

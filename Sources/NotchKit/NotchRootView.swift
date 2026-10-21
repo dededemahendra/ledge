@@ -587,6 +587,9 @@ public struct NotchRootView: View {
                     .transition(BlurReplaceTransition(configuration: .downUp).combined(with: OffsetTransition(CGSize(width: 0, height: 6))))
             } else if parameters.height > row.height + 8 {
                 detailRow
+                    // Look only on the lock screen (2026-10-21): no row or
+                    // button on the card takes a press, so none dips.
+                    .allowsHitTesting(!controller.isLocked)
                     // Mode changes slide the way the swipe went, on the
                     // expand spring (2026-09-30, user's call); the island's
                     // clip keeps the outgoing panel inside.

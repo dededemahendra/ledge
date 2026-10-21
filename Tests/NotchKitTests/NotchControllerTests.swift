@@ -944,3 +944,49 @@ private func matchScore() -> NotchController.ActivityDisplay.Score {
                                   attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
     #expect(c.captionWidth("Pay rent · Flat 2 and the garage · 14:00") == ceil(title + time) + 2 * 14 + 16)
 }
+
+// MARK: - Look only on the lock screen (2026-10-21)
+
+/// Nothing on the locked island can be operated: no link, no pin, no
+/// intent from the card's buttons. Unlocking gives it all back.
+@MainActor
+@Test func whileLockedNothingOnTheIslandCanBeOperated() {
+    let c = makeController()
+    var intents: [NotchIntent] = []
+    c.onIntent = { intents.append($0) }
+    let join = URL(string: "https://example.com/join")!
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: NotchController.calendarActivityID, title: "Standup", compactText: "Now",
+                           symbolName: "calendar", url: join)], overflow: 0)
+    c.setLocked(true)
+
+    #expect(c.linkURL == nil, "no link pointer and no press dip")
+    c.tap()
+    c.click()
+    #expect(!c.isPinnedOpen && c.state != .expanded, "a click never pins the card")
+    c.emit(.togglePlayPause)
+    c.emit(.open(URL(string: "https://example.com")!))
+    #expect(intents.isEmpty, "nothing reaches the app, not even the blip's link")
+
+    c.setLocked(false)
+    #expect(c.linkURL == join)
+    c.emit(.togglePlayPause)
+    #expect(intents == [.togglePlayPause])
+}
+
+/// Hover still opens the card to look at; a swipe changes nothing.
+@MainActor
+@Test func whileLockedHoverStillOpensTheCardAndASwipeTakesNothing() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.setCalendarMode(CalendarModeData(monthTitle: "October 2026", weekdaySymbols: ["S", "M", "T", "W", "T", "F", "S"],
+                                       weeks: [[nil, nil, nil, 1, 2, 3, 4]], today: 1, markedDays: [], items: []))
+    c.setLocked(true)
+    c.setHovered(true)
+    #expect(c.state == .expanded, "hover opens the card to look at")
+    #expect(!c.swipe(.next) && c.panel == .media, "no mode change while locked")
+
+    c.setLocked(false)
+    #expect(c.swipe(.next) && c.panel == .calendar)
+}
