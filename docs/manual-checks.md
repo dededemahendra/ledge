@@ -1670,3 +1670,17 @@ at 100 charged (full green, no bolt) and at 8 low (a red sliver). The figure
 beside it stays white. The battery is drawn at 16 pt rather than the 13 pt the
 ear's other glyphs use: it is a wide, low shape, and at 13 it sat under the
 figure beside it instead of level with it (user's call).
+
+## The pill on a screen without a notch (2026-10-21)
+
+Checked live on the Mac mini's 1920 × 1080 display with the installed build. A
+scripted volume change shows a black pill 120 × 32 pt with round ends, its
+left and right edges at x = 900 and 1019 (centred on 960) and its top 4 pt
+below the screen's edge, the speaker glyph left and the percentage right. Four
+seconds later nothing is left at the top centre. `make test` passes apart from
+the two brightness tests that need a built-in panel.
+
+Not checked, since it means driving the pointer: the hover preview from the
+top edge, the open card with no strip above its content, a volume change with
+the card open (the strip grows to 32 pt, then goes), and the now-playing pill
+taking over from a blip while music plays.
