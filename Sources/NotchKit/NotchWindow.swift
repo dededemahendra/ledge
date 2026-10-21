@@ -3,7 +3,8 @@ import SwiftUI
 import CoreGraphics
 
 /// The island's host: a borderless, non-activating panel of fixed oversized
-/// size, anchored to the top centre of the built-in display.
+/// size, anchored to the top centre of the island's host display: the
+/// notched built-in one, or the main display with a virtual notch.
 ///
 /// The window never animates or resizes — the island animates inside it.
 @MainActor

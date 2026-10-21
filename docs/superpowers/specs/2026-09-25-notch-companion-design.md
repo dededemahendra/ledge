@@ -45,7 +45,8 @@ Explicitly out of scope, and not to be added without a new design round:
 - Clipboard history, timers, Pomodoro, quick notes, calendar, weather
 - Window snapping, app launcher, OCR, text expansion
 - Camera mirror, camera guard, mic mute
-- Support for external or notch-less displays as the island's host
+- Support for external or notch-less displays as the island's host (lifted
+  2026-10-21: see "Screens without a notch" below)
 - Distribution of any kind
 
 Alcove itself has none of the first group; adding them is scope creep dressed as
@@ -369,7 +370,8 @@ direction is decided by area, not height (peek → activity is growth).
 ### Display handling
 
 Always renders on the built-in display. Hides entirely in clamshell mode. No
-support for notch-less or external displays as host (§2).
+support for notch-less or external displays as host (§2). Superseded
+2026-10-21: see "Screens without a notch" at the end.
 
 ---
 
@@ -827,8 +829,8 @@ the event's URL, location or notes (`MeetingLinkDetector`) — or, with no link,
 opens Calendar. Nothing is shown otherwise: no always-on "next event", no card.
 
 **How.** `CalendarService` (EventKit, `NSCalendarsFullAccessUsageDescription`)
-asks for Calendars access once at launch; a refusal is a menu problem row, not a
-crash. It keeps the next 24 h of events (minus all-day, cancelled, declined and
+asks for Calendars access once at launch; a refusal is a menu problem row (a
+Settings › Permissions row since 2026-10-21), not a crash. It keeps the next 24 h of events (minus all-day, cancelled, declined and
 untitled ones), reloads on `EKEventStoreChanged` and on wake, and hands them to
 `MeetingReminderPolicy` — pure and clock-fed — which fires each occurrence's
 `soon` and `now` at most once, suppresses a stale `soon` when the app launches
@@ -876,7 +878,7 @@ yields nothing, since it is not upcoming.
 REMCDReminder/<calendarItemIdentifier>` for a reminder — both registered
 handlers on this macOS (checked without opening anything) — with the app as the
 fallback when the system refuses the link. An event's caption shows its span
-("Test · 21:00–22:00", "Tomorrow 09:00–10:00"), a reminder its time
+("Test · 21:00–22:00", "Tomorrow 09:00–10:00"; "21:00 to 22:00" since 2026-10-21, no dashes in what shows), a reminder its time
 ("Tomorrow at 06:15"), so an item under way says when it ends.
 
 
@@ -983,6 +985,18 @@ left (EventKit reads an empty list as "all"). Layout note: sections generated in
 a loop misrendered in a grouped `Form` on macOS (merged cards, rows drawn
 twice, seen in captures), so the pane is one fixed section per kind with the
 account names as label rows inside.
+
+**Problems move here (2026-10-21).** The menu is Settings… and Quit, nothing
+else (user's call). The problem rows it used to grow above Quit
+(`AppModel.issues`: a service unavailable or short of a grant, the login item
+needing approval) are a "Needs attention" section at the top of Permissions,
+shown only when there is something in it, each with an "Open Settings…" button
+where there is a fix. The sidebar badges Permissions with the count, re-read
+every two seconds like the pane, so a problem still shows from any pane. A
+missing grant therefore appears twice on that pane, once as the problem and once
+as the grant's own row; the first says what is broken, the second what the
+grant is for. The status fingerprint and `onStatusChange`, which existed only to
+refresh the menu rows, are gone.
 
 
 ## Buds: left, right, case (2026-09-30)
@@ -1106,3 +1120,23 @@ dismissed the card and made it blink (2026-10-03).
 **Overflow pip.** The "+N" count in the trailing ear now shows only when the
 leading activity leaves that ear empty: a Clock timer's clock or a Live
 Activity's pill over music and charging keeps its ear.
+
+## Screens without a notch (2026-10-21)
+
+Lifts the §2 non-goal, for running on a Mac mini. One rule: the real notch
+when any screen has one, otherwise a virtual notch on the main display (the
+first screen, the one carrying the menu bar), so a MacBook with its lid shut
+on an external display gets the island too. With the lid open the island
+stays on the notch, as before. `NotchGeometry.placement(among:)` decides;
+`notchRect(for:)` still never guesses a real notch.
+
+The virtual notch is the measured 179 × 32, centred at the top edge, not the
+menu bar's height: every layout was built and pinned against that size, and
+a live island hanging 8 pt below a 24 pt menu bar costs nothing. Idle, it is
+nothing at all, as on the notch; hovering the spot where it would be opens
+the preview (`NotchPresenter.hoverParameters` keeps the hidden hover zone at
+the notch's size). With no hardware to hide behind, hidden and tucked draw
+`NotchMetrics.retracted`, the notch's width at zero height, so a closing
+island slides up into the top edge instead of leaving a black tab for the
+window's `hideSettle`. In a full-screen app on such a screen a live island
+sits over the content, there being no black band to sit in.

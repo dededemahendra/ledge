@@ -1,32 +1,21 @@
 import AppKit
 
 /// The app's only chrome: a menu bar item. Minimal by design (2026-09-29):
-/// Quit, and above it a row for each problem — only when there is one —
-/// clickable when there is something the user can do about it.
+/// Settings… and Quit, nothing else (2026-10-21: the problem rows that sat
+/// above them now live in Settings › Permissions).
 @MainActor
-final class StatusItemController: NSObject, NSMenuDelegate {
+final class StatusItemController: NSObject {
     private let item: NSStatusItem
     private let menu = NSMenu()
-    private var issueItems: [NSMenuItem] = []
-    private var issueSeparator: NSMenuItem?
-
-    /// Called just before the menu drops down, so dynamic titles and
-    /// checkmarks are read from live state, not launch-time state.
-    var onMenuWillOpen: (() -> Void)?
 
     override init() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
         item.button?.image = Self.makeIcon()
         item.button?.toolTip = "Ledge"
-        menu.delegate = self
         item.menu = menu
         menu.addItem(.separator())
         menu.addItem(makeItem(title: "Quit Ledge") { NSApp.terminate(nil) })
-    }
-
-    func menuWillOpen(_ menu: NSMenu) {
-        onMenuWillOpen?()
     }
 
     /// Inserts an action item above the trailing separator + Quit pair and
@@ -39,37 +28,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // construction (`init` above), so "above them" is always here.
         menu.insertItem(entry, at: max(0, menu.items.count - 2))
         return entry
-    }
-
-    /// A problem worth a row. `fix` makes the row clickable.
-    struct Issue {
-        let text: String
-        let fix: (() -> Void)?
-    }
-
-    /// Replaces the problem rows at the top of the menu. Empty means the
-    /// menu starts straight at the actions.
-    func setIssues(_ issues: [Issue]) {
-        issueItems.forEach(menu.removeItem)
-        issueItems.removeAll()
-        if let issueSeparator { menu.removeItem(issueSeparator) }
-        issueSeparator = nil
-        guard !issues.isEmpty else { return }
-
-        for (index, issue) in issues.enumerated() {
-            let entry: NSMenuItem
-            if let fix = issue.fix {
-                entry = makeItem(title: issue.text, action: fix)
-            } else {
-                entry = NSMenuItem(title: issue.text, action: nil, keyEquivalent: "")
-                entry.isEnabled = false
-            }
-            menu.insertItem(entry, at: index)
-            issueItems.append(entry)
-        }
-        let separator = NSMenuItem.separator()
-        menu.insertItem(separator, at: issues.count)
-        issueSeparator = separator
     }
 
     private func makeItem(title: String, keyEquivalent: String = "", action: @escaping () -> Void) -> NSMenuItem {

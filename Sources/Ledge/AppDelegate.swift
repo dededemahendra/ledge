@@ -35,19 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let item = StatusItemController()
         // Settings… above Quit (2026-09-30): the one other row the menu has.
+        // Nothing else, ever (user's call, 2026-10-21): the problem rows
+        // that used to appear above them moved to Settings › Permissions.
         item.addItem(title: "Settings…", keyEquivalent: ",") { [weak settingsWindow] in settingsWindow?.show() }
-        // Just Quit (user's call, 2026-09-29). The panel opens on hover and
-        // the system HUD replacement is simply on; neither needs a menu
-        // item. Problem rows still appear above Quit when — and only when —
-        // something is broken, since a revoked Accessibility grant would
-        // otherwise be invisible.
-        let refreshMenu: () -> Void = { [weak model, weak item] in
-            guard let model, let item else { return }
-            item.setIssues(model.issues.map { StatusItemController.Issue(text: $0.text, fix: $0.fix) })
-        }
-        refreshMenu()
-        item.onMenuWillOpen = refreshMenu
-        model.onStatusChange = refreshMenu
         statusItem = item
 
         Self.log.info("launched; notch \(String(describing: presenter.controller.metrics.notchRect))")

@@ -67,6 +67,13 @@ import SwiftUI
     #expect(!NotchAnimation.isExpanding(from: activity, to: collapsed))
     #expect(!NotchAnimation.isExpanding(from: expanded, to: collapsed))
     #expect(!NotchAnimation.isExpanding(from: activity, to: activity), "no change is not growth")
+    // A virtual notch's hidden island has zero height (2026-10-21): coming
+    // out of it is growth, going back is a collapse.
+    let retracted = CGSize(width: 179, height: 0)
+    #expect(NotchAnimation.isExpanding(from: retracted, to: peek))
+    #expect(NotchAnimation.isExpanding(from: retracted, to: activity))
+    #expect(!NotchAnimation.isExpanding(from: activity, to: retracted))
+    #expect(!NotchAnimation.isExpanding(from: expanded, to: retracted))
 }
 
 /// The blip spring: a visible pop, ~8% overshoot, more than expand's ~1.5%

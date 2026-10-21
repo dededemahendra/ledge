@@ -93,7 +93,7 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         time.timeStyle = .short
         time.dateStyle = .none
         let when = kind == .event
-            ? "\(time.string(from: start))–\(time.string(from: end))"
+            ? "\(time.string(from: start)) to \(time.string(from: end))"   // no dashes in what shows (user's call, 2026-10-21)
             : time.string(from: start)
         if calendar.isDate(start, inSameDayAs: now) {
             return when

@@ -593,7 +593,8 @@ public final class NotchController {
     }
 
     /// Tucked into the notch (2026-10-01): the shape is the bare notch
-    /// whatever the state, without the state changing. The presenter tucks
+    /// (`metrics.retracted`; nothing at all on a virtual notch) whatever
+    /// the state, without the state changing. The presenter tucks
     /// on lock and untucks on unlock, so the island grows back out of the
     /// notch with the arrival pop instead of just being there.
     public private(set) var isTucked = false
@@ -603,10 +604,10 @@ public final class NotchController {
     }
 
     public var parameters: NotchShapeParameters {
-        if isTucked { return metrics.collapsed }
+        if isTucked { return metrics.retracted }
         switch state {
         case .hidden:
-            return metrics.collapsed
+            return metrics.retracted
         case .peek:
             // Wide enough for the line AND for the countdown in the trailing
             // ear (2026-10-01: "2h 20m" was cut at the 255 pt floor).

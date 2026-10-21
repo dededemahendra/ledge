@@ -129,17 +129,24 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsSection.allCases, selection: Binding<SettingsSection?>(
-                get: { selection.section }, set: { if let section = $0 { selection.section = section } }
-            )) { section in
-                Label {
-                    Text(section.title)
-                } icon: {
-                    SettingsTile(symbol: section.symbol, color: section.tile)
+            // Re-read every couple of seconds, like the Permissions pane:
+            // the badge is how a problem shows from any pane, now that the
+            // menu no longer lists them (2026-10-21).
+            TimelineView(.periodic(from: .now, by: 2)) { _ in
+                let issueCount = model.issues.count
+                List(SettingsSection.allCases, selection: Binding<SettingsSection?>(
+                    get: { selection.section }, set: { if let section = $0 { selection.section = section } }
+                )) { section in
+                    Label {
+                        Text(section.title)
+                    } icon: {
+                        SettingsTile(symbol: section.symbol, color: section.tile)
+                    }
+                    .badge(section == .permissions ? issueCount : 0)
+                    .tag(section)
                 }
-                .tag(section)
+                .listStyle(.sidebar)
             }
-            .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 190, ideal: 200, max: 240)
         } detail: {
             Group {
@@ -380,6 +387,25 @@ private struct PermissionsSettings: View {
         // made in System Settings shows here without a relaunch.
         TimelineView(.periodic(from: .now, by: 2)) { _ in
             Form {
+                // What the menu used to list above Quit (moved here
+                // 2026-10-21), and only while something is wrong.
+                let issues = model.issues
+                if !issues.isEmpty {
+                    Section("Needs attention") {
+                        ForEach(issues) { issue in
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(Color(nsColor: .systemOrange))
+                                Text(issue.text)
+                                Spacer()
+                                if let fix = issue.fix {
+                                    Button("Open Settings…") { fix() }
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
                 Section {
                     ForEach(model.permissionRows) { row in
                         HStack {

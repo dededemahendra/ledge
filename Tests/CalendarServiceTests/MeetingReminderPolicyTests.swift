@@ -57,9 +57,9 @@ private func event(_ id: String = "standup", startingIn seconds: TimeInterval, l
     let gb = Locale(identifier: "en_GB"), utc = TimeZone(identifier: "UTC")!
     let e = MeetingEvent(id: "x", title: "Design review", start: Date(timeIntervalSince1970: 1_700_000_000), end: Date(timeIntervalSince1970: 1_700_003_600), joinURL: nil)
     let r = MeetingReminder(event: e, stage: .soon, at: e.start - 300)
-    #expect(r.captionText(locale: gb, timeZone: utc) == "Design review · 22:13–23:13", "an event shows its span")
-    #expect(e.captionText(at: e.start - 24 * 3600, locale: gb, timeZone: utc) == "Design review · Tomorrow 22:13–23:13")
-    #expect(e.captionText(at: e.start - 3 * 24 * 3600, locale: gb, timeZone: utc) == "Design review · 14 Nov 2023 22:13–23:13")
+    #expect(r.captionText(locale: gb, timeZone: utc) == "Design review · 22:13 to 23:13", "an event shows its span")
+    #expect(e.captionText(at: e.start - 24 * 3600, locale: gb, timeZone: utc) == "Design review · Tomorrow 22:13 to 23:13")
+    #expect(e.captionText(at: e.start - 3 * 24 * 3600, locale: gb, timeZone: utc) == "Design review · 14 Nov 2023 22:13 to 23:13")
 
     let reminder = MeetingEvent(id: "r", kind: .reminder, title: "Wake Up!", start: e.start, end: e.start + MeetingEvent.reminderWindow, joinURL: nil)
     #expect(reminder.captionText(at: e.start - 300, locale: gb, timeZone: utc) == "Wake Up! · 22:13", "a reminder has no span")

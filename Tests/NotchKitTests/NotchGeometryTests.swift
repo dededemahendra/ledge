@@ -95,3 +95,59 @@ struct FakeScreen: ScreenDescribing {
     #expect(rect.width == 208)
     #expect(rect.height == 37)
 }
+
+// MARK: - Virtual notch (2026-10-21)
+
+/// An external display, or any screen without a notch: no top safe area, no
+/// auxiliary areas either side.
+private let external = FakeScreen(
+    frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+    safeAreaTopInset: 0,
+    auxiliaryTopLeftMaxX: nil,
+    auxiliaryTopRightMinX: nil,
+    hasNotch: false
+)
+
+@Test func virtualNotchIsTheMeasuredNotchCentredAtTheTopEdge() {
+    #expect(NotchGeometry.virtualNotchRect(for: external) == CGRect(x: 870.5, y: 0, width: 179, height: 32))
+}
+
+@Test func virtualNotchIsScreenRelativeEvenWhenTheScreenIsNotAtTheOrigin() {
+    var screen = external
+    screen.frame = screen.frame.offsetBy(dx: 1470, dy: 0)
+    #expect(NotchGeometry.virtualNotchRect(for: screen) == CGRect(x: 870.5, y: 0, width: 179, height: 32))
+}
+
+/// Lid open beside an external primary: the real notch wins, wherever the
+/// built-in panel sits in the list.
+@Test func aNotchedScreenHostsTheIslandWhereverItIsListed() throws {
+    let placement = try #require(NotchGeometry.placement(among: [external, FakeScreen.measured]))
+    #expect(placement.screenIndex == 1)
+    #expect(!placement.isVirtual)
+    #expect(placement.notchRect == NotchGeometry.notchRect(for: FakeScreen.measured))
+}
+
+/// A Mac mini, or a MacBook with its lid closed: the main display — first
+/// in the list, the one carrying the menu bar — gets a virtual notch.
+@Test func withoutANotchTheMainDisplayHostsAVirtualOne() throws {
+    var second = external
+    second.frame = second.frame.offsetBy(dx: 1920, dy: 0)
+    let placement = try #require(NotchGeometry.placement(among: [external, second]))
+    #expect(placement.screenIndex == 0)
+    #expect(placement.isVirtual)
+    #expect(placement.notchRect == NotchGeometry.virtualNotchRect(for: external))
+}
+
+/// A notch that reports itself but cannot be measured is no notch: still
+/// never a guessed rect for a REAL notch, so the virtual one stands in.
+@Test func aNotchThatCannotBeMeasuredGetsAVirtualOne() throws {
+    var screen = FakeScreen.measured
+    screen.auxiliaryTopLeftMaxX = nil
+    let placement = try #require(NotchGeometry.placement(among: [screen]))
+    #expect(placement.isVirtual)
+    #expect(placement.notchRect == NotchGeometry.virtualNotchRect(for: screen))
+}
+
+@Test func noScreensMeansNoIsland() {
+    #expect(NotchGeometry.placement(among: [FakeScreen]()) == nil)
+}

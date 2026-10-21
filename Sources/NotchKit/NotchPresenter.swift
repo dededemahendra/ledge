@@ -42,9 +42,9 @@ public final class NotchPresenter {
 
     public init() {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        let rect = NSScreen.builtIn.flatMap { NotchGeometry.notchRect(for: $0.snapshot()) }
+        let placement = NSScreen.islandHost?.placement
         controller = NotchController(
-            metrics: NotchMetrics(notchRect: rect ?? .zero),
+            metrics: NotchMetrics(notchRect: placement?.notchRect ?? .zero, isVirtual: placement?.isVirtual ?? false),
             reduceMotion: reduceMotion
         )
     }
@@ -281,14 +281,14 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
-    /// Review Focus 2 and 3: no notch, or no built-in screen, means no island.
+    /// Review Focus 2 and 3, revised 2026-10-21: the real notch when there
+    /// is one, a virtual notch on the main display when there is not (a Mac
+    /// mini, a MacBook with its lid closed), no island only with no screens.
+    /// A hot-plug that moves the island between the two lands here too.
     private func rebuildForCurrentScreen() {
-        guard
-            let screen = NSScreen.builtIn,
-            let rect = NotchGeometry.notchRect(for: screen.snapshot())
-        else {
-            Self.log.info("no notched built-in display; island hidden")
-            // Sleep/display-hot-plug case: if the built-in display
+        guard let (screen, placement) = NSScreen.islandHost else {
+            Self.log.info("no display; island hidden")
+            // Sleep/display-hot-plug case: if the host display
             // disappears while the panel is open (or an activity is live)
             // and later returns, a new window must not resurrect stale
             // state with no user action. `setHovered(false)` first, THEN
@@ -306,15 +306,15 @@ public final class NotchPresenter {
             controller.dismiss()
             // Zeroed, not left stale: makes `NotchController.click()`'s
             // no-island guard correctly reject a "Toggle Panel" press that
-            // lands during this exact gap too, not only on a permanently
-            // notch-less Mac.
+            // lands during this exact gap too, not only with no screen at
+            // all (a Mac without a notch has a virtual one, 2026-10-21).
             controller.metrics = NotchMetrics(notchRect: .zero)
             window?.orderOut(nil)
             window = nil
             return
         }
 
-        controller.metrics = NotchMetrics(notchRect: rect)
+        controller.metrics = NotchMetrics(notchRect: placement.notchRect, isVirtual: placement.isVirtual)
 
         if let window {
             window.reposition(for: screen)
@@ -461,8 +461,21 @@ public final class NotchPresenter {
     /// `.activity`/`.expanded` where the controller believed it was
     /// hovered — suppressing TTL expiry — but clicks passed through.
     private func forgivingParameters() -> NotchShapeParameters {
-        var parameters = controller.parameters
-        guard controller.state == .hidden || controller.state == .peek else { return parameters }
+        Self.hoverParameters(state: controller.state, drawn: controller.parameters, metrics: controller.metrics)
+    }
+
+    /// `forgivingParameters()` as a pure function, so it can be pinned
+    /// without a window. A hidden island is found at the notch's own size,
+    /// not at what it draws (2026-10-21): a virtual notch draws nothing
+    /// while hidden, and its hover spot must not shrink to the 4pt margin.
+    /// On a real notch the two are the same size.
+    nonisolated static func hoverParameters(
+        state: NotchState,
+        drawn: NotchShapeParameters,
+        metrics: NotchMetrics
+    ) -> NotchShapeParameters {
+        var parameters = state == .hidden ? metrics.collapsed : drawn
+        guard state == .hidden || state == .peek else { return parameters }
         parameters.width += 8
         parameters.height += 4
         return parameters
@@ -508,7 +521,7 @@ public final class NotchPresenter {
     /// `hoverDwell`, `false` the moment it leaves.
     @discardableResult
     private func reevaluateHover() -> Bool {
-        guard let screen = NSScreen.builtIn else { return false }
+        guard let screen = NSScreen.islandHost?.screen else { return false }
         let point = Self.localPoint(NSEvent.mouseLocation, on: screen.frame)
         let inside = Self.islandPath(for: forgivingParameters()).contains(point)
         let change = hover.pointer(inside: inside, at: Date())

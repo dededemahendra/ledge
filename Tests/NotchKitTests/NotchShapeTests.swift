@@ -31,6 +31,26 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.captioned.width < metrics.expanded.width)
 }
 
+/// On a real notch, hidden is the notch itself: invisible against the
+/// hardware.
+@Test func aRealNotchRetractsToTheNotchItself() {
+    let metrics = NotchMetrics(notchRect: measuredNotch)
+    #expect(metrics.retracted == metrics.collapsed)
+}
+
+/// A virtual notch has no hardware to hide behind (2026-10-21): hidden
+/// draws nothing, the notch's width at zero height, so the island slides
+/// up into the top edge. Every other size is the real notch's.
+@Test func aVirtualNotchRetractsToNothingAtTheTopEdge() {
+    let real = NotchMetrics(notchRect: measuredNotch)
+    let virtual = NotchMetrics(notchRect: measuredNotch, isVirtual: true)
+    #expect(virtual.retracted.height == 0)
+    #expect(virtual.retracted.width == 179)
+    #expect(virtual.collapsed == real.collapsed)
+    #expect(virtual.oneActivity == real.oneActivity)
+    #expect(virtual.expanded == real.expanded)
+}
+
 /// The output picker grows the expanded panel by exactly its rows.
 @Test func expandedGrowsByOneRowPerOutputWhenThePickerIsOpen() {
     let metrics = NotchMetrics(notchRect: measuredNotch)
@@ -131,6 +151,18 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(abs(bounds.height - 32) < 0.5)
     #expect(abs(bounds.midX - canvas.midX) < 0.5)
     #expect(abs(bounds.minY - canvas.minY) < 0.5)
+}
+
+/// A virtual notch's hidden island (2026-10-21): the radii clamp to the
+/// zero height, so the path covers nothing and claims no point below the
+/// top edge, rather than self-intersecting into a sliver.
+@Test func retractedVirtualPathCoversNothing() {
+    let metrics = NotchMetrics(notchRect: measuredNotch, isVirtual: true)
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let path = NotchShape(metrics.retracted).path(in: canvas)
+    #expect(path.boundingRect.height < 0.5)
+    #expect(abs(path.boundingRect.minY - canvas.minY) < 0.5, "retracts into the top edge, not anywhere else")
+    #expect(!path.contains(CGPoint(x: canvas.midX, y: 1)))
 }
 
 @Test func expandedPathIsWiderByExactlyTwoFillets() {

@@ -48,16 +48,19 @@ public struct ScreenSnapshot: ScreenDescribing {
 
 @MainActor
 extension NSScreen {
-    /// The notch-detection predicate `builtIn` and `snapshot()` both need —
-    /// factored into one place so the two definitions cannot drift apart.
+    /// The notch-detection predicate behind `snapshot().hasNotch`.
     private var reportsNotchShapedSafeArea: Bool {
         safeAreaInsets.top > 0 && auxiliaryTopLeftArea != nil
     }
 
-    /// The display carrying the notch, or `nil` in clamshell mode.
-    /// Review Focus 3: `NSScreen.screens` omits the built-in display when the lid is shut.
-    public static var builtIn: NSScreen? {
-        screens.first { $0.reportsNotchShapedSafeArea }
+    /// The screen the island lives on and where on it — see
+    /// `NotchGeometry.placement(among:)`. `nil` only with no screens.
+    /// Review Focus 3: `NSScreen.screens` omits the built-in display when
+    /// the lid is shut, so a closed MacBook gets the virtual notch.
+    public static var islandHost: (screen: NSScreen, placement: IslandPlacement)? {
+        let screens = screens
+        guard let placement = NotchGeometry.placement(among: screens.map { $0.snapshot() }) else { return nil }
+        return (screens[placement.screenIndex], placement)
     }
 
     public func snapshot() -> ScreenSnapshot {

@@ -42,32 +42,19 @@ final class AppModel {
     /// is not re-announced; only a NEW title is.
     private var captionedTitle: String?
     private var captionTask: Task<Void, Never>?
-    /// Every service's status text, joined; compared on each prune tick so
-    /// the menu rows follow ANY availability change — power and devices
-    /// have no change hook of their own (review, 2026-09-29).
-    private var statusFingerprint = ""
-
     init(presenter: NotchPresenter, settings: AppSettings = AppSettings()) {
         self.settings = settings
         self.presenter = presenter
     }
 
-    var powerStatus: String { power.availability.statusText }
-    var hudStatus: String { hud.availability.statusText }
-    var mediaStatus: String { media.availability.statusText }
-    var deviceStatus: String { device.availability.statusText }
-    var calendarStatus: String { calendar.availability.statusText }
-    var focusStatus: String { focus.availability.statusText }
-    var liveActivityStatus: String { liveActivities.availability.statusText }
-    private var hasScreenAccessText: String { liveActivities.hasScreenAccess ? "screen" : "no-screen" }
-
-    /// What the menu should say — only problems (2026-09-29, minimal menu).
-    /// A service that is fine contributes nothing. The Accessibility grant
-    /// is the one problem the user can fix from here, so its row opens the
-    /// right Settings pane.
-    struct Issue {
+    /// What needs attention — only problems (2026-09-29). A service that is
+    /// fine contributes nothing. Shown in Settings › Permissions since
+    /// 2026-10-21, no longer in the menu; `fix`, where there is one, is
+    /// that row's button and opens the right System Settings pane.
+    struct Issue: Identifiable {
         let text: String
         let fix: (() -> Void)?
+        var id: String { text }
     }
 
     var issues: [Issue] {
@@ -76,7 +63,7 @@ final class AppModel {
             switch availability {
             case .available: break
             case .needsPermission(let what): issues.append(Issue(text: "\(name) needs \(what)", fix: nil))
-            case .unavailable(let reason): issues.append(Issue(text: "\(name) unavailable — \(reason)", fix: nil))
+            case .unavailable(let reason): issues.append(Issue(text: "\(name) unavailable: \(reason)", fix: nil))
             }
         }
         note("Power", power.availability)
@@ -89,21 +76,21 @@ final class AppModel {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
         if case .needsPermission = focus.detail {
-            issues.append(Issue(text: "Focus needs Full Disk Access for its icon, colour and name…", fix: {
+            issues.append(Issue(text: "Focus needs Full Disk Access for its icon, colour and name", fix: {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
                     NSWorkspace.shared.open(url)
                 }
             }))
         }
         if settings.showsLiveActivities, case .needsPermission(let what) = liveActivities.availability, what == "Screen Recording" {
-            issues.append(Issue(text: "Live Activities need Screen Recording…", fix: {
+            issues.append(Issue(text: "Live Activities need Screen Recording", fix: {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
                     NSWorkspace.shared.open(url)
                 }
             }))
         }
         if case .needsPermission = hud.systemHUDReplacement {
-            issues.append(Issue(text: "System HUD needs Accessibility…", fix: {
+            issues.append(Issue(text: "System HUD needs Accessibility", fix: {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
                     NSWorkspace.shared.open(url)
                 }
@@ -114,24 +101,6 @@ final class AppModel {
 
     var isPanelOpen: Bool { presenter.controller.state == .expanded }
     var isSuppressingStockOSD: Bool { hud.isSuppressingStockOSD }
-    var systemHUDStatus: String {
-        switch hud.systemHUDReplacement {
-        case .available:                 return "replaced"
-        case .needsPermission(let what): return "needs \(what) — grant in System Settings › Privacy & Security"
-        case .unavailable:               return "off"
-        }
-    }
-    /// Fires on the main actor whenever any status row's text may have
-    /// changed: the Accessibility grant landing, media giving up or
-    /// recovering. `AppDelegate` refreshes every row from it — cheaper to
-    /// reason about than one hook per service, and the rows are four
-    /// strings.
-    var onStatusChange: (() -> Void)? {
-        didSet {
-            hud.onSystemHUDReplacementChange = { [weak self] _ in self?.onStatusChange?() }
-            media.onAvailabilityChange = { [weak self] _ in self?.onStatusChange?() }
-        }
-    }
 
     func toggleStockOSDSuppression() {
         hud.setSuppressStockOSD(!hud.isSuppressingStockOSD)
@@ -289,7 +258,6 @@ final class AppModel {
         calendar.setLeadTime(TimeInterval(settings.calendarLeadMinutes * 60))
         calendar.setDisabledCalendars(settings.disabledCalendarIDs)
         LoginItem.setEnabled(settings.launchAtLogin)
-        onStatusChange?()
     }
 
     /// The Calendar pane's list.
@@ -951,12 +919,6 @@ final class AppModel {
         evictUnavailableServices()
         queue.prune(at: Date(), hovered: presenter.controller.isHovered)
         if queue.count != before { publish() }
-
-        let fingerprint = [powerStatus, hudStatus, systemHUDStatus, mediaStatus, deviceStatus, calendarStatus, focusStatus, focus.detail.statusText, liveActivityStatus, hasScreenAccessText].joined(separator: "|")
-        if fingerprint != statusFingerprint {
-            statusFingerprint = fingerprint
-            onStatusChange?()
-        }
     }
 
     /// Spec §9: "Service dies at runtime → its activities are evicted from

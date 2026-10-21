@@ -48,13 +48,14 @@ enum LoginItem {
         }
     }
 
-    /// A problem row for the menu, or `nil` when there is nothing to say.
+    /// A problem row for Settings › Permissions, or `nil` when there is
+    /// nothing to say.
     static var issue: (text: String, fix: () -> Void)? {
         switch SMAppService.mainApp.status {
         case .requiresApproval:
-            return ("Launch at login needs approval…", { SMAppService.openSystemSettingsLoginItems() })
+            return ("Launch at login needs approval", { SMAppService.openSystemSettingsLoginItems() })
         case .notFound:
-            return ("Launch at login points at a moved app — relaunch from its new location", {
+            return ("Launch at login points at a moved app. Relaunch it from its new location.", {
                 SMAppService.openSystemSettingsLoginItems()
             })
         default:

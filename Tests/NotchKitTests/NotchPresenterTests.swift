@@ -6,7 +6,7 @@ import CoreGraphics
 // path while `reevaluateHover` tested a plain `CGRect`. These tests exercise
 // the two static, pure geometry helpers `NotchPresenter` now shares between
 // them (`islandPath(for:)`/`localPoint(_:on:)`) directly — no real
-// `NSScreen.builtIn`/`NSEvent.mouseLocation` needed, so they are fast and
+// `NSScreen.islandHost`/`NSEvent.mouseLocation` needed, so they are fast and
 // fully deterministic regardless of what hardware runs the suite.
 
 /// Same shape as `NotchMetrics(notchRect: measuredNotch).expanded` used
@@ -122,4 +122,32 @@ private func naiveRect(_ parameters: NotchShapeParameters) -> CGRect {
     #expect(!NotchPresenter.shouldAcceptMouse(visible: true, hovered: false))
     #expect(!NotchPresenter.shouldAcceptMouse(visible: false, hovered: true), "no island, nothing to click")
     #expect(!NotchPresenter.shouldAcceptMouse(visible: false, hovered: false))
+}
+
+// MARK: - Hover zone (2026-10-21)
+
+private let measuredNotchRect = CGRect(x: 645.5, y: 0, width: 179, height: 32)
+
+/// With nothing showing, the cursor must still find the notch: a virtual
+/// notch draws a zero-height island when hidden, but hovering the spot
+/// where the notch would be opens the preview just as on a real one.
+@Test func aHiddenVirtualNotchIsHoveredAtTheNotchsSize() {
+    let metrics = NotchMetrics(notchRect: measuredNotchRect, isVirtual: true)
+    let zone = NotchPresenter.hoverParameters(state: .hidden, drawn: metrics.retracted, metrics: metrics)
+    #expect(zone.width == 187, "the notch plus the 8pt forgiveness")
+    #expect(zone.height == 36, "the notch plus the 4pt forgiveness")
+}
+
+@Test func aHiddenRealNotchIsHoveredAtTheNotchsSize() {
+    let metrics = NotchMetrics(notchRect: measuredNotchRect)
+    let zone = NotchPresenter.hoverParameters(state: .hidden, drawn: metrics.retracted, metrics: metrics)
+    #expect(zone.width == 187, "the notch plus the 8pt forgiveness")
+    #expect(zone.height == 36, "the notch plus the 4pt forgiveness")
+}
+
+/// The big states are big targets already: hovered exactly as drawn.
+@Test func aLiveIslandIsHoveredExactlyAsDrawn() {
+    let metrics = NotchMetrics(notchRect: measuredNotchRect, isVirtual: true)
+    #expect(NotchPresenter.hoverParameters(state: .activity, drawn: metrics.oneActivity, metrics: metrics) == metrics.oneActivity)
+    #expect(NotchPresenter.hoverParameters(state: .expanded, drawn: metrics.expanded, metrics: metrics) == metrics.expanded)
 }

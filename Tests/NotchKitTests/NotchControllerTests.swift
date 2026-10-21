@@ -806,3 +806,20 @@ private func solidImage(width: Int, height: Int) -> CGImage {
     context.fill(CGRect(x: 0, y: 0, width: width, height: height))
     return context.makeImage()!
 }
+
+/// A virtual notch (2026-10-21): hidden and tucked draw nothing, so no
+/// black tab is left at the top of a screen without a notch; a live
+/// island is the real notch's size.
+@MainActor
+@Test func aVirtualNotchDrawsNothingWhenHiddenOrTucked() {
+    let c = NotchController(
+        metrics: NotchMetrics(notchRect: CGRect(x: 870.5, y: 0, width: 179, height: 32), isVirtual: true),
+        reduceMotion: false
+    )
+    #expect(c.state == .hidden)
+    #expect(c.parameters.height == 0)
+    c.setActivityCount(1)
+    #expect(c.parameters == c.metrics.oneActivity)
+    c.setTucked(true)
+    #expect(c.parameters.height == 0)
+}

@@ -19,8 +19,26 @@ public struct NotchMetrics: Sendable, Equatable {
     /// actually load-bearing today.
     public let notchRect: CGRect
 
-    public init(notchRect: CGRect) {
+    /// No hardware notch behind `notchRect` (2026-10-21): it is
+    /// `NotchGeometry.virtualNotchRect`, drawn on a screen without one.
+    public let isVirtual: Bool
+
+    public init(notchRect: CGRect, isVirtual: Bool = false) {
         self.notchRect = notchRect
+        self.isVirtual = isVirtual
+    }
+
+    /// What the island draws while hidden or tucked. On a real notch that
+    /// is the notch itself, invisible against the hardware. A virtual notch
+    /// has nothing to hide behind, so it retracts to zero height and the
+    /// island slides up into the top edge instead of leaving a black tab
+    /// there until the window orders out. `collapsed` stays the notch's
+    /// size either way: it is also where hover finds a hidden island.
+    public var retracted: NotchShapeParameters {
+        guard isVirtual else { return collapsed }
+        var parameters = collapsed
+        parameters.height = 0
+        return parameters
     }
 
     public var collapsed: NotchShapeParameters {

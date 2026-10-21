@@ -5,8 +5,10 @@ with controls, volume and brightness in place of the stock overlay, battery
 and audio-output blips. Personal build for one machine; not distributed.
 
 Built and measured against a MacBook Air 13" (M5) on macOS 27.0 with a
-179 × 32 pt notch. Nothing about the notch is hardcoded, but nothing has been
-run anywhere else either.
+179 × 32 pt notch. Nothing about the notch is hardcoded. A Mac without one (a
+Mac mini, or a MacBook with its lid shut) gets a virtual notch of that size at
+the top centre of the main display: nothing there at rest, the island drops
+from the top edge when something happens.
 
 ## What it shows
 
@@ -14,7 +16,7 @@ run anywhere else either.
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
-| Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00–22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
+| Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00 to 22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
 | An iPhone Live Activity (paired iPhone, macOS 26+) | a match shows its crest and score in each ear, around the notch, keeping up by the second; hover and the pair drops into a card with names, period and a clock that counts; click for the system's own. Needs Screen Recording |
 | A Focus turns on or off | with Full Disk Access granted: the Focus's own symbol in its own colour left and its name right (the island stretches to fit), "Off" with the symbol uncoloured, 3 s; without it: the moon and On/Off |
@@ -54,7 +56,9 @@ make install       # release build into /Applications
 ```
 
 The app is a menu-bar-less agent; its only chrome is a status item whose menu
-is just Quit (plus a row when something is broken). It registers itself as a
+is just Settings… and Quit. Anything broken (a missing grant, a service with
+nothing to read) is listed under Needs attention in Settings › Permissions,
+with a count on that pane in the sidebar. It registers itself as a
 login item on first launch — macOS says so once, and the switch lives in
 System Settings › General › Login Items.
 
@@ -92,7 +96,6 @@ the app behaved before it had settings; changes apply at once.
   over every user window regardless of level. Findings in the spec, §7.
 - **Notifications, file shelf, timers, weather** and the rest of the notch-app
   feature zoo. See the spec's non-goals.
-- **External or notch-less displays** as the island's host.
 
 ## Where things are
 
