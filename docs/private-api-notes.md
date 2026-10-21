@@ -343,11 +343,27 @@ Mac with no buds connected; the per-component keys are as documented
 elsewhere and parsed defensively. The AirPods renders in
 `HeadphoneAssets.framework` are no longer used.
 
-## Lock screen: closed (2026-10-01, final)
+## Lock screen: a private space (2026-10-21)
 
-Tried live on macOS 27, all invisible under the lock screen: window levels
-1000 / 2005 / 3000 / `CGShieldingWindowLevel() + 1`, and
-`canBecomeVisibleWithoutLogin = true` with the shield level. loginwindow's
-lock UI is composited above every window of the user session. The island is
-hidden while locked and restored on unlock; do not try again without a new
-API.
+Closed on 2026-10-01: window levels 1000 / 2005 / 3000 /
+`CGShieldingWindowLevel() + 1`, and `canBecomeVisibleWithoutLogin = true` with
+the shield level, were all invisible under macOS 27's lock screen.
+
+Reopened 2026-10-21 with a private window-server space, the technique of the
+MIT-licensed `SkyLightWindow` package (Boring Notch uses it). From
+`/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight`:
+
+- `SLSMainConnectionID() -> int`
+- `SLSSpaceCreate(cid, 1, 0) -> int` (the space id)
+- `SLSSpaceSetAbsoluteLevel(cid, space, 400) -> CGError`: 400 is
+  `kSLSSpaceAbsoluteLevelNotificationCenterAtScreenLock`, above the screen
+  lock's 300. Returned 0.
+- `SLSShowSpaces(cid, [space])` and
+  `SLSSpaceAddWindowsAndRemoveFromSpaces(cid, space, [windowNumber], 7)`:
+  both returned `0xB0000000`, not a `CGError`; read as no return value.
+
+A probe panel moved into that space showed on the lock screen for as long as it
+was locked (seen by the user on the Mac mini), and its own tracking area got
+pointer enter, exit and a click there. `screencapture` cannot capture the lock
+screen ("could not create image from rect"). In the app: `SkyLightSpace`,
+`2026-10-21-lock-screen-island-design.md`.

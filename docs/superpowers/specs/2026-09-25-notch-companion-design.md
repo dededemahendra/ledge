@@ -620,6 +620,10 @@ enabled**.
 
 ### LockScreenService — fragile, built last
 
+**Reopened 2026-10-21:** the island now lives in a private window-server space
+above the lock screen and shows there, look only. See "The island on the lock
+screen (2026-10-21)" at the end and `2026-10-21-lock-screen-island-design.md`.
+
 **Does not render on macOS 27.0 — parked 2026-09-28.** The plumbing below is
 in and correct (the lock notification fires, the window rises to
 `CGShieldingWindowLevel() + 1` and is reported on-screen), but the lock screen
@@ -1167,3 +1171,14 @@ colour in the ears, red for a time already past on hover, and the calendar
 card's items as widget rows (ring or calendar bar, title, time) instead of
 tinted chips. While a caption line shows, each ear keeps a 38 pt slot at the
 island's outer end rather than drifting in with a long caption.
+
+## The island on the lock screen (2026-10-21)
+
+Lifts the park of §7 (user's call). The island's window lives in a private
+window-server space at absolute level 400, from launch, so it draws over the
+lock screen (and, all the time, over every other window). While locked it shows
+everything it shows unlocked, meeting and reminder titles included, and is look
+only: hover opens the card display-only; no click, tap, swipe or button does
+anything. Settings › Island › "Show on the lock screen" turns it off. Without
+the SkyLight calls, or with the switch off, it hides while locked as before.
+Design: `2026-10-21-lock-screen-island-design.md`.
