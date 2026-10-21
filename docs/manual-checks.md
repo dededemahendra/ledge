@@ -1680,7 +1680,7 @@ below the screen's edge, the speaker glyph left and the percentage right. Four
 seconds later nothing is left at the top centre. `make test` passes apart from
 the two brightness tests that need a built-in panel.
 
-Not checked, since it means driving the pointer: the hover preview from the
-top edge, the open card with no strip above its content, a volume change with
-the card open (the strip grows to 32 pt, then goes), and the now-playing pill
-taking over from a blip while music plays.
+Checked by the user, since it means driving the pointer: the hover preview
+from the top edge, the open card with no strip above its content, a volume
+change with the card open (the strip grows to 32 pt, then goes), and the
+now-playing pill taking over from a blip while music plays. All as designed.
