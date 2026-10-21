@@ -40,7 +40,19 @@ public final class NotchPresenter {
     private var reduceMotionObserver: NSObjectProtocol?
     private var lockObserver: LockScreenObserver?
 
-    public init() {
+    /// The private space the window lives in (2026-10-21), or `nil` on a
+    /// macOS without the calls; see `SkyLightSpace`.
+    private let space: SkyLightSpace?
+    /// Settings › Island › "Show on the lock screen".
+    private var lockScreenEnabled = true
+
+    /// The island stays on the lock screen, look only (2026-10-21): there
+    /// is a space to draw it over the lock screen and the switch is on.
+    /// Otherwise it hides while locked, as it has since 2026-10-01.
+    public var showsOnLockScreen: Bool { space != nil && lockScreenEnabled }
+
+    public init(space: SkyLightSpace? = SkyLightSpace.system()) {
+        self.space = space
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let placement = NSScreen.islandHost?.placement
         controller = NotchController(
@@ -99,10 +111,9 @@ public final class NotchPresenter {
             return event
         }
 
-        // Lock screen, spec §7: raise the window above the lock shield and
-        // switch the controller to display-only while `loginwindow` owns
-        // the screen. Built last, as the spec sequenced it; nothing else
-        // depends on it and it can be removed without touching anything.
+        // Lock screen, spec §7 and 2026-10-21: from its space the island
+        // stays on the lock screen, look only; without one, or with the
+        // switch off, it hides while locked.
         let lock = LockScreenObserver { [weak self] locked in
             self?.setLocked(locked)
         }
@@ -188,18 +199,23 @@ public final class NotchPresenter {
         window = nil
     }
 
-    /// Screen locked/unlocked (`LockScreenObserver`). Nothing is drawn on
-    /// the lock screen (2026-10-01): macOS 27 composites the lock screen
-    /// over every user window, so raising the island there only ever
-    /// bought an unlock that collapsed a card the user never saw — ears
-    /// drawn outside a shrinking shape, then a window left out (user's
-    /// recording). Now the island is simply hidden while locked, its state
-    /// untouched, and shown again exactly as it was.
+    /// Screen locked/unlocked (`LockScreenObserver`). With a space and the
+    /// switch on (2026-10-21) the island stays where it is and turns look
+    /// only (`NotchController.isLocked`): no tuck on the way in and no pop
+    /// on the way out, since it never left. Otherwise, as from 2026-10-01:
+    /// macOS 27 composites the lock screen over every window level, so the
+    /// island is hidden while locked, its state untouched, and shown again
+    /// exactly as it was.
     public private(set) var isLocked = false
 
     public func setLocked(_ locked: Bool) {
         isLocked = locked
         controller.setLocked(locked)
+        if showsOnLockScreen {
+            controller.setTucked(false)
+            syncWindowToVisibility()
+            return
+        }
         if locked {
             // Tuck into the notch; the window goes after the retract
             // settles. Rarely seen under the lock screen's fade, but free.
@@ -218,6 +234,16 @@ public final class NotchPresenter {
             self.controller.setTucked(false)
             self.syncWindowToVisibility()
         }
+    }
+
+    /// Settings › Island › "Show on the lock screen" (2026-10-21). Flipped
+    /// while locked, the island goes or comes back at once.
+    public func setShowsOnLockScreen(_ shows: Bool) {
+        guard shows != lockScreenEnabled else { return }
+        lockScreenEnabled = shows
+        guard isLocked else { return }
+        controller.setTucked(!showsOnLockScreen)
+        syncWindowToVisibility()
     }
 
     /// Opens or collapses the panel on demand (e.g. the menu bar's "Toggle
@@ -326,6 +352,7 @@ public final class NotchPresenter {
                 }))
             )
             window = created
+            space?.adopt(created)
         }
         syncWindowToVisibility()
     }
@@ -358,14 +385,20 @@ public final class NotchPresenter {
         // not the dwell-promoted `controller.isHovered`: a click on a
         // visible island during the dwell must still land on it.
         window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside))
-        // Nothing shows while locked (final, 2026-10-01: the shield level and
-        // `canBecomeVisibleWithoutLogin` were both tried live and macOS 27
-        // covers them); the window goes after the tuck's retract settles.
-        let shouldShow = controller.isVisible && !isLocked
+        // Locked, the island shows only from its space (2026-10-21); with
+        // no space or the switch off, nothing shows while locked (2026-10-01:
+        // macOS 27 covers every window level), and the window goes after the
+        // tuck's retract settles.
+        let shouldShow = Self.shouldShowWindow(visible: controller.isVisible, locked: isLocked,
+                                               showsOnLockScreen: showsOnLockScreen)
         if shouldShow {
             hideTask?.cancel()
             hideTask = nil
+            let wasOut = !window.isVisible
             window.orderFrontRegardless()
+            // Back in after being out: into the space again, which an
+            // order-out may have taken it from (2026-10-21).
+            if wasOut { space?.adopt(window) }
         } else if hideTask == nil {
             // Keep the window up while the island retracts into the notch
             // (`NotchAnimation.hideSettle`); ordering it out here, on the
@@ -374,7 +407,10 @@ public final class NotchPresenter {
             // clicks fall through meanwhile; a hover returning cancels this.
             hideTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(NotchAnimation.hideSettle))
-                guard !Task.isCancelled, let self, !(self.controller.isVisible && !self.isLocked) else { return }
+                guard !Task.isCancelled, let self,
+                      !NotchPresenter.shouldShowWindow(visible: self.controller.isVisible, locked: self.isLocked,
+                                                       showsOnLockScreen: self.showsOnLockScreen)
+                else { return }
                 self.window?.orderOut(nil)
                 self.hideTask = nil
             }
@@ -386,6 +422,13 @@ public final class NotchPresenter {
     /// cursor is on it. Everything else must fall through.
     nonisolated static func shouldAcceptMouse(visible: Bool, hovered: Bool) -> Bool {
         visible && hovered
+    }
+
+    /// Pure, pinned by `NotchPresenterTests`: the window is ordered in while
+    /// the island has something to show, and while locked only when it may
+    /// show on the lock screen (2026-10-21).
+    nonisolated static func shouldShowWindow(visible: Bool, locked: Bool, showsOnLockScreen: Bool) -> Bool {
+        visible && (!locked || showsOnLockScreen)
     }
 
     /// The previewed next event (`NotchController.upcoming`) changes the
@@ -410,8 +453,9 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
-    private func handleSwipe(deltaX: CGFloat, phase: SwipeToSkipTracker.Phase, invertedFromDevice: Bool) {
-        guard controller.isVisible else { return }
+    func handleSwipe(deltaX: CGFloat, phase: SwipeToSkipTracker.Phase, invertedFromDevice: Bool) {
+        // Look only on the lock screen (2026-10-21): no mode change, no skip.
+        guard controller.isVisible, !controller.isLocked else { return }
         guard let direction = swipe.track(deltaX: deltaX, phase: phase, invertedFromDevice: invertedFromDevice) else { return }
         // Modes first (2026-09-30): on the open card the swipe changes mode;
         // on the preview it opens the calendar. Only the compact island

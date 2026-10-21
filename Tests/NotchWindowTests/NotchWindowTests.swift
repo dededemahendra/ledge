@@ -76,15 +76,6 @@ private func makeWindow() throws -> NotchWindow {
     #expect(abs(w.frame.maxY - screen.frame.maxY) < 1)
 }
 
-@MainActor
-@Test func lockedStateRaisesAboveTheShield() throws {
-    let w = try makeWindow()
-    w.setLocked(true)
-    #expect(w.level.rawValue == Int(CGShieldingWindowLevel()) + 1)
-    w.setLocked(false)
-    #expect(w.level.rawValue == NSWindow.Level.statusBar.rawValue + 1)
-}
-
 // --- hit testing: Review Focus 4 ---
 
 @MainActor

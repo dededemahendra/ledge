@@ -13,10 +13,6 @@ public final class NotchWindow: NSPanel {
         NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
     }
 
-    private static var lockedLevel: NSWindow.Level {
-        NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)
-    }
-
     /// Exposed so hit testing can be asserted directly in tests.
     public let hostingView: NotchHostingView<AnyView>
 
@@ -99,10 +95,6 @@ public final class NotchWindow: NSPanel {
         var flip = CGAffineTransform(translationX: 0, y: rect.height)
             .scaledBy(x: 1, y: -1)
         interactivePath = base.copy(using: &flip) ?? base
-    }
-
-    public func setLocked(_ locked: Bool) {
-        level = locked ? Self.lockedLevel : Self.normalLevel
     }
 
     /// Whether the window takes mouse events at all. `NotchPresenter` turns

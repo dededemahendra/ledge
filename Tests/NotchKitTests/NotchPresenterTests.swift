@@ -174,3 +174,90 @@ private let measuredNotchRect = CGRect(x: 645.5, y: 0, width: 179, height: 32)
         #expect(NotchPresenter.islandPath(for: zone).contains(CGPoint(x: NotchPresenter.canvas.midX, y: 0.5)))
     }
 }
+
+// MARK: - The lock screen (2026-10-21)
+
+@Test func theWindowShowsWhileLockedOnlyWhenTheIslandMayBeThere() {
+    #expect(NotchPresenter.shouldShowWindow(visible: true, locked: false, showsOnLockScreen: false))
+    #expect(NotchPresenter.shouldShowWindow(visible: true, locked: true, showsOnLockScreen: true))
+    #expect(!NotchPresenter.shouldShowWindow(visible: true, locked: true, showsOnLockScreen: false),
+            "no space or the switch off: hidden while locked, as from 2026-10-01")
+    #expect(!NotchPresenter.shouldShowWindow(visible: false, locked: false, showsOnLockScreen: true), "nothing to show")
+    #expect(!NotchPresenter.shouldShowWindow(visible: false, locked: true, showsOnLockScreen: true))
+}
+
+/// A space whose calls do nothing: a presenter that may show on the lock
+/// screen, without touching the real window server.
+@MainActor
+private func quietSpace() -> SkyLightSpace {
+    SkyLightSpace(calls: .init(mainConnection: { 1 }, createSpace: { _ in 2 }, setAbsoluteLevel: { _, _, _ in },
+                               showSpace: { _, _ in }, addWindow: { _, _, _ in }))
+}
+
+@MainActor
+private func playing(_ p: NotchPresenter) {
+    p.controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    p.controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+}
+
+@MainActor
+@Test func withASpaceLockingKeepsTheIslandOutAndLookOnly() {
+    let p = NotchPresenter(space: quietSpace())
+    #expect(p.showsOnLockScreen)
+    playing(p)
+    p.setLocked(true)
+    #expect(p.controller.isLocked)
+    #expect(!p.controller.isTucked, "not tucked into the notch: it stays on the lock screen")
+    #expect(p.controller.state == .activity)
+    p.setLocked(false)
+    #expect(!p.controller.isLocked && !p.controller.isTucked)
+}
+
+@MainActor
+@Test func withoutASpaceLockingTucksAndHidesAsBefore() {
+    let p = NotchPresenter(space: nil)
+    #expect(!p.showsOnLockScreen)
+    playing(p)
+    p.setLocked(true)
+    #expect(p.controller.isLocked && p.controller.isTucked, "tucked and hidden while locked, the 2026-10-01 behaviour")
+}
+
+@MainActor
+@Test func theSwitchFlippedWhileLockedHidesOrShowsTheIslandAtOnce() {
+    let p = NotchPresenter(space: quietSpace())
+    playing(p)
+    p.setLocked(true)
+    p.setShowsOnLockScreen(false)
+    #expect(!p.showsOnLockScreen && p.controller.isTucked)
+    p.setShowsOnLockScreen(true)
+    #expect(p.showsOnLockScreen && !p.controller.isTucked)
+}
+
+/// Review Focus 3: unlocking under a card the pointer opened keeps it open,
+/// controls back, with no tuck and so no collapse or pop.
+@MainActor
+@Test func unlockingWithTheCardOpenKeepsItOpenAndUntucked() {
+    let p = NotchPresenter(space: quietSpace())
+    playing(p)
+    p.controller.setHovered(true)
+    #expect(p.controller.state == .expanded)
+    p.setLocked(true)
+    #expect(p.controller.state == .expanded)
+    p.setLocked(false)
+    #expect(p.controller.state == .expanded && !p.controller.isTucked && !p.controller.isLocked)
+}
+
+/// Review Focus 4: a two-finger swipe over the locked island with music
+/// playing skips nothing and shows no skip glyph.
+@MainActor
+@Test func aSwipeOnTheLockedIslandSkipsNothing() {
+    let p = NotchPresenter(space: quietSpace())
+    var intents: [NotchIntent] = []
+    p.controller.onIntent = { intents.append($0) }
+    playing(p)
+    p.setLocked(true)
+    p.handleSwipe(deltaX: 0, phase: .began, invertedFromDevice: true)
+    p.handleSwipe(deltaX: -60, phase: .changed, invertedFromDevice: true)
+    #expect(intents.isEmpty)
+    #expect(p.controller.skipHint == nil, "no skip glyph while locked")
+}
