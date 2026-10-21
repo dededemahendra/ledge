@@ -255,6 +255,7 @@ final class AppModel {
             publish()
         }
         presenter.setHoverDwell(settings.hoverDwell)
+        presenter.setShowsOnLockScreen(settings.showsOnLockScreen)
         calendar.setLeadTime(TimeInterval(settings.calendarLeadMinutes * 60))
         calendar.setDisabledCalendars(settings.disabledCalendarIDs)
         LoginItem.setEnabled(settings.launchAtLogin)

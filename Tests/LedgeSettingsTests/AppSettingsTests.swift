@@ -39,3 +39,15 @@ private func fresh() -> (AppSettings, UserDefaults) {
     #expect(again.calendarLeadMinutes == 10)
     #expect(!again.isCalendarEnabled("holidays") && again.isCalendarEnabled("anything-new"), "off is remembered; new calendars start on")
 }
+
+/// The lock screen switch (2026-10-21): on by default, remembered off.
+@MainActor
+@Test func theLockScreenSwitchIsOnByDefaultAndRemembered() {
+    let (s, defaults) = fresh()
+    #expect(s.showsOnLockScreen)
+    var changes = 0
+    s.onChange = { changes += 1 }
+    s.showsOnLockScreen = false
+    #expect(changes == 1)
+    #expect(!AppSettings(defaults: defaults).showsOnLockScreen)
+}

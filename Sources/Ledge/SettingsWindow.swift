@@ -252,6 +252,13 @@ private struct IslandSettings: View {
             } footer: {
                 Text("A blip a few minutes before, and again as it starts. Resting on the island with nothing playing shows the next one.")
             }
+            Section {
+                Toggle("Show on the lock screen", isOn: bind(\.showsOnLockScreen))
+            } header: {
+                Text("Lock screen")
+            } footer: {
+                Text("While the Mac is locked the island shows what it shows unlocked, meeting and reminder titles included, for anyone at the Mac to see. Resting on it opens the card to look at; nothing on it can be pressed until you unlock.")
+            }
         }
     }
 
