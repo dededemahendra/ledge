@@ -719,3 +719,150 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
     #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
     #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
 }
+
+// MARK: - The pill (2026-10-21)
+
+private let pillHole = CGRect(x: 0, y: 0, width: 44, height: 32)
+
+@MainActor
+private func makePillController(reduceMotion: Bool = false) -> NotchController {
+    NotchController(metrics: NotchMetrics(notchRect: pillHole, isVirtual: true), reduceMotion: reduceMotion)
+}
+
+@MainActor
+private func openPillCard(_ c: NotchController) {
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    c.click()
+}
+
+private struct PillCheck {
+    var hasContent = false
+    /// Content within 1.5 pt of the outline: what a glyph cut by a round
+    /// end leaves behind.
+    var contentAtTheEdgeCount = 0
+    var contentOutsideCount = 0
+    /// Content in the 44 pt middle of a compact pill.
+    var contentInTheMiddleCount = 0
+    /// Content in an open card's top band.
+    var contentInTopBandCount = 0
+    /// The box around every content pixel inside the outline.
+    var contentBounds: CGRect = .null
+}
+
+@MainActor
+private func renderPill(_ controller: NotchController) -> PillCheck {
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let parameters = controller.parameters
+    let path = NotchShape(parameters).path(in: canvas)
+    let inset = parameters.topInset
+    let middle = CGRect(x: canvas.midX - pillHole.width / 2, y: inset, width: pillHole.width, height: pillHole.height)
+    let band = controller.state == .expanded
+        ? CGRect(x: canvas.midX - parameters.width / 2, y: inset, width: parameters.width,
+                 height: controller.metrics.cardTopBand(earsShowing: controller.earsShowAboveCard))
+        : CGRect.null
+    var check = PillCheck()
+    RenderedImage(controller).forEachPixel { point, isContent, _ in
+        guard isContent else { return }
+        guard path.contains(point) else { check.contentOutsideCount += 1; return }
+        check.hasContent = true
+        check.contentBounds = check.contentBounds.union(CGRect(origin: point, size: CGSize(width: 1 / 2, height: 1 / 2)))
+        let margin: CGFloat = 1.5
+        let neighbours = [CGPoint(x: point.x - margin, y: point.y), CGPoint(x: point.x + margin, y: point.y),
+                          CGPoint(x: point.x, y: point.y - margin), CGPoint(x: point.x, y: point.y + margin)]
+        if !neighbours.allSatisfy({ path.contains($0) }) { check.contentAtTheEdgeCount += 1 }
+        if controller.state != .expanded, middle.contains(point) { check.contentInTheMiddleCount += 1 }
+        if band.contains(point) { check.contentInTopBandCount += 1 }
+    }
+    return check
+}
+
+@MainActor
+@Test func pillVolumeBlipKeepsClearOfItsRoundEnds() {
+    let c = makePillController()
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
+    #expect(c.parameters == c.metrics.oneActivity)
+    let r = renderPill(c)
+    #expect(r.hasContent, "the glyph and the percentage did not render")
+    #expect(r.contentAtTheEdgeCount == 0, "\(r.contentAtTheEdgeCount) content pixel(s) cut by the pill's outline")
+    #expect(r.contentOutsideCount == 0)
+    #expect(r.contentInTheMiddleCount == 0)
+    #expect(abs(r.contentBounds.midY - (NotchMetrics.pillTopInset + 16)) < 2, "content centred in the pill, not 4 pt high: \(r.contentBounds)")
+}
+
+@MainActor
+@Test func pillNowPlayingKeepsClearOfItsRoundEnds() {
+    let c = makePillController()
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    #expect(c.state == .activity)
+    let r = renderPill(c)
+    #expect(r.hasContent, "the artwork placeholder did not render")
+    #expect(r.contentAtTheEdgeCount == 0, "\(r.contentAtTheEdgeCount) content pixel(s) cut by the pill's outline")
+    #expect(r.contentOutsideCount == 0)
+    #expect(r.contentInTheMiddleCount == 0)
+    #expect(abs(r.contentBounds.midY - (NotchMetrics.pillTopInset + 16)) < 2, "content centred in the pill, not 4 pt high: \(r.contentBounds)")
+}
+
+@MainActor
+@Test func pillCardContentStartsBelowItsTwelvePointTop() {
+    let c = makePillController()
+    openPillCard(c)
+    #expect(c.parameters.height == 148)
+    let r = renderPill(c)
+    #expect(r.hasContent)
+    #expect(r.contentOutsideCount == 0)
+    #expect(r.contentAtTheEdgeCount == 0)
+    #expect(r.contentInTopBandCount == 0, "nothing in the 12 pt band above the card's content")
+}
+
+@MainActor
+@Test func aBlipOverThePillCardShowsInItsGrownStrip() {
+    let c = makePillController()
+    openPillCard(c)
+    c.setActivities([
+        .init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"),
+        .init(id: "media", title: "Song", detail: "Artist"),
+    ], overflow: 0)
+    #expect(c.parameters.height == 168)
+    let r = renderPill(c)
+    #expect(r.contentInTopBandCount > 0, "the blip's glyph and value sit in the strip")
+    #expect(r.contentOutsideCount == 0)
+    #expect(r.contentAtTheEdgeCount == 0)
+}
+
+@MainActor
+@Test func pillRendersUnderReduceMotion() {
+    let c = makePillController(reduceMotion: true)
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
+    let r = renderPill(c)
+    #expect(r.hasContent)
+    #expect(r.contentOutsideCount == 0)
+    #expect(r.contentAtTheEdgeCount == 0)
+}
+
+/// The harness self-check, for the pill: the black fill lands where the
+/// path says, 4 pt below the top.
+@MainActor
+@Test func renderedPillFillMatchesItsPath() {
+    let c = makePillController()
+    openPillCard(c)
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let expected = NotchShape(c.parameters).path(in: canvas).boundingRect
+    var minX = CGFloat.infinity, maxX = -CGFloat.infinity
+    var minY = CGFloat.infinity, maxY = -CGFloat.infinity
+    var sawAny = false
+    RenderedImage(c).forEachPixel { point, _, isIslandFill in
+        guard isIslandFill else { return }
+        sawAny = true
+        minX = min(minX, point.x); maxX = max(maxX, point.x)
+        minY = min(minY, point.y); maxY = max(maxY, point.y)
+    }
+    #expect(sawAny, "no black island-fill pixels found at all")
+    guard sawAny else { return }
+    let tolerance: CGFloat = 3
+    #expect(abs(minX - expected.minX) < tolerance, "\(minX) vs \(expected)")
+    #expect(abs(maxX - expected.maxX) < tolerance, "\(maxX) vs \(expected)")
+    #expect(abs(minY - 4) < tolerance, "the fill floats 4 pt below the top: \(minY)")
+    #expect(abs(maxY - expected.maxY) < tolerance, "\(maxY) vs \(expected)")
+}

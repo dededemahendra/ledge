@@ -823,3 +823,111 @@ private func solidImage(width: Int, height: Int) -> CGImage {
     c.setTucked(true)
     #expect(c.parameters.height == 0)
 }
+
+// MARK: - The pill's card strip (2026-10-21)
+
+@MainActor
+private func makePillController() -> NotchController {
+    NotchController(metrics: NotchMetrics(notchRect: CGRect(x: 938, y: 0, width: 44, height: 32), isVirtual: true))
+}
+
+@MainActor
+private func openNowPlayingCard(_ c: NotchController) {
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    c.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    c.click()
+}
+
+/// Now-playing alone: its artwork moves into the card, the ears are
+/// empty, and the pill's card has no strip.
+@MainActor
+@Test func theEarsAreEmptyAboveACardOfNowPlayingAlone() {
+    let c = makePillController()
+    openNowPlayingCard(c)
+    #expect(c.state == .expanded)
+    #expect(!c.earsShowAboveCard)
+    #expect(c.parameters.height == 148)
+}
+
+/// A blip leading while the card is open shows in the ears, and the
+/// pill's card grows its strip back for it.
+@MainActor
+@Test func aBlipOverAnOpenCardGrowsThePillsStrip() {
+    let c = makePillController()
+    openNowPlayingCard(c)
+    c.setActivities([
+        .init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"),
+        .init(id: "media", title: "Song", detail: "Artist"),
+    ], overflow: 0)
+    #expect(c.state == .expanded)
+    #expect(c.earsShowAboveCard)
+    #expect(c.parameters.height == 168)
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    #expect(c.parameters.height == 148, "and shrinks again when the blip ends")
+}
+
+/// The "+N" pip sits in the trailing ear, so it counts too.
+@MainActor
+@Test func theOverflowPipCountsAsSomethingAboveTheCard() {
+    let c = makePillController()
+    openNowPlayingCard(c)
+    c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 2)
+    #expect(c.earsShowAboveCard)
+}
+
+@MainActor
+private func matchScore() -> NotchController.ActivityDisplay.Score {
+    NotchController.ActivityDisplay.Score(
+        home: .init(name: "Indonesia", value: "6", crest: nil),
+        away: .init(name: "Bangladesh", value: "1", crest: nil),
+        status: "HT", clock: "5:56", title: "Cup")
+}
+
+/// A match's own card open: both ears are empty (the crests fly into the
+/// card), so the pill's card has no strip.
+@MainActor
+@Test func anOpenMatchCardHasNoStrip() {
+    let c = makePillController()
+    c.setActivities([.init(id: "live-activity", title: "Live Activity", symbolName: "iphone", score: matchScore())], overflow: 0)
+    c.setHovered(true)
+    #expect(c.state == .expanded && c.panel == .liveActivity)
+    #expect(!c.earsShowAboveCard)
+    #expect(c.parameters.height == 148)
+}
+
+/// A match leading over the pinned music card: the crests stay in the
+/// ears, so the strip is back.
+@MainActor
+@Test func aMatchOverTheMusicCardGrowsTheStrip() {
+    let c = makePillController()
+    openNowPlayingCard(c)
+    c.setActivities([
+        .init(id: "live-activity", title: "Live Activity", symbolName: "iphone", score: matchScore()),
+        .init(id: "media", title: "Song", detail: "Artist"),
+    ], overflow: 0)
+    #expect(c.state == .expanded && c.panel == .media)
+    #expect(c.earsShowAboveCard)
+    #expect(c.parameters.height == 168)
+}
+
+/// Only an open card has ears above it.
+@MainActor
+@Test func earsAboveTheCardNeedAnOpenCard() {
+    let c = makePillController()
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
+    #expect(c.state == .activity)
+    #expect(!c.earsShowAboveCard)
+}
+
+/// Lid shut with a blip up: the metrics swap to the pill and the very
+/// next read is the pill's size, nothing of the notch left over.
+@MainActor
+@Test func swappingToAPillMidBlipResizesAtOnce() {
+    let c = makeController()
+    c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill")], overflow: 0)
+    #expect(c.parameters.width == 255)
+    c.metrics = NotchMetrics(notchRect: CGRect(x: 938, y: 0, width: 44, height: 32), isVirtual: true)
+    #expect(c.parameters == c.metrics.oneActivity)
+    #expect(c.parameters.width == 120)
+    #expect(c.parameters.topRadius == 16)
+}

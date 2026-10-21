@@ -1140,3 +1140,16 @@ the notch's size). With no hardware to hide behind, hidden and tucked draw
 island slides up into the top edge instead of leaving a black tab for the
 window's `hideSettle`. In a full-screen app on such a screen a live island
 sits over the content, there being no black band to sit in.
+
+## The pill (2026-10-21)
+
+Supersedes the shape of "Screens without a notch" above (user's call): on a
+screen without a notch the island is a floating pill like the iPhone's Dynamic
+Island, not the measured 179 × 32 tab. It floats 4 pt below the top edge over
+the menu bar; its middle is 44 pt, so the small pill is 120 × 32 with round
+ends; the open card is 356 × 148 with every corner at 26 pt, its top strip gone
+and grown back to 32 pt only while a blip shows above it; hidden, it is a point
+it grows out of and shrinks into, replacing the slide-up. Its hover zone reaches
+the top edge. The MacBook's notch island is unchanged, value for value
+(`realNotchSizesAreExactlyAsBefore`). Design and numbers:
+`2026-10-21-pill-island-design.md`.

@@ -38,19 +38,6 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.retracted == metrics.collapsed)
 }
 
-/// A virtual notch has no hardware to hide behind (2026-10-21): hidden
-/// draws nothing, the notch's width at zero height, so the island slides
-/// up into the top edge. Every other size is the real notch's.
-@Test func aVirtualNotchRetractsToNothingAtTheTopEdge() {
-    let real = NotchMetrics(notchRect: measuredNotch)
-    let virtual = NotchMetrics(notchRect: measuredNotch, isVirtual: true)
-    #expect(virtual.retracted.height == 0)
-    #expect(virtual.retracted.width == 179)
-    #expect(virtual.collapsed == real.collapsed)
-    #expect(virtual.oneActivity == real.oneActivity)
-    #expect(virtual.expanded == real.expanded)
-}
-
 /// The output picker grows the expanded panel by exactly its rows.
 @Test func expandedGrowsByOneRowPerOutputWhenThePickerIsOpen() {
     let metrics = NotchMetrics(notchRect: measuredNotch)
@@ -153,18 +140,6 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(abs(bounds.minY - canvas.minY) < 0.5)
 }
 
-/// A virtual notch's hidden island (2026-10-21): the radii clamp to the
-/// zero height, so the path covers nothing and claims no point below the
-/// top edge, rather than self-intersecting into a sliver.
-@Test func retractedVirtualPathCoversNothing() {
-    let metrics = NotchMetrics(notchRect: measuredNotch, isVirtual: true)
-    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
-    let path = NotchShape(metrics.retracted).path(in: canvas)
-    #expect(path.boundingRect.height < 0.5)
-    #expect(abs(path.boundingRect.minY - canvas.minY) < 0.5, "retracts into the top edge, not anywhere else")
-    #expect(!path.contains(CGPoint(x: canvas.midX, y: 1)))
-}
-
 @Test func expandedPathIsWiderByExactlyTwoFillets() {
     let metrics = NotchMetrics(notchRect: measuredNotch)
     let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
@@ -190,4 +165,148 @@ private let measuredNotch = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(metrics.contentOpacity(progress: 1.0) == 1)
     let mid = metrics.contentOpacity(progress: 0.64)
     #expect(mid > 0.4 && mid < 0.6)
+}
+
+// MARK: - The pill (2026-10-21)
+
+private let pillCapsule = NotchShapeParameters(
+    width: 120, height: 32, bottomRadius: 16, outerFillet: 0, topInset: 4, topRadius: 16
+)
+
+@Test func newValuesDefaultToZeroSoTheNotchOutlineIsUnchanged() {
+    let p = NotchShapeParameters(width: 255, height: 32, bottomRadius: 12, outerFillet: 6)
+    #expect(p.topInset == 0)
+    #expect(p.topRadius == 0)
+}
+
+@Test func pillFloatsAtItsInset() {
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let bounds = NotchShape(pillCapsule).path(in: canvas).boundingRect
+    #expect(abs(bounds.minY - 4) < 0.5, "the pill floats 4 pt below the top edge")
+    #expect(abs(bounds.height - 32) < 0.5)
+    #expect(abs(bounds.width - 120) < 0.5)
+    #expect(abs(bounds.midX - canvas.midX) < 0.5)
+}
+
+@Test func pillEndsAreRoundTopAndBottom() {
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let path = NotchShape(pillCapsule).path(in: canvas)
+    let left = canvas.midX - 60, right = canvas.midX + 60
+    let top: CGFloat = 4, bottom: CGFloat = 36
+    // 2 pt in from each corner: inside a square corner, outside a 16 pt round one.
+    for corner in [CGPoint(x: left + 2, y: top + 2), CGPoint(x: right - 2, y: top + 2),
+                   CGPoint(x: left + 2, y: bottom - 2), CGPoint(x: right - 2, y: bottom - 2)] {
+        #expect(!path.contains(corner), "\(corner) should be cut away by a round end")
+    }
+    #expect(path.contains(CGPoint(x: left + 1, y: top + 16)), "the end's widest point reaches the edge")
+    #expect(path.contains(CGPoint(x: canvas.midX, y: top + 1)), "the top edge is straight between the ends")
+}
+
+/// A pill has nothing to blend into: an outer fillet left in its
+/// parameters must not flare it wider.
+@Test func pillIgnoresOuterFillets() {
+    var flared = pillCapsule
+    flared.outerFillet = 6
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    #expect(abs(NotchShape(flared).path(in: canvas).boundingRect.width - 120) < 0.5)
+}
+
+/// The point a hidden pill shrinks into draws nothing.
+@Test func aZeroSizedPillCoversNothing() {
+    let point = NotchShapeParameters(width: 0, height: 0, bottomRadius: 16, outerFillet: 0, topInset: 4, topRadius: 16)
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let path = NotchShape(point).path(in: canvas)
+    #expect(path.boundingRect.width < 0.5 && path.boundingRect.height < 0.5)
+    #expect(!path.contains(CGPoint(x: canvas.midX, y: 4)))
+}
+
+/// Mid-growth the two ends share the height: neither radius may pass half
+/// of it, so a short pill is rounded top AND bottom, not square on top.
+@Test func pillRadiiShareTheHeight() {
+    let small = NotchShapeParameters(width: 40, height: 10, bottomRadius: 16, outerFillet: 0, topInset: 4, topRadius: 16)
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let path = NotchShape(small).path(in: canvas)
+    let left = canvas.midX - 20, top: CGFloat = 4, bottom: CGFloat = 14
+    #expect(abs(path.boundingRect.height - 10) < 0.5)
+    #expect(!path.contains(CGPoint(x: left + 0.5, y: top + 0.5)), "the top end is rounded too")
+    #expect(!path.contains(CGPoint(x: left + 0.5, y: bottom - 0.5)))
+}
+
+@Test func pillValuesInterpolateAndRoundTrip() {
+    let point = NotchShapeParameters(width: 0, height: 0, bottomRadius: 16, outerFillet: 0, topInset: 4, topRadius: 16)
+    let mid = NotchShapeParameters.lerp(point, pillCapsule, 0.5)
+    #expect(mid.topInset == 4)
+    #expect(mid.topRadius == 16)
+    #expect(mid.width == 60)
+
+    var p = pillCapsule
+    let captured = p.animatableData
+    p.topInset = 0; p.topRadius = 0
+    p.animatableData = captured
+    #expect(p.topInset == 4)
+    #expect(p.topRadius == 16)
+}
+
+// MARK: - Sizes on a real notch never change (2026-10-21)
+
+/// Every resting size on the measured notch and on a scaled mode's wider,
+/// taller one, exactly as before the pill: it must not move a MacBook by a
+/// point.
+@Test func realNotchSizesAreExactlyAsBefore() {
+    func p(_ w: CGFloat, _ h: CGFloat, _ r: CGFloat, _ f: CGFloat) -> NotchShapeParameters {
+        NotchShapeParameters(width: w, height: h, bottomRadius: r, outerFillet: f)
+    }
+    let measured = NotchMetrics(notchRect: measuredNotch)
+    #expect(measured.collapsed == p(179, 32, 9, 0))
+    #expect(measured.retracted == p(179, 32, 9, 0))
+    #expect(measured.peek == p(179, 38, 11, 4))
+    #expect(measured.captioned(fitting: 300) == p(300, 58, 18, 9))
+    #expect(measured.oneActivity == p(255, 32, 12, 6))
+    #expect(measured.oneActivity(earWidth: 60) == p(299, 32, 12, 6))
+    #expect(measured.expanded == p(356, 168, 26, 13))
+    #expect(measured.expanded(outputRows: 2) == p(356, 238, 26, 13))
+    #expect(measured.expanded(outputRows: 2, earsShowing: true) == p(356, 238, 26, 13))
+    #expect(measured.cardTopBand(earsShowing: false) == 32)
+    #expect(measured.cardTopBand(earsShowing: true) == 32)
+
+    let scaled = NotchMetrics(notchRect: CGRect(x: 751, y: 0, width: 208, height: 37))
+    #expect(scaled.collapsed == p(208, 37, 9, 0))
+    #expect(scaled.peek == p(208, 43, 11, 4))
+    #expect(scaled.captioned(fitting: 300) == p(300, 63, 18, 9))
+    #expect(scaled.oneActivity == p(255, 37, 12, 6))
+    #expect(scaled.expanded == p(356, 168, 26, 13))
+    #expect(scaled.cardTopBand(earsShowing: false) == 37)
+}
+
+// MARK: - The pill's sizes (2026-10-21)
+
+private let pillHole = CGRect(x: 938, y: 0, width: 44, height: 32)
+
+@Test func pillSizesFollowTheSpec() {
+    func pill(_ w: CGFloat, _ h: CGFloat, _ r: CGFloat) -> NotchShapeParameters {
+        NotchShapeParameters(width: w, height: h, bottomRadius: r, outerFillet: 0, topInset: 4, topRadius: r)
+    }
+    let m = NotchMetrics(notchRect: pillHole, isVirtual: true)
+    #expect(m.retracted == pill(0, 0, 16), "hidden: a point at the top centre")
+    #expect(m.collapsed == pill(120, 32, 16), "the resting footprint: 44 pt middle, two 38 pt ears")
+    #expect(m.peek == m.collapsed, "an empty pill acknowledges the hover")
+    #expect(m.oneActivity == pill(120, 32, 16))
+    #expect(m.oneActivity(earWidth: 60) == pill(164, 32, 16), "a long Focus name still stretches it")
+    #expect(m.captioned(fitting: 300) == pill(300, 58, 18))
+    #expect(m.captioned(fitting: 100).width == NotchMetrics.captionedMinimumWidth)
+    #expect(m.expanded == pill(356, 148, 26), "the card without its top strip")
+    #expect(m.expanded(outputRows: 2) == pill(356, 218, 26))
+}
+
+/// The strip comes back while the ears have something to show, output
+/// list or not, and the content area stays 136 pt either way.
+@Test func pillCardGrowsItsStripOnlyWhileTheEarsShowSomething() {
+    let m = NotchMetrics(notchRect: pillHole, isVirtual: true)
+    #expect(m.cardTopBand(earsShowing: false) == 12)
+    #expect(m.cardTopBand(earsShowing: true) == 32)
+    #expect(m.expanded(outputRows: 0, earsShowing: true).height == 168)
+    #expect(m.expanded(outputRows: 2, earsShowing: true).height == 238)
+    for ears in [false, true] {
+        #expect(m.expanded(outputRows: 0, earsShowing: ears).height - m.cardTopBand(earsShowing: ears) == 136)
+    }
 }

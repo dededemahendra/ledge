@@ -603,6 +603,25 @@ public final class NotchController {
         isTucked = tucked
     }
 
+    /// Whether the ears show something above the open card (2026-10-21):
+    /// any leading activity but now-playing, whose artwork moves into the
+    /// card; the "+N" pip; or a match's crests while the card shows
+    /// something else. A match's own card open leaves both ears empty, the
+    /// pip included, since the crest's ear never gives way to it. Mirrors
+    /// the `.expanded` branches of `NotchRootView`'s `leadingEar` and
+    /// `trailingEar`. On a pill the card grows its top strip back for
+    /// exactly this (`NotchMetrics.cardTopBand`); on a MacBook the strip is
+    /// always there and this changes nothing.
+    public var earsShowAboveCard: Bool {
+        guard state == .expanded else { return false }
+        // A match's crests fly into its own card (2026-10-21): with that card
+        // open both ears are empty, the "+N" pip included, since the crest's
+        // ear never gives way to it.
+        if score != nil { return panel != .liveActivity }
+        if let first = activities.first, first.id != Self.mediaActivityID { return true }
+        return overflowCount > 0
+    }
+
     public var parameters: NotchShapeParameters {
         if isTucked { return metrics.retracted }
         switch state {
@@ -625,7 +644,10 @@ public final class NotchController {
                 ? metrics.captioned(fitting: max(captionWidth(caption), metrics.notchRect.width + 2 * leadingEarWidth))
                 : metrics.oneActivity(earWidth: leadingEarWidth)
         case .expanded:
-            return metrics.expanded(outputRows: panel == .media && isOutputPickerOpen ? outputs.count : 0)
+            return metrics.expanded(
+                outputRows: panel == .media && isOutputPickerOpen ? outputs.count : 0,
+                earsShowing: earsShowAboveCard
+            )
         }
     }
 

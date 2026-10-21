@@ -468,16 +468,24 @@ public final class NotchPresenter {
     /// without a window. A hidden island is found at the notch's own size,
     /// not at what it draws (2026-10-21): a virtual notch draws nothing
     /// while hidden, and its hover spot must not shrink to the 4pt margin.
-    /// On a real notch the two are the same size.
+    /// On a real notch the two are the same size. A floating pill's zone
+    /// also reaches up over its inset to the top edge in every state.
     nonisolated static func hoverParameters(
         state: NotchState,
         drawn: NotchShapeParameters,
         metrics: NotchMetrics
     ) -> NotchShapeParameters {
         var parameters = state == .hidden ? metrics.collapsed : drawn
-        guard state == .hidden || state == .peek else { return parameters }
-        parameters.width += 8
-        parameters.height += 4
+        if state == .hidden || state == .peek {
+            parameters.width += 8
+            parameters.height += 4
+        }
+        // A floating pill's zone reaches up over its float to the top edge
+        // in every state (2026-10-21): a pointer pushed against the top of
+        // the screen must find it, as it finds a notch. Nothing changes on a
+        // real notch, whose inset is 0.
+        parameters.height += parameters.topInset
+        parameters.topInset = 0
         return parameters
     }
 

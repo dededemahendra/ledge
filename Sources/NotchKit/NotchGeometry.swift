@@ -34,10 +34,11 @@ public enum NotchGeometry {
     }
 
     /// The notch a screen without one gets instead (2026-10-21): the
-    /// measured MacBook Air notch, centred at the top edge. Its size, not
-    /// the menu bar's, because every island layout was built and pinned
-    /// against it. Same island space as `notchRect(for:)`.
-    public static let virtualNotchSize = CGSize(width: 179, height: 32)
+    /// pill's middle, centred at the top edge. 44 pt wide, not the
+    /// measured notch's 179, so the pill's ears sit close as on the
+    /// iPhone; 32 pt tall, the measured notch's height, which every layout
+    /// was built against. Same island space as `notchRect(for:)`.
+    public static let virtualNotchSize = CGSize(width: 44, height: 32)
 
     public static func virtualNotchRect(for screen: some ScreenDescribing) -> CGRect {
         CGRect(

@@ -59,6 +59,14 @@ public enum NotchAnimation {
         return expanding ? expand : collapse
     }
 
+    /// Whether a change of size is an arrival: growth out of what a hidden
+    /// island draws (2026-10-21). On a real notch `retracted` is the notch,
+    /// as `collapsed` was before; on a pill it is the point, so the hover
+    /// pill opening into the card is not mistaken for an arrival.
+    public static func isArrival(from previous: CGSize, retracted: NotchShapeParameters) -> Bool {
+        previous.width <= retracted.width && previous.height <= retracted.height
+    }
+
     /// For in-place text swaps (the trailing ear's `compactText`, a detail
     /// row's `title`) — spec §5's "`.blurReplace` transition for text
     /// swaps." A spring reads wrong here: a spring is for something moving
@@ -388,8 +396,10 @@ public struct NotchRootView: View {
             from: CGSize(width: previousWidth, height: previousHeight),
             to: CGSize(width: parameters.width, height: parameters.height)
         )
-        let collapsed = controller.metrics.collapsed
-        let fromHidden = previousWidth <= collapsed.width && previousHeight <= collapsed.height
+        let fromHidden = NotchAnimation.isArrival(
+            from: CGSize(width: previousWidth, height: previousHeight),
+            retracted: controller.metrics.retracted
+        )
 
         let expanded = controller.state == .expanded
         let showEffects = expanded && !visualEffectsSuppressed
@@ -411,6 +421,9 @@ public struct NotchRootView: View {
                 // the island actually is.
                 .overlay(alignment: .top) {
                     islandContent(parameters: parameters)
+                        // Down by the pill's float (2026-10-21), so the
+                        // content sits inside the shape; 0 on a notch.
+                        .padding(.top, parameters.topInset)
                         // Press feedback where a click does something
                         // (`NotchController.linkURL`): the same dip as the
                         // panel's buttons, so a clickable blip feels like one.
@@ -517,15 +530,22 @@ public struct NotchRootView: View {
     private func islandContent(parameters: NotchShapeParameters) -> some View {
         let notch = controller.metrics.notchRect
         let ear = controller.metrics.earWidth(forIslandWidth: parameters.width)
+        // The row of ears. Above an open card on a pill it is the card's
+        // top band, 12 pt while the ears are empty (2026-10-21); everywhere
+        // else, and always on a MacBook, it is the notch's height.
+        let rowHeight = controller.state == .expanded
+            ? controller.metrics.cardTopBand(earsShowing: controller.earsShowAboveCard)
+            : notch.height
+        let row = CGRect(x: notch.minX, y: notch.minY, width: notch.width, height: rowHeight)
 
         #if DEBUG
-        let _ = assertContentStaysInsideIslandAndClearOfNotch(parameters: parameters, notch: notch, ear: ear)
+        let _ = assertContentStaysInsideIslandAndClearOfNotch(parameters: parameters, notch: row, ear: ear)
         #endif
 
         VStack(spacing: 0) {
             IslandEarsRow(
                 target: parameters,
-                notch: notch,
+                notch: row,
                 key: earContentKey,
                 animation: NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                 reduceMotion: controller.reduceMotion,
@@ -546,10 +566,10 @@ public struct NotchRootView: View {
                 // goes. Keyed on the text so a second change inside the
                 // window crossfades in place.
                 captionRow(caption)
-                    .frame(width: parameters.width, height: parameters.height - notch.height)
+                    .frame(width: parameters.width, height: parameters.height - row.height)
                     .id(caption)
                     .transition(BlurReplaceTransition(configuration: .downUp).combined(with: OffsetTransition(CGSize(width: 0, height: 6))))
-            } else if parameters.height > notch.height + 8 {
+            } else if parameters.height > row.height + 8 {
                 detailRow
                     // Mode changes slide the way the swipe went, on the
                     // expand spring (2026-09-30, user's call); the island's
@@ -566,7 +586,7 @@ public struct NotchRootView: View {
                     // the `.clipShape` below trims it invisibly — never
                     // upward into the ear row and the notch rect. Caught by
                     // `NotchRenderTests`.
-                    .frame(height: parameters.height - notch.height, alignment: .top)
+                    .frame(height: parameters.height - row.height, alignment: .top)
                     // Target width, not live: the card's text must not
                     // reflow mid-morph.
                     .frame(width: parameters.width)

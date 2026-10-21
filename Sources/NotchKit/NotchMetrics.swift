@@ -29,20 +29,20 @@ public struct NotchMetrics: Sendable, Equatable {
     }
 
     /// What the island draws while hidden or tucked. On a real notch that
-    /// is the notch itself, invisible against the hardware. A virtual notch
-    /// has nothing to hide behind, so it retracts to zero height and the
-    /// island slides up into the top edge instead of leaving a black tab
-    /// there until the window orders out. `collapsed` stays the notch's
-    /// size either way: it is also where hover finds a hidden island.
+    /// is the notch itself, invisible against the hardware. A pill has
+    /// nothing to hide behind, so it shrinks into a point at the top
+    /// centre and grows back out of it (2026-10-21). `collapsed` is where
+    /// hover finds a hidden island, either way.
     public var retracted: NotchShapeParameters {
         guard isVirtual else { return collapsed }
-        var parameters = collapsed
-        parameters.height = 0
-        return parameters
+        return pill(width: 0, height: 0, radius: notchRect.height / 2)
     }
 
     public var collapsed: NotchShapeParameters {
-        NotchShapeParameters(
+        // The pill's resting footprint is its one-activity size: never
+        // drawn while hidden, it is where hover finds the island.
+        if isVirtual { return oneActivity }
+        return NotchShapeParameters(
             width: notchRect.width,
             height: notchRect.height,
             bottomRadius: 9,
@@ -51,7 +51,9 @@ public struct NotchMetrics: Sendable, Equatable {
     }
 
     public var peek: NotchShapeParameters {
-        NotchShapeParameters(
+        // An empty pill, so the hover is acknowledged (2026-10-21).
+        if isVirtual { return collapsed }
+        return NotchShapeParameters(
             width: notchRect.width,
             height: notchRect.height + 6,
             bottomRadius: 11,
@@ -74,12 +76,10 @@ public struct NotchMetrics: Sendable, Equatable {
     public static let captionedMaximumWidth: CGFloat = 430
 
     public func captioned(fitting width: CGFloat) -> NotchShapeParameters {
-        NotchShapeParameters(
-            width: min(Self.captionedMaximumWidth, max(Self.captionedMinimumWidth, width)),
-            height: notchRect.height + Self.captionRowHeight,
-            bottomRadius: 18,
-            outerFillet: 9
-        )
+        let width = min(Self.captionedMaximumWidth, max(Self.captionedMinimumWidth, width))
+        let height = notchRect.height + Self.captionRowHeight
+        if isVirtual { return pill(width: width, height: height, radius: 18) }
+        return NotchShapeParameters(width: width, height: height, bottomRadius: 18, outerFillet: 9)
     }
 
     /// The ear beside the hole at one-activity size: 38 pt, room for a
@@ -97,6 +97,12 @@ public struct NotchMetrics: Sendable, Equatable {
     /// leaves the default and the shape is the 255 pt island it was.
     public func oneActivity(earWidth: CGFloat) -> NotchShapeParameters {
         let ear = min(Self.activityEarMaximum, max(Self.activityEarWidth, earWidth))
+        // The pill's middle is a gap, not a camera (2026-10-21): its width
+        // follows the 44 pt virtual notch, so the ears sit close, and the
+        // ends are round. The 255 below stays the MacBook's own figure.
+        if isVirtual {
+            return pill(width: notchRect.width + 2 * ear, height: notchRect.height, radius: notchRect.height / 2)
+        }
         // Height tracks the hardware, not a literal: with a single activity the
         // island stays exactly notch-height. Hardcoding 32 would make the island
         // SHORTER than the cutout on a scaling mode with a taller notch, so it
@@ -120,13 +126,23 @@ public struct NotchMetrics: Sendable, Equatable {
     /// user's call: "expand bottom" rather than swap the control row for
     /// chips). Width and corners unchanged; only the height follows the
     /// number of rows, so the spring morphs the card taller in place.
-    public func expanded(outputRows: Int) -> NotchShapeParameters {
+    /// `earsShowing`: only the pill reads it — see `cardTopBand(earsShowing:)`.
+    public func expanded(outputRows: Int, earsShowing: Bool = false) -> NotchShapeParameters {
         let list = outputRows > 0 ? Self.outputListInset + CGFloat(outputRows) * Self.outputRowHeight : 0
+        if isVirtual {
+            // The pill's card (2026-10-21): the same content room under a
+            // 12 pt top, or a 32 pt one while a blip shows above it.
+            return pill(
+                width: Self.expandedWidth,
+                height: Self.cardContentHeight + cardTopBand(earsShowing: earsShowing) + list,
+                radius: 26
+            )
+        }
         return NotchShapeParameters(
             // 390 -> 356 (2026-10-01, user's call: "too wide"). The card's
             // own content measures well under this; the width was simply
             // generous.
-            width: 356,
+            width: Self.expandedWidth,
             // 118 -> 140 during the media-player redesign: the richer card
             // (15pt rounded title, focal 26pt play button, scrub block with
             // live-drag affordance) measures ~97pt of ideal height, and 118's
@@ -138,6 +154,39 @@ public struct NotchMetrics: Sendable, Equatable {
             height: atLeastNotchHeight(168 + list),
             bottomRadius: 26,
             outerFillet: 13
+        )
+    }
+
+    /// The row above the open card's content. On a MacBook it is the
+    /// notch, always. On a pill it is 12 pt, and the full ear height while
+    /// the ears show something above the card (`NotchController.
+    /// earsShowAboveCard`), so the card grows a strip for a blip instead of
+    /// squeezing it (2026-10-21).
+    public func cardTopBand(earsShowing: Bool) -> CGFloat {
+        guard isVirtual else { return notchRect.height }
+        return earsShowing ? notchRect.height : Self.pillCardTopBand
+    }
+
+    // MARK: - The pill (2026-10-21)
+
+    /// How far below the top edge a pill floats: over the menu bar, where a
+    /// notch would be.
+    public static let pillTopInset: CGFloat = 4
+    /// The open card's top on a pill while the ears are empty: the strip a
+    /// MacBook's card keeps beside its notch, gone.
+    public static let pillCardTopBand: CGFloat = 12
+    /// Room for the open card's content below its top: the measured 168 pt
+    /// card less the 32 pt notch.
+    public static let cardContentHeight: CGFloat = 136
+    /// The open card's width, on a notch or a pill.
+    public static let expandedWidth: CGFloat = 356
+
+    /// A pill's parameters: every corner `radius`, no fillets, floating at
+    /// `pillTopInset`.
+    private func pill(width: CGFloat, height: CGFloat, radius: CGFloat) -> NotchShapeParameters {
+        NotchShapeParameters(
+            width: width, height: height, bottomRadius: radius, outerFillet: 0,
+            topInset: Self.pillTopInset, topRadius: radius
         )
     }
 

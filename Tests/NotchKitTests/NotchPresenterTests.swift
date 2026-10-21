@@ -128,14 +128,24 @@ private func naiveRect(_ parameters: NotchShapeParameters) -> CGRect {
 
 private let measuredNotchRect = CGRect(x: 645.5, y: 0, width: 179, height: 32)
 
-/// With nothing showing, the cursor must still find the notch: a virtual
-/// notch draws a zero-height island when hidden, but hovering the spot
-/// where the notch would be opens the preview just as on a real one.
-@Test func aHiddenVirtualNotchIsHoveredAtTheNotchsSize() {
-    let metrics = NotchMetrics(notchRect: measuredNotchRect, isVirtual: true)
+/// The hidden pill is found at its resting footprint plus the margin, and
+/// right up to the top edge over its 4 pt float (2026-10-21): a pointer
+/// pushed against the top of the screen finds it, as it finds a notch.
+@Test func aHiddenPillIsHoveredFromTheTopEdgeDown() {
+    let metrics = NotchMetrics(notchRect: CGRect(x: 938, y: 0, width: 44, height: 32), isVirtual: true)
     let zone = NotchPresenter.hoverParameters(state: .hidden, drawn: metrics.retracted, metrics: metrics)
-    #expect(zone.width == 187, "the notch plus the 8pt forgiveness")
-    #expect(zone.height == 36, "the notch plus the 4pt forgiveness")
+    #expect(zone.width == 128, "the 120 pt pill plus the 8 pt forgiveness")
+    #expect(zone.height == 40, "32, the 4 pt forgiveness, and the 4 pt float")
+    #expect(zone.topInset == 0)
+    let path = NotchPresenter.islandPath(for: zone)
+    #expect(path.contains(CGPoint(x: NotchPresenter.canvas.midX, y: 0.5)), "a pointer against the top edge")
+}
+
+@Test func thePillsHoverPreviewReachesTheTopEdgeToo() {
+    let metrics = NotchMetrics(notchRect: CGRect(x: 938, y: 0, width: 44, height: 32), isVirtual: true)
+    let zone = NotchPresenter.hoverParameters(state: .peek, drawn: metrics.peek, metrics: metrics)
+    #expect(zone.topInset == 0)
+    #expect(zone.height == 40)
 }
 
 @Test func aHiddenRealNotchIsHoveredAtTheNotchsSize() {
@@ -145,9 +155,22 @@ private let measuredNotchRect = CGRect(x: 645.5, y: 0, width: 179, height: 32)
     #expect(zone.height == 36, "the notch plus the 4pt forgiveness")
 }
 
-/// The big states are big targets already: hovered exactly as drawn.
+/// On a real notch the big states are hovered exactly as drawn: its inset is 0.
 @Test func aLiveIslandIsHoveredExactlyAsDrawn() {
-    let metrics = NotchMetrics(notchRect: measuredNotchRect, isVirtual: true)
+    let metrics = NotchMetrics(notchRect: measuredNotchRect)
     #expect(NotchPresenter.hoverParameters(state: .activity, drawn: metrics.oneActivity, metrics: metrics) == metrics.oneActivity)
     #expect(NotchPresenter.hoverParameters(state: .expanded, drawn: metrics.expanded, metrics: metrics) == metrics.expanded)
+}
+
+/// A visible pill is found from the top edge down too (2026-10-21): the
+/// zone reaches up over its float, as a notch's does.
+@Test func aLivePillIsHoveredFromTheTopEdgeDown() {
+    let metrics = NotchMetrics(notchRect: CGRect(x: 938, y: 0, width: 44, height: 32), isVirtual: true)
+    for (state, drawn) in [(NotchState.activity, metrics.oneActivity), (.expanded, metrics.expanded)] {
+        let zone = NotchPresenter.hoverParameters(state: state, drawn: drawn, metrics: metrics)
+        #expect(zone.width == drawn.width)
+        #expect(zone.height == drawn.height + 4)
+        #expect(zone.topInset == 0)
+        #expect(NotchPresenter.islandPath(for: zone).contains(CGPoint(x: NotchPresenter.canvas.midX, y: 0.5)))
+    }
 }

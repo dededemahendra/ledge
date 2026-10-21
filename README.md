@@ -6,9 +6,10 @@ and audio-output blips. Personal build for one machine; not distributed.
 
 Built and measured against a MacBook Air 13" (M5) on macOS 27.0 with a
 179 × 32 pt notch. Nothing about the notch is hardcoded. A Mac without one (a
-Mac mini, or a MacBook with its lid shut) gets a virtual notch of that size at
-the top centre of the main display: nothing there at rest, the island drops
-from the top edge when something happens.
+Mac mini, or a MacBook with its lid shut) gets a floating pill instead, like the
+iPhone's Dynamic Island: 4 pt below the top edge at the centre of the main
+display, nothing there at rest, growing out of a point when something happens.
+See `docs/superpowers/specs/2026-10-21-pill-island-design.md`.
 
 ## What it shows
 

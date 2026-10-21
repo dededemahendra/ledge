@@ -67,9 +67,9 @@ import SwiftUI
     #expect(!NotchAnimation.isExpanding(from: activity, to: collapsed))
     #expect(!NotchAnimation.isExpanding(from: expanded, to: collapsed))
     #expect(!NotchAnimation.isExpanding(from: activity, to: activity), "no change is not growth")
-    // A virtual notch's hidden island has zero height (2026-10-21): coming
-    // out of it is growth, going back is a collapse.
-    let retracted = CGSize(width: 179, height: 0)
+    // A pill's hidden island is a point (2026-10-21): coming out of it is
+    // growth, going back is a collapse.
+    let retracted = CGSize(width: 0, height: 0)
     #expect(NotchAnimation.isExpanding(from: retracted, to: peek))
     #expect(NotchAnimation.isExpanding(from: retracted, to: activity))
     #expect(!NotchAnimation.isExpanding(from: activity, to: retracted))
@@ -94,4 +94,17 @@ import SwiftUI
     #expect(NotchAnimation.animation(expanding: true, fromHidden: false, reduceMotion: false) == NotchAnimation.expand, "opening the panel is not a throw")
     #expect(NotchAnimation.animation(expanding: false, fromHidden: false, reduceMotion: false) == NotchAnimation.collapse)
     #expect(NotchAnimation.animation(expanding: true, fromHidden: true, reduceMotion: true) == NotchAnimation.reduced)
+}
+
+/// An arrival is growth out of what a hidden island draws (2026-10-21):
+/// the notch on a MacBook, as before; the point on a pill, so the hover
+/// pill opening into the card keeps the expand spring, as a MacBook's
+/// hover lip does.
+@Test func anArrivalIsGrowthOutOfWhatAHiddenIslandDraws() {
+    let real = NotchMetrics(notchRect: CGRect(x: 645.5, y: 0, width: 179, height: 32))
+    #expect(NotchAnimation.isArrival(from: CGSize(width: 179, height: 32), retracted: real.retracted))
+    #expect(!NotchAnimation.isArrival(from: CGSize(width: 179, height: 38), retracted: real.retracted), "the hover lip is not hidden")
+    let pill = NotchMetrics(notchRect: CGRect(x: 938, y: 0, width: 44, height: 32), isVirtual: true)
+    #expect(NotchAnimation.isArrival(from: .zero, retracted: pill.retracted))
+    #expect(!NotchAnimation.isArrival(from: CGSize(width: 120, height: 32), retracted: pill.retracted), "the hover pill is not hidden")
 }

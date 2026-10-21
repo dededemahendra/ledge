@@ -108,14 +108,14 @@ private let external = FakeScreen(
     hasNotch: false
 )
 
-@Test func virtualNotchIsTheMeasuredNotchCentredAtTheTopEdge() {
-    #expect(NotchGeometry.virtualNotchRect(for: external) == CGRect(x: 870.5, y: 0, width: 179, height: 32))
+@Test func virtualNotchIsThePillsMiddleCentredAtTheTopEdge() {
+    #expect(NotchGeometry.virtualNotchRect(for: external) == CGRect(x: 938, y: 0, width: 44, height: 32))
 }
 
 @Test func virtualNotchIsScreenRelativeEvenWhenTheScreenIsNotAtTheOrigin() {
     var screen = external
     screen.frame = screen.frame.offsetBy(dx: 1470, dy: 0)
-    #expect(NotchGeometry.virtualNotchRect(for: screen) == CGRect(x: 870.5, y: 0, width: 179, height: 32))
+    #expect(NotchGeometry.virtualNotchRect(for: screen) == CGRect(x: 938, y: 0, width: 44, height: 32))
 }
 
 /// Lid open beside an external primary: the real notch wins, wherever the
