@@ -94,12 +94,13 @@ public struct NotchMetrics: Sendable, Equatable {
     /// One activity with ears at least `earWidth` wide (2026-09-30): a
     /// Focus's name in the trailing ear stretches the island to fit, the
     /// way the Dynamic Island stretches for content; everything else
-    /// leaves the default and the shape is the 255 pt island it was.
+    /// leaves the default, the notch and two 38 pt ears, 255 pt on the
+    /// measured notch.
     public func oneActivity(earWidth: CGFloat) -> NotchShapeParameters {
         let ear = min(Self.activityEarMaximum, max(Self.activityEarWidth, earWidth))
         // The pill's middle is a gap, not a camera (2026-10-21): its width
         // follows the 44 pt virtual notch, so the ears sit close, and the
-        // ends are round. The 255 below stays the MacBook's own figure.
+        // ends are round.
         if isVirtual {
             return pill(width: notchRect.width + 2 * ear, height: notchRect.height, radius: notchRect.height / 2)
         }
@@ -107,9 +108,10 @@ public struct NotchMetrics: Sendable, Equatable {
         // island stays exactly notch-height. Hardcoding 32 would make the island
         // SHORTER than the cutout on a scaling mode with a taller notch, so it
         // would shrink at the moment it is supposed to grow and would stop
-        // covering the hole.
+        // covering the hole. Width likewise (2026-10-21): a fixed 255 left a
+        // scaled mode's 208 pt notch 23.5 pt ears, "100%" clipped at the edge.
         return NotchShapeParameters(
-            width: 255 + 2 * (ear - Self.activityEarWidth),
+            width: notchRect.width + 2 * ear,
             height: notchRect.height,
             bottomRadius: 12,
             outerFillet: 6

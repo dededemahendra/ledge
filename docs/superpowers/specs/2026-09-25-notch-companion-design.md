@@ -1153,3 +1153,17 @@ it grows out of and shrinks into, replacing the slide-up. Its hover zone reaches
 the top edge. The MacBook's notch island is unchanged, value for value
 (`realNotchSizesAreExactlyAsBefore`). Design and numbers:
 `2026-10-21-pill-island-design.md`.
+
+## A scaled mode's blip, and reminders drawn Apple's way (2026-10-21)
+
+The ~255 pt one-activity island above is the measured 179 pt notch plus two
+38 pt ears. It is now built that way, not fixed at 255: a scaled display mode's
+208 × 37 notch gets a 284 pt blip with the same ears, where 255 left 23.5 pt
+ones and clipped "100%" at the edge. The measured notch's sizes are unchanged
+(`realNotchSizesAreExactlyAsBefore`, which now pins 284 for the scaled mode).
+
+Reminders draw as Reminders does (user's call): the hollow ring in the list's
+colour in the ears, red for a time already past on hover, and the calendar
+card's items as widget rows (ring or calendar bar, title, time) instead of
+tinted chips. While a caption line shows, each ear keeps a 38 pt slot at the
+island's outer end rather than drifting in with a long caption.

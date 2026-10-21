@@ -251,7 +251,9 @@ private let pillCapsule = NotchShapeParameters(
 
 /// Every resting size on the measured notch and on a scaled mode's wider,
 /// taller one, exactly as before the pill: it must not move a MacBook by a
-/// point.
+/// point. One deliberate change since (2026-10-21): a scaled mode's plain
+/// blip is the notch plus two 38 pt ears, 284 pt, not the measured notch's
+/// 255, which left it 23.5 pt ears.
 @Test func realNotchSizesAreExactlyAsBefore() {
     func p(_ w: CGFloat, _ h: CGFloat, _ r: CGFloat, _ f: CGFloat) -> NotchShapeParameters {
         NotchShapeParameters(width: w, height: h, bottomRadius: r, outerFillet: f)
@@ -273,7 +275,9 @@ private let pillCapsule = NotchShapeParameters(
     #expect(scaled.collapsed == p(208, 37, 9, 0))
     #expect(scaled.peek == p(208, 43, 11, 4))
     #expect(scaled.captioned(fitting: 300) == p(300, 63, 18, 9))
-    #expect(scaled.oneActivity == p(255, 37, 12, 6))
+    #expect(scaled.oneActivity == p(284, 37, 12, 6))
+    #expect(scaled.oneActivity(earWidth: 60) == p(328, 37, 12, 6))
+    #expect(scaled.earWidth(forIslandWidth: scaled.oneActivity.width) == NotchMetrics.activityEarWidth)
     #expect(scaled.expanded == p(356, 168, 26, 13))
     #expect(scaled.cardTopBand(earsShowing: false) == 37)
 }

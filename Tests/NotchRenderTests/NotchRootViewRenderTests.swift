@@ -916,7 +916,7 @@ private func earContentBounds(_ controller: NotchController) -> (leading: CGRect
 @Test func aLongCaptionKeepsTheEarsAtTheOuterEnds() {
     for (name, metrics) in reminderScreens {
         let c = NotchController(metrics: metrics, reduceMotion: true)
-        let title = "Call the plumber about the kitchen sink"
+        let title = "Call the plumber about the kitchen sink and the tap"
         c.setActivities([.init(id: NotchController.calendarActivityID, title: title, compactText: "Now",
                                symbolName: "circle", url: URL(string: "ledge://reminders"))], overflow: 0)
         c.setCaption("\(title) · 14:00")
@@ -958,5 +958,27 @@ private func earContentBounds(_ controller: NotchController) -> (leading: CGRect
         #expect(count > 20, "\(name): the ring and the bar did not render in the item's colour")
         #expect(bounds.width <= 14, "\(name): the colour spans \(bounds.width) pt, a chip's width, not a ring's")
         #expect(bounds.minX >= island.minX + 12 && bounds.maxX < island.midX, "\(name): the colour sits at \(bounds), not at the rows' leading edge")
+    }
+}
+
+/// A plain blip in a MacBook's scaled display mode (2026-10-21): its 208 pt
+/// notch gets the measured notch's 38 pt ears, so "100%" and "Now" sit
+/// exactly where they do there, instead of clipped at the island's edge.
+@MainActor
+@Test func aScaledModeBlipPlacesItsFiguresAsTheMeasuredNotchDoes() {
+    func insets(_ metrics: NotchMetrics, _ figure: String) -> (leading: CGFloat, trailing: CGFloat) {
+        let c = NotchController(metrics: metrics, reduceMotion: true)
+        c.setActivities([.init(id: "power", title: "Charged", compactText: figure, symbolName: "bolt.fill")], overflow: 0)
+        #expect(c.parameters == metrics.oneActivity)
+        let r = earContentBounds(c)
+        return (r.leading.minX - r.island.minX, r.island.maxX - r.trailing.maxX)
+    }
+    let measured = NotchMetrics(notchRect: testNotchRect)
+    let scaled = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 208, height: 37))
+    for figure in ["100%", "Now"] {
+        let want = insets(measured, figure), got = insets(scaled, figure)
+        #expect(got.trailing > 2, "\(figure) ends \(got.trailing) pt from the edge")
+        #expect(abs(got.trailing - want.trailing) < 0.75, "\(figure) ends \(got.trailing) pt in, the measured notch's \(want.trailing)")
+        #expect(abs(got.leading - want.leading) < 0.75, "the glyph starts \(got.leading) pt in, the measured notch's \(want.leading)")
     }
 }
