@@ -506,11 +506,13 @@ public final class NotchController {
     /// paddings and room to spare (2026-10-01).
     func captionWidth(_ caption: String?) -> CGFloat {
         guard let caption else { return NotchMetrics.captionedMinimumWidth }
-        let parts = caption.components(separatedBy: " · ")
-        let title = NSAttributedString(string: parts.first ?? caption, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
-        let rest = parts.count > 1
-            ? NSAttributedString(string: " · " + parts.dropFirst().joined(separator: " · "), attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
-            : 0
+        // Split where `captionRow` splits it, at the last separator.
+        let split = caption.range(of: " · ", options: .backwards)
+        let title = NSAttributedString(string: split.map { String(caption[..<$0.lowerBound]) } ?? caption,
+                                       attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
+        let rest = split.map {
+            NSAttributedString(string: " · " + caption[$0.upperBound...], attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
+        } ?? 0
         return ceil(title + rest) + 2 * 14 + 16
     }
 

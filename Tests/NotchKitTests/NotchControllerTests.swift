@@ -931,3 +931,16 @@ private func matchScore() -> NotchController.ActivityDisplay.Score {
     #expect(c.parameters.width == 120)
     #expect(c.parameters.topRadius == 16)
 }
+
+/// The caption is measured as it is drawn (2026-10-21): split at its LAST
+/// " · ", so a title with one in it is measured in the title's weight and
+/// the island is not left a few points short of it.
+@MainActor
+@Test func captionWidthSplitsAtTheLastSeparatorLikeTheView() {
+    let c = NotchController(metrics: NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32)))
+    let title = NSAttributedString(string: "Pay rent · Flat 2 and the garage",
+                                   attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
+    let time = NSAttributedString(string: " · 14:00",
+                                  attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
+    #expect(c.captionWidth("Pay rent · Flat 2 and the garage · 14:00") == ceil(title + time) + 2 * 14 + 16)
+}
