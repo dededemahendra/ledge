@@ -24,6 +24,9 @@ public final class PreviewDirector {
     /// What the strip puts on the island now: `scene`, except that the
     /// hover scene is now playing until `hoverDwell` has passed.
     public private(set) var staged: PreviewScene?
+    /// Bumped when a switch is turned on for the scene already showing, so
+    /// the strip plays it again from the start (2026-10-22).
+    public private(set) var replays = 0
 
     @ObservationIgnored private var pointed: PreviewScene?
     @ObservationIgnored private var playing: (scene: PreviewScene, until: Date)?
@@ -63,8 +66,16 @@ public final class PreviewDirector {
 
     public func switchedOn(_ scene: PreviewScene, now: Date = Date()) {
         self.now = now
+        let before = self.scene
         playing = (scene, now + Self.playDuration)
         resolve()
+        // Already showing (the row pointed at, or in the cycle): play it
+        // again from the start, two-step hover included.
+        if before == scene, self.scene == scene {
+            sceneSince = now
+            replays += 1
+            resolve()
+        }
     }
 
     public func tick(at now: Date) {
