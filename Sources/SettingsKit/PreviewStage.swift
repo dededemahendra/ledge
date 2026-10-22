@@ -136,7 +136,8 @@ public enum PreviewStage {
         case .githubRunning:
             c.setActivities([NotchController.ActivityDisplay(
                 id: NotchController.githubRunActivityID, title: "Checks running", compactText: "2:14",
-                tint: .system(GitHubNotice.runningTintName)
+                tint: .system(GitHubNotice.runningTintName),
+                segments: [.passed, .passed, .passed, .failed, .running, .running]
             )], overflow: 0)
             return caption(scene, sample: "nothing running")
         case .githubChecks:

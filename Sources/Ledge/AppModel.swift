@@ -333,6 +333,10 @@ final class AppModel {
     /// The debug probe's made-up rounds stand in for GitHub's while it plays.
     private var githubProbeSnapshot: GitHubSnapshot?
     private static let githubKeychain = GitHubKeychain(service: "\(Bundle.main.bundleIdentifier ?? "Ledge").github")
+    private let githubAvatars = GitHubAvatars()
+    /// Pictures already fetched, for drawing at once (2026-10-22).
+    private var githubAvatarImages: [URL: Data] = [:]
+    private var githubAvatarLoading: Set<URL> = []
 
     /// Where the login came from, once connected.
     private(set) var githubSource: GitHubTokenSource?
@@ -343,6 +347,26 @@ final class AppModel {
     var githubHidesOrganisations: Bool { github.snapshot?.hidesSomeOrganisations ?? false }
     /// The sidebar badge: GitHub no longer takes the login.
     var githubNeedsAttention: Bool { github.status == .signInAgain }
+
+    /// The account card's picture, once it has loaded (2026-10-22).
+    var githubAvatar: Data? { github.snapshot?.avatarURL.flatMap { githubAvatarImages[$0] } }
+
+    /// The account card's line: open PRs, failing, running, waiting for
+    /// the user's review (2026-10-22).
+    struct GitHubStats: Equatable {
+        let open: Int
+        let failing: Int
+        let running: Int
+        let waiting: Int
+    }
+
+    var githubStats: GitHubStats? {
+        guard let snapshot = githubSnapshot else { return nil }
+        return GitHubStats(open: snapshot.mineTotal,
+                           failing: snapshot.mine.filter { $0.checks?.state == .failed }.count,
+                           running: GitHubEvents.running(in: snapshot).count,
+                           waiting: snapshot.requestedTotal)
+    }
 
     /// Fresh only: see `GitHubMonitor.current(at:)` (2026-10-22).
     private var githubSnapshot: GitHubSnapshot? { githubProbeSnapshot ?? github.current(at: Date()) }
@@ -401,6 +425,7 @@ final class AppModel {
         githubNeedsToken = false
         githubMissed = []
         githubClock = RunningClock()
+        githubAvatarImages = [:]
         githubRunShown = nil
         queue.remove(kind: .githubRun)
         queue.remove(kind: .github)
@@ -409,6 +434,7 @@ final class AppModel {
     }
 
     private func handleGitHubRound(_ snapshot: GitHubSnapshot, _ events: [GitHubEvent]) {
+        if let url = snapshot.avatarURL { loadGitHubAvatar(url) }
         let wanted = events.filter(isWanted)
         if presenter.isLocked {
             githubMissed += wanted
@@ -428,14 +454,53 @@ final class AppModel {
         }
     }
 
+    /// A blip waits at most a second for its person's picture, then shows
+    /// its disc (2026-10-22).
     private func showGitHub(_ blip: GitHubBlip) {
-        queue.insert(ActivityRecord(
-            id: NotchController.githubActivityID, kind: .github, insertedAt: Date(),
-            ttl: ActivityKind.github.defaultTTL, title: blip.title, compactText: blip.word,
-            symbolName: blip.symbolName, tint: blip.tintName.map { .system($0) }, url: blip.url
-        ))
-        publish()
-        showCaption(blip.caption, for: ActivityKind.github.defaultTTL ?? NotchController.captionDuration)
+        Task { @MainActor [weak self] in
+            let avatar = await self?.githubAvatar(blip.avatarURL, within: 1)
+            // Locked while the picture came: no GitHub on the lock screen.
+            guard let self, !self.presenter.isLocked else { return }
+            self.queue.insert(ActivityRecord(
+                id: NotchController.githubActivityID, kind: .github, insertedAt: Date(),
+                ttl: ActivityKind.github.defaultTTL, title: blip.title, compactText: blip.word,
+                symbolName: blip.symbolName, artwork: avatar, tint: blip.tintName.map { .system($0) }, url: blip.url
+            ))
+            self.publish()
+            self.showCaption(blip.caption, for: ActivityKind.github.defaultTTL ?? NotchController.captionDuration)
+        }
+    }
+
+    /// A picture from memory, else from GitHub's image server within
+    /// `seconds`; `nil` if it has not come by then (2026-10-22).
+    private func githubAvatar(_ url: URL?, within seconds: Double) async -> Data? {
+        guard let url else { return nil }
+        if let data = githubAvatarImages[url] { return data }
+        let avatars = githubAvatars
+        let data = await withTaskGroup(of: Data?.self) { group in
+            group.addTask { await avatars.image(at: url) }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(seconds))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+        if let data { githubAvatarImages[url] = data }
+        return data
+    }
+
+    /// Fetches a picture in the background, then redraws the panel;
+    /// Settings reads it from memory (2026-10-22).
+    private func loadGitHubAvatar(_ url: URL) {
+        guard githubAvatarImages[url] == nil, !githubAvatarLoading.contains(url) else { return }
+        githubAvatarLoading.insert(url)
+        Task { @MainActor [weak self] in
+            _ = await self?.githubAvatar(url, within: 10)
+            self?.githubAvatarLoading.remove(url)
+            self?.publishGitHubPanel()
+        }
     }
 
     /// Every tick: what was missed while locked, the running item's clock,
@@ -462,11 +527,12 @@ final class AppModel {
                 title: lead.item.source == .run ? "Run going" : "Checks running", detail: lead.item.caption,
                 compactText: TimerText.format(seconds: now.timeIntervalSince(lead.since).rounded(.down)),
                 tint: .system(GitHubNotice.runningTintName), url: lead.item.url,
-                badge: lead.count > 1 ? lead.count : nil
+                badge: lead.count > 1 ? lead.count : nil,
+                segments: lead.item.segments.map(Self.activitySegment)
             )
             // Republished only when what the island draws changes.
             if record.compactText != githubRunShown?.compactText || record.badge != githubRunShown?.badge
-                || record.url != githubRunShown?.url {
+                || record.url != githubRunShown?.url || record.segments != githubRunShown?.segments {
                 githubRunShown = record
                 queue.insert(record)
                 publish()
@@ -490,11 +556,19 @@ final class AppModel {
         var data: GitHubPanelData?
         if !presenter.isLocked, let snapshot = githubSnapshot {
             let list = GitHubPanelRows.make(snapshot)
-            if !list.rows.isEmpty {
+            if list.hero != nil || !list.rows.isEmpty {
                 data = GitHubPanelData(
+                    hero: list.hero.map { hero in
+                        GitHubPanelData.Hero(
+                            id: hero.id, kind: Self.heroKind(hero.kind), tag: hero.tag, title: hero.title,
+                            detail: hero.detail, segments: hero.segments.map(Self.heroSegment), since: hero.startedAt,
+                            avatar: hero.avatarURL.flatMap { githubAvatarImages[$0] }, url: hero.url
+                        )
+                    },
                     rows: list.rows.map { GitHubPanelData.Row(id: $0.id, mark: Self.panelMark($0.mark), title: $0.title, repo: $0.repo, url: $0.url) },
                     more: list.more, moreURL: GitHubPanelRows.moreURL
                 )
+                if let url = list.hero?.avatarURL { loadGitHubAvatar(url) }
             }
         }
         guard data != githubPanelShown else { return }
@@ -509,6 +583,38 @@ final class AppModel {
         case .failed:  .failed
         case .none:    .none
         case .review:  .review
+        }
+    }
+
+    private static func heroKind(_ kind: GitHubHero.Kind) -> GitHubPanelData.Hero.Kind {
+        switch kind {
+        case .running: .running
+        case .failed:  .failed
+        case .review:  .review
+        }
+    }
+
+    private static func heroSegment(_ segment: CheckSegment) -> IslandCheck {
+        switch segment {
+        case .passed:  .passed
+        case .failed:  .failed
+        case .running: .running
+        }
+    }
+
+    private static func activitySegment(_ segment: CheckSegment) -> ActivitySegment {
+        switch segment {
+        case .passed:  .passed
+        case .failed:  .failed
+        case .running: .running
+        }
+    }
+
+    private static func displaySegment(_ segment: ActivitySegment) -> IslandCheck {
+        switch segment {
+        case .passed:  .passed
+        case .failed:  .failed
+        case .running: .running
         }
     }
 
@@ -529,6 +635,21 @@ final class AppModel {
                 try? await Task.sleep(for: .seconds(3))
             }
             try? await Task.sleep(for: .seconds(30))
+            self?.githubProbeSnapshot = nil
+            self?.publishGitHubPanel()
+        }
+    }
+
+    /// `ledge://probe/github-panel`, debug builds only (2026-10-22): pins the
+    /// GitHub panel open on `GitHubSample.panelSnapshot` for twenty seconds,
+    /// for screenshots, with no network.
+    private func openGitHubPanelProbe() {
+        githubProbeSnapshot = GitHubSample.panelSnapshot(login: "you", now: Date())
+        publishGitHubPanel()
+        presenter.debugOpen(.github)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            self?.presenter.controller.dismiss()
             self?.githubProbeSnapshot = nil
             self?.publishGitHubPanel()
         }
@@ -1047,6 +1168,11 @@ final class AppModel {
             playGitHubStory()
             return
         }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/github-panel" {
+            Self.log.notice("probe: github panel")
+            openGitHubPanelProbe()
+            return
+        }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/settings" {
             let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
             onSnapshotSettings?(dir)
@@ -1405,7 +1531,8 @@ final class AppModel {
                           status: $0.status, clock: $0.clock, title: $0.title)
                 },
                 lines: record.lines,
-                badge: record.badge
+                badge: record.badge,
+                segments: record.segments?.map(Self.displaySegment)
             )
         }
         // `setActivities` sets the count itself — do not also call
