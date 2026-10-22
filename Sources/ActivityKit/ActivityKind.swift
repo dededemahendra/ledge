@@ -21,6 +21,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
     /// A newer Ledge on GitHub (2026-10-22): once per version, under every
     /// other blip (it waits for nothing) and over a Clock timer.
     case update
+    /// A call in any app (2026-10-22): sticky while the mic is held, over a
+    /// Clock timer and music — a call is what matters while it lasts — and
+    /// under every blip, which passes over it for its few seconds.
+    case call
     /// The island's own timer or stopwatch (2026-09-29): sticky while it
     /// runs, above media (a running timer is what the island is for) and
     /// below every blip, which pre-empts it for its few seconds.
@@ -51,6 +55,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .notification: return 40
         case .github:       return 38
         case .update:       return 35
+        case .call:         return 30
         case .timer:        return 20
         case .githubRun:    return 18
         case .liveActivity: return 15
@@ -70,6 +75,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .notification: return 5
         case .github:       return 8       // a word and a line to read
         case .update:       return 8       // a version and a line to read
+        case .call:         return nil
         case .timer:        return nil
         case .githubRun:    return nil
         case .liveActivity: return nil

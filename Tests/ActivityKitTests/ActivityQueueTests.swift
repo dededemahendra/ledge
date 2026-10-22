@@ -177,3 +177,12 @@ private func record(
                                 segments: [.passed, .running])
     #expect(record.segments == [.passed, .running])
 }
+
+/// A call (2026-10-22): sticky while the mic is on, under every blip, over
+/// a Clock timer, GitHub runs, Live Activities and music.
+@Test func aCallSitsUnderEveryBlipAndOverTimersAndMusic() {
+    #expect(ActivityKind.call.priority == 30)
+    #expect(ActivityKind.call.defaultTTL == nil)
+    #expect(ActivityKind.call < .update && ActivityKind.call > .timer)
+    #expect(ActivityKind.call > .media && ActivityKind.call > .liveActivity && ActivityKind.call > .githubRun)
+}
