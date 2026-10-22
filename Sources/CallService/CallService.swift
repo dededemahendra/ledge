@@ -31,8 +31,7 @@ public final class CallService {
 
     public private(set) var availability: ServiceAvailability = .available
 
-    private let injectedHolders: (() -> [pid_t]?)?
-    private var micHolders: MicHolders?
+    private let holders: MicHolderSource
     private let devices: InputDeviceIO
     private let lookup: ProcessLookup
     private let defaults: UserDefaults
@@ -45,9 +44,9 @@ public final class CallService {
         didSet { save() }
     }
 
-    public init(holders: (() -> [pid_t]?)? = nil, devices: InputDeviceIO = CoreAudioInputDevices(),
+    public init(holders: MicHolderSource? = nil, devices: InputDeviceIO = CoreAudioInputDevices(),
                 lookup: ProcessLookup = .live, defaults: UserDefaults = .standard, ownPID: pid_t = getpid()) {
-        self.injectedHolders = holders
+        self.holders = holders ?? MicHolders()
         self.devices = devices
         self.lookup = lookup
         self.defaults = defaults
@@ -57,30 +56,23 @@ public final class CallService {
     /// Idempotent. Undoes a mute a crashed or relaunched Ledge left behind.
     public func start() {
         restoreSavedRecord()
-        guard injectedHolders == nil, micHolders == nil else { return }
-        let holders = MicHolders()
         holders.start()
-        micHolders = holders
     }
 
     public func stop() {
         restoreMute()
-        micHolders?.stop()
-        micHolders = nil
+        holders.stop()
         tracker = CallTracker()
         isLive = false
     }
 
     public func refresh(at now: Date, hidden: Set<String>) -> CallUpdate {
-        let pids: [pid_t]?
-        if let injectedHolders {
-            pids = injectedHolders()
-        } else if let micHolders {
-            pids = micHolders.holderPIDs
-        } else {
-            return CallUpdate(state: .idle, isMuted: false, canMute: false, micName: nil)
-        }
-        guard let pids else {
+        // While anything holds the mic, read again each time: CoreAudio
+        // doesn't announce an app letting go when its process stays (a
+        // browser tab closing), nor one leaving while another keeps the mic
+        // running. Idle, the source's own notifications are enough.
+        if holders.holderPIDs?.isEmpty == false { holders.refresh() }
+        guard let pids = holders.holderPIDs else {
             availability = .unavailable(reason: "can't read which apps use the microphone")
             if isLive { restoreMute() }
             isLive = false

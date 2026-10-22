@@ -45,15 +45,35 @@ private func mic(_ uid: String, name: String = "MacBook Pro Microphone", running
                      canSetVolume: true, volume: volume)
 }
 
+/// Who holds the mic, the way CoreAudio tells it: a change reaches
+/// `holderPIDs` only when announced or when the service reads again
+/// (`refresh()`). A browser tab closing is never announced: its audio
+/// process stays and only stops using the mic (2026-10-22).
+@MainActor
+private final class FakeHolders: MicHolderSource {
+    var truth: [pid_t]?
+    private(set) var holderPIDs: [pid_t]?
+    init(_ pids: [pid_t]?) { truth = pids; holderPIDs = pids }
+    func start() {}
+    func stop() {}
+    func refresh() { holderPIDs = truth }
+    func announce() { holderPIDs = truth }
+}
+
 /// A service on fake devices, a fake process table where 100 is Zoom, and
-/// a defaults suite of its own. `holders` is what the mic watcher reports.
+/// a defaults suite of its own. Setting `holders` changes who holds the
+/// mic without announcing it.
 @MainActor
 private final class Rig {
-    var holders: [pid_t]? = [100]
+    let source = FakeHolders([100])
+    var holders: [pid_t]? {
+        get { source.truth }
+        set { source.truth = newValue }
+    }
     let devices: FakeDevices
     let defaults = UserDefaults(suiteName: UUID().uuidString)!
     lazy var service = CallService(
-        holders: { [unowned self] in self.holders },
+        holders: source,
         devices: devices,
         lookup: ProcessLookup(regularApp: { $0 == 100 ? zoom : nil }, responsiblePID: { _ in nil }, parentPID: { _ in nil }),
         defaults: defaults,
@@ -164,4 +184,19 @@ private final class Rig {
     let update = rig.refresh(to: 3)
     #expect(update.state == .idle)
     #expect(rig.service.availability == .unavailable(reason: "can't read which apps use the microphone"))
+}
+
+/// Closing the Meet tab: the browser's audio process stays and stops using
+/// the mic, and CoreAudio announces nothing. The call still ends.
+@MainActor @Test func aReleaseCoreAudioNeverAnnouncesStillEndsTheCall() {
+    let rig = Rig()
+    rig.refresh(to: 30)
+    rig.holders = []
+    var states: [CallState] = []
+    var t = 30.25
+    while t <= 34 {
+        states.append(rig.service.refresh(at: t0.addingTimeInterval(t), hidden: []).state)
+        t += 0.25
+    }
+    #expect(states.contains(.ended(app: zoom, length: 30)))
 }

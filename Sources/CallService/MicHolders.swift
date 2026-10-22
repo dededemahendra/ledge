@@ -3,11 +3,28 @@ import Foundation
 import os
 
 /// Which processes hold the mic right now (2026-10-22), from CoreAudio's
-/// process objects. Listens rather than polls: to the process list, and to
-/// each process's "running input", re-listening when the list changes.
+/// process objects. Reads again whenever the process list changes or an
+/// input device starts or stops running somewhere — CoreAudio announces
+/// those, but not a process's own "running input", which never notifies
+/// (checked 2026-10-22: a process's running flags stay silent while its
+/// device's flips every time). What neither announces, `CallService`
+/// catches by calling `refresh()` while anything holds the mic.
 /// `holderPIDs` is `nil` when the list can't be read.
+/// Who holds the mic (2026-10-22). A protocol so the service can be tested
+/// on a source that, like CoreAudio, doesn't announce every change.
 @MainActor
-final class MicHolders {
+public protocol MicHolderSource: AnyObject {
+    /// The PIDs holding the mic as last read; `nil` when the list can't be
+    /// read.
+    var holderPIDs: [pid_t]? { get }
+    func start()
+    func stop()
+    /// Reads again now, for what CoreAudio doesn't announce.
+    func refresh()
+}
+
+@MainActor
+final class MicHolders: MicHolderSource {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "call")
     private static let system = AudioObjectID(kAudioObjectSystemObject)
 
@@ -19,39 +36,57 @@ final class MicHolders {
         let block: AudioObjectPropertyListenerBlock
     }
 
-    private(set) var holderPIDs: [pid_t]?
-    private var listListener: InstalledListener?
-    private var processListeners: [InstalledListener] = []
+    /// Nothing until started; `nil` only once a read has failed.
+    /// Nothing until started; `nil` only once a read has failed.
+    private(set) var holderPIDs: [pid_t]? = []
+    private var systemListeners: [InstalledListener] = []
+    private var deviceListeners: [InstalledListener] = []
 
     func start() {
-        guard listListener == nil else { return }
-        listListener = Self.listen(Self.system, Self.address(kAudioHardwarePropertyProcessObjectList)) { [weak self] in
-            self?.relisten()
-        }
-        relisten()
+        guard systemListeners.isEmpty else { return }
+        systemListeners = [
+            Self.listen(Self.system, Self.address(kAudioHardwarePropertyProcessObjectList)) { [weak self] in
+                self?.read()
+            },
+            Self.listen(Self.system, Self.address(kAudioHardwarePropertyDevices)) { [weak self] in
+                self?.relistenToDevices()
+            },
+        ].compactMap { $0 }
+        relistenToDevices()
     }
 
     func stop() {
-        if let listListener { Self.remove(listListener) }
-        listListener = nil
-        processListeners.forEach(Self.remove)
-        processListeners.removeAll()
-        holderPIDs = nil
+        systemListeners.forEach(Self.remove)
+        systemListeners.removeAll()
+        deviceListeners.forEach(Self.remove)
+        deviceListeners.removeAll()
+        holderPIDs = []
     }
 
-    private func relisten() {
-        processListeners.forEach(Self.remove)
-        processListeners.removeAll()
-        guard let processes = Self.processes() else {
-            holderPIDs = nil
-            return
-        }
-        processListeners = processes.compactMap { process in
-            Self.listen(process, Self.address(kAudioProcessPropertyIsRunningInput)) { [weak self] in
-                self?.read()
+    /// One "running somewhere" listener per input device, renewed when a
+    /// device comes or goes (AirPods connecting mid-call).
+    private func relistenToDevices() {
+        deviceListeners.forEach(Self.remove)
+        deviceListeners = Self.inputDevices().compactMap { device in
+            Self.listen(device, Self.address(kAudioDevicePropertyDeviceIsRunningSomewhere)) { [weak self] in
+                self?.readNowAndSoon()
             }
         }
         read()
+    }
+
+    func refresh() { read() }
+
+    /// A device can flip to running a moment before the process taking it
+    /// says so, and that second flip is never announced: read now, and
+    /// again shortly after.
+    private func readNowAndSoon() {
+        read()
+        for delay in [0.3, 1.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                MainActor.assumeIsolated { self?.read() }
+            }
+        }
     }
 
     private func read() {
@@ -88,6 +123,21 @@ final class MicHolders {
         return ids
     }
 
+    private static func inputDevices() -> [AudioObjectID] {
+        var addr = address(kAudioHardwarePropertyDevices)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(system, &addr, 0, nil, &size) == noErr else { return [] }
+        var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(system, &addr, 0, nil, &size, &ids) == noErr else { return [] }
+        return ids.filter { id in
+            var streams = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams,
+                                                     mScope: kAudioObjectPropertyScopeInput,
+                                                     mElement: kAudioObjectPropertyElementMain)
+            var streamSize: UInt32 = 0
+            return AudioObjectGetPropertyDataSize(id, &streams, 0, nil, &streamSize) == noErr && streamSize > 0
+        }
+    }
+
     private static func listen(_ objectID: AudioObjectID, _ address: AudioObjectPropertyAddress,
                                _ action: @escaping @MainActor () -> Void) -> InstalledListener? {
         var addr = address
@@ -105,6 +155,9 @@ final class MicHolders {
     private static func remove(_ listener: InstalledListener) {
         var addr = listener.address
         let status = AudioObjectRemovePropertyListenerBlock(listener.objectID, &addr, DispatchQueue.main, listener.block)
-        if status != noErr { log.error("mic listener removal failed: \(status)") }
+        // A device or process already gone has taken its listener with it.
+        if status != noErr, status != kAudioHardwareBadObjectError {
+            log.error("mic listener removal failed: \(status)")
+        }
     }
 }
