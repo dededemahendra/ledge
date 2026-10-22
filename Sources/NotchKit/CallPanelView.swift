@@ -78,13 +78,13 @@ struct CallPanelView: View {
                         .frame(width: 30, height: 30)
                 }
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(data.appName)
+                    Text(data.meetingTitle ?? data.appName)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(contentColor)
                         .lineLimit(1)
-                    Text(data.isMuted ? "Muted" : "On a call")
+                        .truncationMode(.tail)
+                    status
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(data.isMuted ? Color(nsColor: .systemRed) : contentColor.opacity(0.55))
                         .contentTransition(.opacity)
                 }
             }
@@ -94,24 +94,55 @@ struct CallPanelView: View {
         .animation(reduceMotion ? nil : .snappy, value: data.isMuted)
     }
 
-    /// The mic in use, or why the button can't mute it.
+    /// The call's state in a word, or a meeting's time left (2026-10-22):
+    /// "12m left", "+3m" in red once over, "Muted · " in red before either.
     @ViewBuilder
-    private var micLine: some View {
-        if !data.canMute {
-            Text("This mic can't be muted from here")
-                .font(.system(size: 11))
-                .foregroundStyle(contentColor.opacity(0.55))
+    private var status: some View {
+        let red = Color(nsColor: .systemRed)
+        let quiet = contentColor.opacity(0.55)
+        if let end = data.meetingEnd {
+            TimelineView(.periodic(from: data.since, by: 1)) { context in
+                let left = CallMeetingText.timeLeft(end: end, now: context.date)
+                HStack(spacing: 0) {
+                    if data.isMuted { Text("Muted · ").foregroundStyle(red) }
+                    Text(left.text).foregroundStyle(left.isOver ? red : quiet)
+                }
                 .lineLimit(1)
-        } else if let mic = data.micName {
-            HStack(spacing: 4) {
-                Image(systemName: "mic.fill")
+            }
+        } else {
+            Text(data.isMuted ? "Muted" : "On a call")
+                .foregroundStyle(data.isMuted ? red : quiet)
+        }
+    }
+
+    /// The camera while it is on, then the first that applies: why the
+    /// button can't mute, the next meeting, the mic in use (2026-10-22).
+    private var micLine: some View {
+        HStack(spacing: 6) {
+            if data.isCameraOn {
+                Image(systemName: "video.fill")
                     .font(.system(size: 9, weight: .medium))
-                Text(mic)
+            }
+            if !data.canMute {
+                Text("This mic can't be muted from here")
                     .font(.system(size: 11))
                     .lineLimit(1)
+            } else if let next = data.nextMeeting {
+                Text("Next: \(next)")
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } else if let mic = data.micName {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 9, weight: .medium))
+                    Text(mic)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                }
             }
-            .foregroundStyle(contentColor.opacity(0.55))
         }
+        .foregroundStyle(contentColor.opacity(0.55))
     }
 
     /// Ticks on the call's own whole seconds, so it turns over when the
