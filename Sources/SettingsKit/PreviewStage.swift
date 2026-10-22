@@ -5,6 +5,7 @@ import PowerService
 import DeviceService
 import FocusService
 import UpdateService
+import GitHubService
 
 /// What a strip says under the island (2026-10-22): the option's name,
 /// and why a sample stands in where the user has nothing of their own.
@@ -132,6 +133,28 @@ public enum PreviewStage {
             )], overflow: 0)
             c.setCaption(UpdateNotice.caption(version))
             return caption(scene, sample: content.availableUpdate == nil ? "no update out" : nil)
+        case .githubRunning:
+            c.setActivities([NotchController.ActivityDisplay(
+                id: NotchController.githubRunActivityID, title: "Checks running", compactText: "2:14",
+                tint: .system(GitHubNotice.runningTintName)
+            )], overflow: 0)
+            return caption(scene, sample: "nothing running")
+        case .githubChecks:
+            showGitHub(c, .checksFailed(content.pullRequest ?? GitHubSample.pr))
+            return caption(scene, sample: content.pullRequest == nil ? "not connected" : nil)
+        case .githubReviews:
+            let review = GitHubReview(id: "sample", author: GitHubSample.reviewer, state: .approved, at: nil, url: nil)
+            showGitHub(c, .reviewed(content.pullRequest ?? GitHubSample.pr, review))
+            return caption(scene, sample: content.pullRequest == nil ? "not connected" : nil)
+        case .githubMerges:
+            showGitHub(c, .merged(content.pullRequest ?? GitHubSample.pr))
+            return caption(scene, sample: content.pullRequest == nil ? "not connected" : nil)
+        case .githubRequests:
+            showGitHub(c, .reviewRequested(GitHubSample.request))
+            return caption(scene, sample: "no review requested")
+        case .githubRuns:
+            showGitHub(c, .runPassed(GitHubSample.run))
+            return caption(scene, sample: "no run of yours")
         }
     }
 
@@ -140,6 +163,16 @@ public enum PreviewStage {
             id: NotchController.hudActivityID, title: event.activityTitle, compactText: event.compactText,
             symbolName: event.symbolName, barFill: event.barFill
         )], overflow: 0)
+    }
+
+    /// A GitHub blip as the app shows it, caption and all (2026-10-22).
+    private static func showGitHub(_ c: NotchController, _ event: GitHubEvent) {
+        let blip = GitHubNotice.blip(for: event)
+        c.setActivities([NotchController.ActivityDisplay(
+            id: NotchController.githubActivityID, title: blip.title, compactText: blip.word,
+            symbolName: blip.symbolName, tint: blip.tintName.map { .system($0) }
+        )], overflow: 0)
+        c.setCaption(blip.caption)
     }
 
     /// A meeting or reminder blip at the lead time, its caption under it.

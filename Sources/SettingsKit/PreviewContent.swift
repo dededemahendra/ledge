@@ -1,5 +1,6 @@
 import Foundation
 import NotchKit
+import GitHubService
 
 /// The user's own content for the Settings previews (2026-10-22), every
 /// field optional: `AppModel.previewContent()` fills what the island
@@ -49,13 +50,15 @@ public struct PreviewContent: Sendable, Equatable {
     public var timer: NotchController.ActivityDisplay?
     /// A newer version that is really out, for the update scene.
     public var availableUpdate: String?
+    /// The user's latest open PR, for the GitHub scenes (2026-10-22).
+    public var pullRequest: GitHubPR?
 
     public init(
         media: MediaPresentation? = nil, mediaSource: String? = nil,
         nextEvent: UpcomingEvent? = nil, nextReminder: UpcomingEvent? = nil,
         batteryPercent: Int? = nil, headphones: Headphones? = nil, focus: Focus? = nil,
         volume: Double? = nil, timer: NotchController.ActivityDisplay? = nil,
-        availableUpdate: String? = nil
+        availableUpdate: String? = nil, pullRequest: GitHubPR? = nil
     ) {
         self.media = media
         self.mediaSource = mediaSource
@@ -67,6 +70,7 @@ public struct PreviewContent: Sendable, Equatable {
         self.volume = volume
         self.timer = timer
         self.availableUpdate = availableUpdate
+        self.pullRequest = pullRequest
     }
 }
 
