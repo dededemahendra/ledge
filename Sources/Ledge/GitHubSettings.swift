@@ -45,7 +45,7 @@ struct GitHubSettings: View {
                         get: { wantsToken }, set: { wantsToken = $0 }
                     ))
                 }
-                if model.githubNeedsToken || wantsToken {
+                if model.githubNeedsToken || wantsToken || model.githubStatus == .signInAgain {
                     SettingsRow("Token", detail: "A token with the repo and read:org scopes, from github.com › Settings › Developer settings.",
                                 symbol: "key.fill", color: Color(nsColor: .systemYellow)) {
                         HStack(spacing: 8) {
@@ -107,6 +107,9 @@ struct GitHubConnectionRow: View {
                     Button("Use a token") { wantsToken.wrappedValue = true }
                     Button("Connect") { model.connectGitHub() }
                 } else {
+                    if model.githubSource == .gh, model.githubStatus != .signInAgain, !wantsToken.wrappedValue {
+                        Button("Use a token") { wantsToken.wrappedValue = true }
+                    }
                     if model.githubNeedsToken || model.githubStatus == .signInAgain {
                         Button("Try again") { model.checkGitHubNow() }
                     } else if model.githubStatus != .checking {
