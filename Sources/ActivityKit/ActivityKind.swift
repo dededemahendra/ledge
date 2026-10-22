@@ -14,6 +14,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
     /// physically happening.
     case focus
     case notification
+    /// Something on GitHub (2026-10-22): checks finished, a review, a
+    /// merge, a review request. Under a notification, over the update
+    /// notice.
+    case github
     /// A newer Ledge on GitHub (2026-10-22): once per version, under every
     /// other blip (it waits for nothing) and over a Clock timer.
     case update
@@ -21,6 +25,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
     /// runs, above media (a running timer is what the island is for) and
     /// below every blip, which pre-empts it for its few seconds.
     case timer
+    /// GitHub checks or a run of the user's going now (2026-10-22):
+    /// sticky while anything runs, under a Clock timer (the user's own
+    /// doing), over an iPhone Live Activity.
+    case githubRun
     /// An iPhone Live Activity (2026-10-01): sticky while its pill
     /// shows, above media — the phone's island too gives a new activity
     /// the stage and minimises Now Playing — and below a Clock timer,
@@ -41,8 +49,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .calendar:     return 70
         case .focus:        return 45
         case .notification: return 40
+        case .github:       return 38
         case .update:       return 35
         case .timer:        return 20
+        case .githubRun:    return 18
         case .liveActivity: return 15
         case .media:        return 10
         case .charging:     return 5
@@ -58,8 +68,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .calendar:     return 8       // a title and a time take longer to read than "42%"
         case .focus:        return 3
         case .notification: return 5
+        case .github:       return 8       // a word and a line to read
         case .update:       return 8       // a version and a line to read
         case .timer:        return nil
+        case .githubRun:    return nil
         case .liveActivity: return nil
         case .media:        return nil
         case .charging:     return nil

@@ -783,6 +783,11 @@ public struct NotchRootView: View {
                     NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion),
                     value: activity.title
                 )
+        } else if let activity = controller.activities.first, activity.id == NotchController.githubRunActivityID {
+            // GitHub checks or a run going (2026-10-22): an amber arc
+            // turning, the count of what runs on it.
+            GitHubRunRing(color: tintColor(for: activity.tint) ?? contentColor, count: activity.badge,
+                          reduceMotion: controller.reduceMotion)
         } else if let activity = controller.activities.first, activity.id == NotchController.timerActivityID,
                   let fill = activity.barFill {
             // A running countdown (2026-09-29): a ring emptying clockwise
@@ -1138,8 +1143,10 @@ public struct NotchRootView: View {
                 // Only the Clock's timer colours its digits (orange end to
                 // end, as on the phone); every other tinted record — the
                 // charging battery, say — keeps its figure white.
-                let isTimer = activity.id == NotchController.timerActivityID
-                compactValue(compact, bump: !isTimer, color: isTimer ? tintColor(for: activity.tint) : nil)
+                // …and the GitHub running item's clock, amber (2026-10-22).
+                let isTicking = activity.id == NotchController.timerActivityID
+                    || activity.id == NotchController.githubRunActivityID
+                compactValue(compact, bump: !isTicking, color: isTicking ? tintColor(for: activity.tint) : nil)
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {
@@ -1243,6 +1250,15 @@ public struct NotchRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .id("calendar")
+            .transition(panelTransition)
+        } else if controller.state == .expanded, controller.panel == .github, let data = controller.githubPanel {
+            // The GitHub panel (2026-10-22).
+            GitHubPanelView(
+                data: data, contentColor: contentColor,
+                reduceMotion: controller.reduceMotion, emit: { controller.emit($0) }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .id("github")
             .transition(panelTransition)
         } else if controller.state == .expanded, let media = controller.media {
             MediaPanelView(

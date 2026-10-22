@@ -157,3 +157,17 @@ private func record(
     #expect(ActivityKind.update.defaultTTL == 8)
     #expect(ActivityKind.update < .notification && ActivityKind.update > .timer)
 }
+
+@Test func gitHubBlipsAndTheRunningItemSitWhereTheSpecSays() {
+    #expect(ActivityKind.github.priority == 38)
+    #expect(ActivityKind.github.defaultTTL == 8)
+    #expect(ActivityKind.github < .notification && ActivityKind.github > .update)
+    #expect(ActivityKind.githubRun.priority == 18)
+    #expect(ActivityKind.githubRun.defaultTTL == nil, "sticky while anything runs")
+    #expect(ActivityKind.githubRun < .timer && ActivityKind.githubRun > .liveActivity)
+}
+
+@Test func aRecordCarriesItsBadge() {
+    let record = ActivityRecord(id: "github-run", kind: .githubRun, insertedAt: Date(), ttl: nil, title: "Checks running", badge: 2)
+    #expect(record.badge == 2)
+}

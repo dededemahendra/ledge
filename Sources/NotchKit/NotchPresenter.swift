@@ -446,6 +446,13 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    /// The GitHub panel (2026-10-22); can open or close the card.
+    public func setGitHubPanel(_ data: GitHubPanelData?) {
+        guard data != controller.githubPanel else { return }
+        controller.setGitHubPanel(data)
+        syncWindowToVisibility()
+    }
+
     /// A song-change caption (`NotchController.caption`) grows the island,
     /// so it goes through the presenter for the window resync.
     public func setCaption(_ caption: String?) {
