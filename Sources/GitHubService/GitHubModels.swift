@@ -6,6 +6,12 @@ public enum CheckState: String, Sendable, Equatable {
     case pending, passed, failed
 }
 
+/// One check's state on a PR's latest commit (2026-10-22): a segment of
+/// the island's ring and the panel's bar.
+public enum CheckSegment: String, Sendable, Equatable {
+    case passed, failed, running
+}
+
 /// The checks on a PR's latest commit: Actions and outside statuses alike.
 public struct GitHubChecks: Sendable, Equatable {
     public let state: CheckState
@@ -14,12 +20,16 @@ public struct GitHubChecks: Sendable, Equatable {
     /// The first failing check, by name, and where it is.
     public let failedName: String?
     public let failedURL: URL?
+    /// Every check, finished first: passed, failed, then still going (2026-10-22).
+    public let segments: [CheckSegment]
 
-    public init(state: CheckState, startedAt: Date? = nil, failedName: String? = nil, failedURL: URL? = nil) {
+    public init(state: CheckState, startedAt: Date? = nil, failedName: String? = nil, failedURL: URL? = nil,
+                segments: [CheckSegment] = []) {
         self.state = state
         self.startedAt = startedAt
         self.failedName = failedName
         self.failedURL = failedURL
+        self.segments = segments
     }
 }
 
@@ -35,13 +45,16 @@ public struct GitHubReview: Sendable, Equatable {
     public let state: ReviewState
     public let at: Date?
     public let url: URL?
+    /// Their picture on GitHub's image server (2026-10-22).
+    public let avatarURL: URL?
 
-    public init(id: String, author: String, state: ReviewState, at: Date?, url: URL?) {
+    public init(id: String, author: String, state: ReviewState, at: Date?, url: URL?, avatarURL: URL? = nil) {
         self.id = id
         self.author = author
         self.state = state
         self.at = at
         self.url = url
+        self.avatarURL = avatarURL
     }
 }
 
@@ -50,12 +63,15 @@ public struct GitHubComment: Sendable, Equatable {
     public let author: String
     public let at: Date?
     public let url: URL?
+    /// Their picture on GitHub's image server (2026-10-22).
+    public let avatarURL: URL?
 
-    public init(id: String, author: String, at: Date?, url: URL?) {
+    public init(id: String, author: String, at: Date?, url: URL?, avatarURL: URL? = nil) {
         self.id = id
         self.author = author
         self.at = at
         self.url = url
+        self.avatarURL = avatarURL
     }
 }
 
@@ -70,6 +86,8 @@ public struct GitHubPR: Sendable, Equatable, Identifiable {
     /// The repository's short name, "ledge".
     public let repo: String
     public let author: String?
+    /// The author's picture (2026-10-22).
+    public let authorAvatarURL: URL?
     public let headSHA: String?
     public let checks: GitHubChecks?
     /// The last ten, oldest first.
@@ -77,6 +95,7 @@ public struct GitHubPR: Sendable, Equatable, Identifiable {
     public let comments: [GitHubComment]
 
     public init(id: String, number: Int, title: String, url: URL, repo: String, author: String? = nil,
+                authorAvatarURL: URL? = nil,
                 headSHA: String? = nil, checks: GitHubChecks? = nil,
                 reviews: [GitHubReview] = [], comments: [GitHubComment] = []) {
         self.id = id
@@ -85,6 +104,7 @@ public struct GitHubPR: Sendable, Equatable, Identifiable {
         self.url = url
         self.repo = repo
         self.author = author
+        self.authorAvatarURL = authorAvatarURL
         self.headSHA = headSHA
         self.checks = checks
         self.reviews = reviews
@@ -128,11 +148,14 @@ public struct GitHubDeparture: Sendable, Equatable {
     public let pr: GitHubPR
     public let merged: Bool
     public let by: String?
+    /// Their picture (2026-10-22).
+    public let byAvatarURL: URL?
 
-    public init(pr: GitHubPR, merged: Bool, by: String?) {
+    public init(pr: GitHubPR, merged: Bool, by: String?, byAvatarURL: URL? = nil) {
         self.pr = pr
         self.merged = merged
         self.by = by
+        self.byAvatarURL = byAvatarURL
     }
 }
 
@@ -153,10 +176,12 @@ public struct GitHubSnapshot: Sendable, Equatable {
     /// GitHub left some organisations out: the token is not authorised for
     /// their single sign-on.
     public let hidesSomeOrganisations: Bool
+    /// The user's own picture, for Settings (2026-10-22).
+    public let avatarURL: URL?
 
     public init(login: String, takenAt: Date, mine: [GitHubPR] = [], mineTotal: Int? = nil,
                 requested: [GitHubPR] = [], requestedTotal: Int? = nil, runs: [GitHubRun] = [],
-                departed: [GitHubDeparture] = [], hidesSomeOrganisations: Bool = false) {
+                departed: [GitHubDeparture] = [], hidesSomeOrganisations: Bool = false, avatarURL: URL? = nil) {
         self.login = login
         self.takenAt = takenAt
         self.mine = mine
@@ -166,5 +191,6 @@ public struct GitHubSnapshot: Sendable, Equatable {
         self.runs = runs
         self.departed = departed
         self.hidesSomeOrganisations = hidesSomeOrganisations
+        self.avatarURL = avatarURL
     }
 }
