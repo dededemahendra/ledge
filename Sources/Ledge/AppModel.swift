@@ -214,6 +214,8 @@ final class AppModel {
         pruneTimer = nil
         updateTimers.forEach { $0.invalidate() }
         updateTimers.removeAll()
+        checkTask?.cancel()
+        checkTask = nil
         clearMediaTask?.cancel()
         clearMediaTask = nil
         hud.stop()
@@ -236,6 +238,7 @@ final class AppModel {
     private(set) var updateStatus: UpdateStatus = .notChecked
     var hasUpdate: Bool { if case .available = updateStatus { true } else { false } }
     private var updateTimers: [Timer] = []
+    private var checkTask: Task<Void, Never>?
     /// Found while locked: shown at the first tick after unlock.
     private var pendingUpdate: ReleaseInfo?
     private static let lastAnnouncedKey = "lastAnnouncedUpdate"
@@ -249,13 +252,20 @@ final class AppModel {
             updateStatus = .off
             return
         }
+        // One check at a time (2026-10-22): a timer firing during a manual
+        // check would otherwise announce the same version twice.
+        guard checkTask == nil else { return }
         updateStatus = .checking
         let checker = UpdateChecker(currentVersion: version ?? Self.runningVersion)
         let lastAnnounced = version == nil
             ? UserDefaults.standard.string(forKey: Self.lastAnnouncedKey).flatMap(AppVersion.init) : nil
-        Task { @MainActor [weak self] in
+        checkTask = Task { @MainActor [weak self] in
             let finding = await checker.check(lastAnnounced: lastAnnounced)
-            self?.apply(finding, remember: version == nil)
+            guard let self else { return }
+            self.checkTask = nil
+            // Switched off while asking: the answer is dropped (2026-10-22).
+            guard !Task.isCancelled, self.settings.checksForUpdates || version != nil else { return }
+            self.apply(finding, remember: version == nil)
         }
     }
 
@@ -371,6 +381,8 @@ final class AppModel {
         calendar.setDisabledCalendars(settings.disabledCalendarIDs)
         LoginItem.setEnabled(settings.launchAtLogin)
         if !settings.checksForUpdates {
+            checkTask?.cancel()
+            checkTask = nil
             updateStatus = .off
         } else if updateStatus == .off {
             checkForUpdates()
