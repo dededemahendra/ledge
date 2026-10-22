@@ -13,6 +13,7 @@ import LiveActivityService
 import SettingsKit
 import UpdateService
 import GitHubService
+import CallService
 import LedgeSettings
 import OSLog
 
@@ -31,6 +32,7 @@ final class AppModel {
     private let calendar = CalendarService()
     private let focus = FocusService()
     private let liveActivities = LiveActivityService()
+    private let call = CallService()
     private let favorites = MusicFavorites()
 
     private var queue = ActivityQueue()
@@ -75,6 +77,7 @@ final class AppModel {
         note("Devices", device.availability)
         note("Calendar", calendar.availability)
         note("Focus", focus.availability)
+        if settings.showsCalls { note("Calls", call.availability) }
         if let login = LoginItem.issue {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
@@ -188,6 +191,7 @@ final class AppModel {
                 self?.prune()
                 self?.refreshUpcoming()
                 self?.refreshTimer()
+                self?.refreshCall()
                 self?.refreshCharging()
                 self?.refreshLiveActivityOnHover()
                 self?.showPendingUpdate()
@@ -230,6 +234,7 @@ final class AppModel {
         githubConnecting?.cancel()
         githubConnecting = nil
         github.stop()
+        call.stop()
         clearMediaTask?.cancel()
         clearMediaTask = nil
         hud.stop()
@@ -778,6 +783,20 @@ final class AppModel {
     /// else is a `guard` where the event lands.
     private func applySettings() {
         hud.setSuppressStockOSD(settings.showsVolumeBrightness)
+        // Calls (2026-10-22): off undoes any mute Ledge applied and takes the
+        // pill away at once, with no ended moment.
+        if settings.showsCalls {
+            call.start()
+        } else {
+            call.stop()
+            if queue.ordered.contains(where: { $0.kind == .call }) {
+                queue.remove(kind: .call)
+                publish()
+            }
+            callShown = nil
+            callLiveApp = nil
+            presenter.setCallPanel(nil)
+        }
         liveActivities.setEnabled(settings.showsLiveActivities)
         if !settings.showsLiveActivities, queue.ordered.contains(where: { $0.kind == .liveActivity }) {
             queue.remove(kind: .liveActivity)
@@ -1169,6 +1188,11 @@ final class AppModel {
     /// deep link — the item's app. `ledge://calendar|reminders` are this
     /// model's own stand-ins for "the app", never handed to the system.
     private func open(_ url: URL) {
+        // The call's app (2026-10-22): a stand-in, never handed to the system.
+        if url.scheme == "ledge", url.host() == "call" {
+            if let app = callLiveApp { activateApp(bundleID: app.bundleID, pid: app.pid) }
+            return
+        }
         if url.scheme == "ledge", url.host() == "live-activity" {
             liveActivities.press()
             return
@@ -1255,6 +1279,71 @@ final class AppModel {
     /// ten minutes" lands here without touching this app. A click opens
     /// the Clock on the matching tab.
     private var timerShown: ActivityRecord?
+
+    /// The live call's record as last published, the app on the mic, and
+    /// each app's icon as PNG (2026-10-22).
+    private var callShown: ActivityRecord?
+    private var callLiveApp: CallAppInfo?
+    private var callIcons: [String: Data] = [:]
+
+    /// Calls (2026-10-22): the app on the mic and its clock while the call
+    /// lasts, a red crossed-out mic when muted, a red hang-up and the
+    /// length for 3 s when it ends. Republished only when what shows
+    /// changes. Never logs which app or how long.
+    private func refreshCall() {
+        guard settings.showsCalls else { return }
+        let now = Date()
+        let update = call.refresh(at: now, hidden: Set(settings.hiddenCallApps))
+        switch update.state {
+        case .live(let app, let since):
+            let icon = callIcon(for: app)
+            callLiveApp = app
+            presenter.setCallPanel(CallPanelData(appName: app.name, icon: icon, since: since, isMuted: update.isMuted,
+                                                 canMute: update.canMute, micName: update.micName))
+            let record = ActivityRecord(
+                id: NotchController.callActivityID, kind: .call, insertedAt: callShown?.insertedAt ?? now, ttl: nil,
+                title: "On a call · \(app.name)",
+                compactText: TimerText.format(seconds: now.timeIntervalSince(since).rounded(.down)),
+                symbolName: update.isMuted ? "mic.slash.fill" : "mic.fill",
+                artwork: icon, tint: .positive, url: URL(string: "ledge://call")
+            )
+            guard record.title != callShown?.title || record.compactText != callShown?.compactText
+                    || record.symbolName != callShown?.symbolName else { return }
+            callShown = record
+            queue.insert(record)
+            publish()
+        case .ended(let app, let length):
+            callShown = nil
+            callLiveApp = nil
+            presenter.setCallPanel(nil)
+            queue.insert(ActivityRecord(
+                id: NotchController.callActivityID, kind: .call, insertedAt: now, ttl: 3,
+                title: "Call ended · \(app.name)",
+                compactText: TimerText.format(seconds: length.rounded(.down)),
+                symbolName: "phone.down.fill"
+            ))
+            publish()
+        case .idle:
+            // An ended moment runs out on its own; only a live call is taken
+            // away here (hidden, or Calls unable to read the mic).
+            guard callShown != nil else { return }
+            callShown = nil
+            callLiveApp = nil
+            presenter.setCallPanel(nil)
+            queue.remove(kind: .call)
+            publish()
+        }
+    }
+
+    private func callIcon(for app: CallAppInfo) -> Data? {
+        if let cached = callIcons[app.bundleID] { return cached }
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) else { return nil }
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        icon.size = NSSize(width: 64, height: 64)
+        let png = icon.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
+        callIcons[app.bundleID] = png
+        return png
+    }
     private let clock = ClockTimerObserver()
     private var clockOddities: [String] = []
 
@@ -1338,7 +1427,11 @@ final class AppModel {
         case .selectOutput(let id): device.setDefaultOutput(uid: id)
         case .openSource:           openSourceApp()
         case .toggleFavorite:       favorites.toggle()
-        case .toggleMute, .hideCallApp: break
+        case .toggleMute:           call.toggleMute()
+        case .hideCallApp:
+            // The next refresh hands over to another app on the mic or ends
+            // the call quietly, and the service undoes Ledge's mute.
+            if let app = callLiveApp { settings.hideCallApp(app.bundleID) }
         case .seek(let fraction):
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.
@@ -1405,23 +1498,26 @@ final class AppModel {
         presenter.setCaption(nil)
     }
 
-    /// Brings the app that is playing to the front. LaunchServices first
-    /// (`openApplication(at:)` with `activates`), keyed by bundle id: it
-    /// works from a background agent like this one, where macOS 14's
-    /// cooperative activation would refuse a bare
+    /// Brings the app that is playing to the front.
+    private func openSourceApp() {
+        activateApp(bundleID: mediaPayload.bundleIdentifier, pid: mediaPayload.processIdentifier.map { pid_t($0) })
+    }
+
+    /// Brings an app to the front: the one playing, or the one on a call.
+    /// LaunchServices first (`openApplication(at:)` with `activates`), keyed
+    /// by bundle id: it works from a background agent like this one, where
+    /// macOS 14's cooperative activation would refuse a bare
     /// `NSRunningApplication.activate()` because Ledge is never the active
     /// app itself. The pid path is the fallback for a running app that
     /// LaunchServices cannot locate by bundle id (an unbundled binary).
-    private func openSourceApp() {
-        if let bundleID = mediaPayload.bundleIdentifier,
-           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+    private func activateApp(bundleID: String?, pid: pid_t?) {
+        if let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.activates = true
             NSWorkspace.shared.openApplication(at: url, configuration: configuration)
             return
         }
-        if let pid = mediaPayload.processIdentifier,
-           let app = NSRunningApplication(processIdentifier: pid_t(pid)) {
+        if let pid, let app = NSRunningApplication(processIdentifier: pid) {
             app.activate()
         }
     }
@@ -1541,6 +1637,12 @@ final class AppModel {
         }
         if !focus.availability.isAvailable { queue.remove(kind: .focus) }
         if !liveActivities.availability.isAvailable { queue.remove(kind: .liveActivity) }
+        if !call.availability.isAvailable {
+            queue.remove(kind: .call)
+            callShown = nil
+            callLiveApp = nil
+            presenter.setCallPanel(nil)
+        }
         if !power.availability.isAvailable { queue.remove(kind: .charging) }
         if !media.availability.isAvailable {
             queue.remove(kind: .media)
