@@ -43,6 +43,13 @@ public final class CallService {
     private var changes: [MuteChange] = [] {
         didSet { save() }
     }
+    /// Ledge's changes on devices that were gone when they were due to be
+    /// undone (a headset unplugged while muted), undone when they return.
+    private var owed: [MuteChange] = [] {
+        didSet { save() }
+    }
+    private var lastIdleRead = Date.distantPast
+    private var lastOwedTry = Date.distantPast
 
     public init(holders: MicHolderSource? = nil, devices: InputDeviceIO = CoreAudioInputDevices(),
                 lookup: ProcessLookup = .live, defaults: UserDefaults = .standard, ownPID: pid_t = getpid()) {
@@ -67,11 +74,22 @@ public final class CallService {
     }
 
     public func refresh(at now: Date, hidden: Set<String>) -> CallUpdate {
-        // While anything holds the mic, read again each time: CoreAudio
-        // doesn't announce an app letting go when its process stays (a
-        // browser tab closing), nor one leaving while another keeps the mic
-        // running. Idle, the source's own notifications are enough.
-        if holders.holderPIDs?.isEmpty == false { holders.refresh() }
+        // Read again each time while a call is on (its grace included),
+        // while anything holds the mic, or while the list couldn't be read:
+        // CoreAudio doesn't announce an app letting go when its process
+        // stays (a browser tab closing), nor one coming back on a mic that
+        // is already running. Idle, once a second while a mic runs, since a
+        // call can start on it unannounced; else notifications are enough.
+        if isLive || holders.holderPIDs?.isEmpty != true {
+            holders.refresh()
+        } else if holders.isMicRunning, now.timeIntervalSince(lastIdleRead) >= 1 {
+            lastIdleRead = now
+            holders.refresh()
+        }
+        if !owed.isEmpty, now.timeIntervalSince(lastOwedTry) >= 1 {
+            lastOwedTry = now
+            settleOwed()
+        }
         guard let pids = holders.holderPIDs else {
             availability = .unavailable(reason: "can't read which apps use the microphone")
             if isLive { restoreMute() }
@@ -91,13 +109,14 @@ public final class CallService {
         isLive = live
         guard live else { return CallUpdate(state: state, isMuted: false, canMute: false, micName: nil) }
 
-        var states = devices.states()
+        var states = micStates()
         if wantsMute {
             // A mic that starts while muted (AirPods connecting) is muted too.
+            // One unmuted elsewhere stays as the user left it.
             let plan = InputMutePlan.mute(states, changes: changes)
             if !plan.actions.isEmpty {
                 devices.perform(plan.actions)
-                states = devices.states()
+                states = micStates()
             }
             if plan.changes != changes { changes = plan.changes }
         }
@@ -106,7 +125,12 @@ public final class CallService {
     }
 
     public func toggleMute() {
-        let states = devices.states()
+        // Plan against what still stands: a mute undone elsewhere is no
+        // longer Ledge's to skip.
+        let all = devices.states()
+        owed += InputMutePlan.absent(all, changes: changes)
+        changes = InputMutePlan.stillHeld(all, changes: changes)
+        let states = micStates(all)
         if InputMutePlan.isMuted(states, changes: changes) {
             devices.perform(InputMutePlan.unmute(states, changes: changes))
             changes = []
@@ -119,26 +143,51 @@ public final class CallService {
         }
     }
 
+    /// The input devices, with "running" narrowed to the mics the holders
+    /// actually use when CoreAudio says which: a headset only playing the
+    /// call's sound is not the call's mic.
+    private func micStates(_ all: [InputDeviceState]? = nil) -> [InputDeviceState] {
+        let all = all ?? devices.states()
+        let used = holders.inputDeviceUIDs
+        guard !used.isEmpty else { return all }
+        return all.map { device in
+            InputDeviceState(uid: device.uid, name: device.name, isRunning: device.isRunning && used.contains(device.uid),
+                             canMute: device.canMute, isMuted: device.isMuted, canSetVolume: device.canSetVolume,
+                             volume: device.volume)
+        }
+    }
+
     private func restoreMute() {
         if !changes.isEmpty {
-            devices.perform(InputMutePlan.restore(devices.states(), changes: changes))
+            let states = devices.states()
+            devices.perform(InputMutePlan.restore(states, changes: changes))
+            owed += InputMutePlan.absent(states, changes: changes)
             changes = []
         }
         wantsMute = false
     }
 
-    private func restoreSavedRecord() {
-        guard changes.isEmpty, let data = defaults.data(forKey: Self.recordKey) else { return }
-        if let saved = try? JSONDecoder().decode([MuteChange].self, from: data) {
-            devices.perform(InputMutePlan.restore(devices.states(), changes: saved))
-        }
-        defaults.removeObject(forKey: Self.recordKey)
+    /// Undoes what is owed on the devices that are back; keeps the rest.
+    private func settleOwed() {
+        let states = devices.states()
+        devices.perform(InputMutePlan.restore(states, changes: owed))
+        owed = InputMutePlan.absent(states, changes: owed)
     }
 
+    private func restoreSavedRecord() {
+        guard changes.isEmpty, owed.isEmpty, let data = defaults.data(forKey: Self.recordKey) else { return }
+        defaults.removeObject(forKey: Self.recordKey)
+        guard let saved = try? JSONDecoder().decode([MuteChange].self, from: data) else { return }
+        owed = saved
+        settleOwed()
+    }
+
+    /// The record holds both what Ledge has changed and what it still owes.
     private func save() {
-        if changes.isEmpty {
+        let record = changes + owed
+        if record.isEmpty {
             defaults.removeObject(forKey: Self.recordKey)
-        } else if let data = try? JSONEncoder().encode(changes) {
+        } else if let data = try? JSONEncoder().encode(record) {
             defaults.set(data, forKey: Self.recordKey)
         }
     }

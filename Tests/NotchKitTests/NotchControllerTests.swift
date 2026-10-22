@@ -1213,3 +1213,19 @@ private func callDisplay(artwork: Data? = nil) -> NotchController.ActivityDispla
     #expect(c.metrics.callCard.width == c.metrics.expanded.width)
     #expect(!c.earsShowAboveCard)
 }
+
+/// The island pulses for a call's ended moment only — not for a hand-over
+/// to another app, nor the call coming back after a blip (review,
+/// 2026-10-22; the user has turned down extra motion before).
+@MainActor
+@Test func theCallPulsesOnlyWhenItEnds() {
+    let c = makeController()
+    c.setActivities([callDisplay()], overflow: 0)
+    let before = c.blipPulse
+    c.setActivities([.init(id: NotchController.callActivityID, title: "On a call · FaceTime", compactText: "12:04",
+                           symbolName: "mic.fill", tint: .positive)], overflow: 0)
+    #expect(c.blipPulse == before, "a hand-over")
+    c.setActivities([.init(id: NotchController.callActivityID, title: "Call ended · FaceTime", compactText: "12:04",
+                           symbolName: "phone.down.fill")], overflow: 0)
+    #expect(c.blipPulse == before + 1, "the ended moment")
+}

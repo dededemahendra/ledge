@@ -95,12 +95,32 @@ public enum InputMutePlan {
 
     public static func isMuted(_ devices: [InputDeviceState], changes: [MuteChange]) -> Bool {
         let running = devices.filter(\.isRunning)
+        // Read back from the device: a volume Ledge zeroed counts only while
+        // it is still zero (turned back up elsewhere, the mic is live).
         return !running.isEmpty && running.allSatisfy { device in
-            device.isMuted || changes.contains { change in
+            device.isMuted || (device.volume == 0 && changes.contains { change in
                 if case .volume = change.kind { return change.uid == device.uid }
                 return false
+            })
+        }
+    }
+
+    /// Ledge's changes that still stand: the device is still muted, or its
+    /// volume still zero. One undone elsewhere is Ledge's no longer.
+    public static func stillHeld(_ devices: [InputDeviceState], changes: [MuteChange]) -> [MuteChange] {
+        changes.filter { change in
+            guard let device = devices.first(where: { $0.uid == change.uid }) else { return false }
+            switch change.kind {
+            case .mute: return device.isMuted
+            case .volume: return device.volume == 0
             }
         }
+    }
+
+    /// Changes on devices that aren't there (a headset unplugged), still
+    /// owed a restore when they come back.
+    public static func absent(_ devices: [InputDeviceState], changes: [MuteChange]) -> [MuteChange] {
+        changes.filter { change in !devices.contains { $0.uid == change.uid } }
     }
 
     public static func canMute(_ devices: [InputDeviceState]) -> Bool {

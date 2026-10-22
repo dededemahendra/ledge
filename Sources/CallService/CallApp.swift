@@ -24,12 +24,24 @@ public struct ProcessLookup {
     /// The process macOS holds responsible for this one, if any.
     public var responsiblePID: (pid_t) -> pid_t?
     public var parentPID: (pid_t) -> pid_t?
+    /// Whether the process runs from inside a bundle (an app, an XPC
+    /// service, an extension) — a helper of some app — rather than a bare
+    /// executable such as a command-line tool.
+    public var isBundled: (pid_t) -> Bool
+    public var executableName: (pid_t) -> String?
+    /// A running app by bundle id.
+    public var runningApp: (String) -> CallAppInfo?
 
     public init(regularApp: @escaping (pid_t) -> CallAppInfo?, responsiblePID: @escaping (pid_t) -> pid_t?,
-                parentPID: @escaping (pid_t) -> pid_t?) {
+                parentPID: @escaping (pid_t) -> pid_t?, isBundled: @escaping (pid_t) -> Bool = { _ in true },
+                executableName: @escaping (pid_t) -> String? = { _ in nil },
+                runningApp: @escaping (String) -> CallAppInfo? = { _ in nil }) {
         self.regularApp = regularApp
         self.responsiblePID = responsiblePID
         self.parentPID = parentPID
+        self.isBundled = isBundled
+        self.executableName = executableName
+        self.runningApp = runningApp
     }
 
     public static let live = ProcessLookup(
@@ -47,8 +59,26 @@ public struct ProcessLookup {
             let size = Int32(MemoryLayout<proc_bsdinfo>.size)
             guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
             return pid_t(info.pbi_ppid)
+        },
+        isBundled: { pid in
+            guard let path = executablePath(pid) else { return false }
+            return [".app/Contents/", ".xpc/Contents/", ".appex/Contents/"].contains { path.contains($0) }
+        },
+        executableName: { pid in
+            executablePath(pid).map { URL(fileURLWithPath: $0).lastPathComponent }
+        },
+        runningApp: { bundleID in
+            guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
+                  let name = app.localizedName else { return nil }
+            return CallAppInfo(bundleID: bundleID, name: name, pid: app.processIdentifier)
         }
     )
+
+    private static func executablePath(_ pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
 }
 
 /// The private call Activity Monitor relies on to group a helper under its
@@ -64,12 +94,24 @@ public enum CallApp {
     /// How far up the parents to look; a cycle or a deep tree gives up.
     static let maxHops = 10
 
+    /// System daemons that carry an app's calls, by executable name: the
+    /// app to show for them. FaceTime's audio (and an iPhone call relayed
+    /// to the Mac) runs in `avconferenced`, launchd's child and its own
+    /// responsible process (review, 2026-10-22).
+    static let callDaemons = ["avconferenced": (bundleID: "com.apple.FaceTime", name: "FaceTime")]
+
     public static func resolve(_ pid: pid_t, ownPID: pid_t, lookup: ProcessLookup) -> CallAppInfo? {
         func regular(_ pid: pid_t) -> CallAppInfo? {
             pid == ownPID ? nil : lookup.regularApp(pid)
         }
         guard pid != ownPID else { return nil }
         if let app = regular(pid) { return app }
+        if let name = lookup.executableName(pid), let daemon = callDaemons[name] {
+            return lookup.runningApp(daemon.bundleID) ?? CallAppInfo(bundleID: daemon.bundleID, name: daemon.name, pid: pid)
+        }
+        // A bare executable — a command-line tool — is no app's helper, even
+        // though the terminal it was started from is responsible for it.
+        guard lookup.isBundled(pid) else { return nil }
         if let responsible = lookup.responsiblePID(pid), responsible != pid, let app = regular(responsible) {
             return app
         }

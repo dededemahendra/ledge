@@ -25,6 +25,14 @@ private final class FakeDevices: InputDeviceIO {
 
     func device(_ uid: String) -> InputDeviceState { devices.first { $0.uid == uid }! }
 
+    func unplug(_ uid: String) -> InputDeviceState {
+        let gone = device(uid)
+        devices.removeAll { $0.uid == uid }
+        return gone
+    }
+
+    func plug(_ device: InputDeviceState) { devices.append(device) }
+
     func setRunning(_ uid: String, _ running: Bool) {
         update(uid, running: running) { (muted: $0.isMuted, volume: $0.volume) }
     }
@@ -53,6 +61,8 @@ private func mic(_ uid: String, name: String = "MacBook Pro Microphone", running
 private final class FakeHolders: MicHolderSource {
     var truth: [pid_t]?
     private(set) var holderPIDs: [pid_t]?
+    var isMicRunning = false
+    var inputDeviceUIDs: Set<String> = []
     init(_ pids: [pid_t]?) { truth = pids; holderPIDs = pids }
     func start() {}
     func stop() {}
@@ -65,7 +75,7 @@ private final class FakeHolders: MicHolderSource {
 /// mic without announcing it.
 @MainActor
 private final class Rig {
-    let source = FakeHolders([100])
+    let source: FakeHolders
     var holders: [pid_t]? {
         get { source.truth }
         set { source.truth = newValue }
@@ -80,7 +90,10 @@ private final class Rig {
         ownPID: 9
     )
 
-    init(_ devices: [InputDeviceState] = [mic("a")]) { self.devices = FakeDevices(devices) }
+    init(_ devices: [InputDeviceState] = [mic("a")], holders: [pid_t]? = [100]) {
+        self.devices = FakeDevices(devices)
+        self.source = FakeHolders(holders)
+    }
 
     /// Refreshes every quarter second over `seconds` after `t0`, returning
     /// the last update.
@@ -199,4 +212,74 @@ private final class Rig {
         t += 0.25
     }
     #expect(states.contains(.ended(app: zoom, length: 30)))
+}
+
+/// One read landing in a mic switch's gap must not stop the re-reads: the
+/// app comes back on a device that is already running, unannounced
+/// (review, 2026-10-22).
+@MainActor @Test func aGapReadMidCallDoesNotEndIt() {
+    let rig = Rig()
+    rig.refresh(to: 10)
+    rig.holders = []
+    rig.source.announce()
+    _ = rig.service.refresh(at: t0.addingTimeInterval(10.25), hidden: [])
+    rig.holders = [100]
+    var states: [CallState] = []
+    var t = 10.5
+    while t <= 16 {
+        states.append(rig.service.refresh(at: t0.addingTimeInterval(t), hidden: []).state)
+        t += 0.25
+    }
+    #expect(states.allSatisfy { $0 == .live(app: zoom, since: t0) })
+}
+
+/// Joining a call on a headset already playing audio: the mic was running,
+/// so nothing is announced; the call still shows.
+@MainActor @Test func aCallOnAMicAlreadyRunningIsSeen() {
+    let rig = Rig(holders: [])
+    rig.source.isMicRunning = true
+    rig.holders = [100]
+    #expect(rig.refresh(to: 3).state == .live(app: zoom, since: t0))
+}
+
+/// Muted from the card, unmuted from System Settings: the card's button
+/// mutes again rather than doing nothing.
+@MainActor @Test func muteWorksAgainAfterAnOutsideUnmute() {
+    let rig = Rig()
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    rig.devices.perform([.setMute(uid: "a", false)])
+    #expect(!rig.refresh(from: 2.25, to: 2.25).isMuted)
+    rig.service.toggleMute()
+    #expect(rig.devices.device("a").isMuted)
+}
+
+/// A headset muted from the card and unplugged before the call ends is
+/// unmuted when it comes back, not left muted for the next call.
+@MainActor @Test func aMuteOnAnAbsentDeviceIsRestoredWhenItReturns() {
+    let rig = Rig([mic("a"), mic("b")])
+    rig.refresh(to: 10)
+    rig.service.toggleMute()
+    let headset = rig.devices.unplug("b")
+    rig.holders = []
+    rig.refresh(from: 10.25, to: 14)
+    #expect(rig.savedRecord != nil, "the headset's mute is still owed")
+    rig.devices.plug(headset)
+    rig.refresh(from: 14.25, to: 16)
+    #expect(!rig.devices.device("b").isMuted)
+    #expect(rig.savedRecord == nil)
+}
+
+/// A headset only playing the call's sound is not the call's mic: muting
+/// the mic that is used reads as muted.
+@MainActor @Test func anOutputOnlyHeadsetIsNotTheCallsMic() {
+    let rig = Rig([mic("a", name: "MacBook Air Microphone"),
+                   InputDeviceState(uid: "h", name: "Headset", isRunning: true, canMute: false, isMuted: false,
+                                    canSetVolume: false, volume: 0.5)])
+    rig.source.inputDeviceUIDs = ["a"]
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    let update = rig.refresh(from: 2.25, to: 2.25)
+    #expect(update.isMuted)
+    #expect(update.micName == "MacBook Air Microphone")
 }

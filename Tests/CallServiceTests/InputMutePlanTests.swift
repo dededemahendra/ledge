@@ -65,3 +65,21 @@ private func mic(_ uid: String, name: String = "Mic", running: Bool = true, canM
     #expect(InputMutePlan.micName([mic("a"), mic("b")]) == "2 mics")
     #expect(InputMutePlan.micName([mic("a", running: false)]) == nil)
 }
+
+/// Turning the input back up in System Settings unmutes, as far as the
+/// island can tell (review, 2026-10-22).
+@Test func aVolumeRaisedElsewhereIsNoLongerMuted() {
+    let devices = [mic("b", canMute: false, volume: 0.4)]
+    #expect(InputMutePlan.isMuted(devices, changes: [MuteChange(uid: "b", kind: .volume(previous: 0.7))]) == false)
+}
+
+@Test func stillHeldDropsWhatTheUserUndidElsewhere() {
+    let devices = [mic("a"), mic("b", canMute: false, volume: 0)]
+    let changes = [MuteChange(uid: "a", kind: .mute), MuteChange(uid: "b", kind: .volume(previous: 0.7))]
+    #expect(InputMutePlan.stillHeld(devices, changes: changes) == [MuteChange(uid: "b", kind: .volume(previous: 0.7))])
+}
+
+@Test func absentListsTheChangesOnDevicesThatAreGone() {
+    let changes = [MuteChange(uid: "a", kind: .mute), MuteChange(uid: "x", kind: .mute)]
+    #expect(InputMutePlan.absent([mic("a")], changes: changes) == [MuteChange(uid: "x", kind: .mute)])
+}

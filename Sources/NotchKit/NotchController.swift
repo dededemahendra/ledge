@@ -939,11 +939,13 @@ public final class NotchController {
     private var callIconData: Data?
 
     /// Identity of the leading blip, if the leading activity is one.
-    /// Title included so plug → unplug (same id, new title) pulses again,
-    /// and a call's ended moment pulses as it replaces the call (2026-10-22).
+    /// Title included so plug → unplug (same id, new title) pulses again.
+    /// Of a call, only its ended moment is a blip (2026-10-22): the call
+    /// itself, a hand-over or its return after a blip never pulse.
     private var leadingBlipKey: String? {
-        guard let first = activities.first,
-              [Self.hudActivityID, Self.powerActivityID, Self.deviceActivityID, Self.callActivityID].contains(first.id)
+        guard let first = activities.first else { return nil }
+        let isCallEnding = first.id == Self.callActivityID && first.symbolName == "phone.down.fill"
+        guard isCallEnding || [Self.hudActivityID, Self.powerActivityID, Self.deviceActivityID].contains(first.id)
         else { return nil }
         return "\(first.id)|\(first.title)"
     }
