@@ -32,6 +32,8 @@ Needs macOS 27 on an Apple silicon Mac.
    for Accessibility at launch and for the other permissions below when a
    feature first needs them.
 
+Once a day Ledge asks GitHub whether a newer version is out, and says so once, on the island; Settings › About shows it too. Settings › General › Check for updates turns it off. It never downloads or installs anything itself.
+
 There is no licence: you may download and use Ledge and read its code, but not
 reuse or redistribute the code.
 

@@ -1201,3 +1201,12 @@ that shows the option the pointer rests on, with the user's own content or a
 labelled sample (user's call). The logic lives in a new `SettingsKit` library.
 New options are a separate, later piece. Design:
 `2026-10-22-rich-settings-design.md`.
+
+## Update notice (2026-10-22)
+
+Lifts "no auto-update" for a notice only (user's call): a minute after launch
+and once a day Ledge asks GitHub's API for the latest full release; a newer one
+is announced once per version with an island blip (click: the release page) and
+shown in Settings › About until updated. Settings › General › Check for updates
+turns it off. Nothing is downloaded or installed. Design:
+`2026-10-22-update-notice-design.md`.
