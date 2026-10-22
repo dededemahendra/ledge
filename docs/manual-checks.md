@@ -1777,3 +1777,26 @@ Pending until the user reports them:
 7. Switching Calls off mid-call: the pill goes, with no ended moment.
 8. "Not a call" on Voice Memos, then bringing it back from Settings ›
    Island › Not calls.
+
+## Calls that know the meeting (2026-10-22)
+
+Headless renders checked:
+
+- A matched Meet: the green tile, "Design review", "12m left", the camera
+  glyph and "Next: 1:1 at 15:00".
+- Over and muted: "Muted · +3m" in red.
+- A 90-character title with an emoji: one truncated line, with the card's
+  height unchanged.
+
+CoreMediaIO's camera state read with no prompt (all cameras off at the time).
+
+Pending until the user reports them:
+
+1. A scheduled Meet in Dia: the green Meet tile on the island and the card,
+   and the event's title.
+2. The time left counts down, and goes red ("+3m") past the end.
+3. "Next:" appears when another meeting starts within 10 minutes.
+4. The camera glyph appears and goes with the camera.
+5. A Zoom meeting in Zoom's app shows Zoom's icon and the title.
+6. Joining 15 minutes early: "On a call" until 10 minutes before, then the
+   title.
