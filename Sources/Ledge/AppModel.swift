@@ -1467,7 +1467,10 @@ final class AppModel {
         case .hideCallApp:
             // The next refresh hands over to another app on the mic or ends
             // the call quietly, and the service undoes Ledge's mute.
-            if let app = callLiveApp { settings.hideCallApp(app.bundleID) }
+            if let app = callLiveApp {
+                call.dismissCurrent()
+                settings.hideCallApp(app.bundleID)
+            }
         case .seek(let fraction):
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.

@@ -63,6 +63,13 @@ public final class CallService {
     private var matched: CallMeeting?
     private var matchedApp: String?
     private var exemptApp: String?
+    /// Meetings the user marked "Not a call", as "bundle id|meeting id".
+    private var dismissed: Set<String> = []
+
+    /// How long past its meeting's end a hidden app shown as that meeting
+    /// stays (review, 2026-10-22): a real meeting can overrun; a forgotten
+    /// tab after a skipped one shouldn't stay for good.
+    public static let hiddenOverrun: TimeInterval = 30 * 60
 
     public init(holders: MicHolderSource? = nil, devices: InputDeviceIO = CoreAudioInputDevices(),
                 camera: CameraSource? = nil, lookup: ProcessLookup = .live, defaults: UserDefaults = .standard,
@@ -118,12 +125,23 @@ public final class CallService {
         let apps = pids
             .compactMap { CallApp.resolve($0, ownPID: ownPID, lookup: lookup) }
             .filter { seen.insert($0.bundleID).inserted }
-        // A hidden app still shows while it is a meeting under way, and for
-        // as long as that match then lasts.
-        let exempt = Set(apps.map(\.bundleID).filter { bundleID in
-            hidden.contains(bundleID) && ((bundleID == exemptApp && matched != nil)
-                || CallMeetingMatcher.match(bundleID: bundleID, at: now, in: meetings, requireUnderWay: true) != nil)
-        })
+        // A hidden app still shows while it is a meeting under way and no
+        // visible app holds the mic, and then for as long as that match
+        // lasts, up to half an hour past its end — read whether or not it
+        // holds the mic this tick, so a mic switch doesn't drop it.
+        var exempt = Set<String>()
+        if let kept = exemptApp, let meeting = matched, now < meeting.end.addingTimeInterval(Self.hiddenOverrun),
+           !dismissed.contains("\(kept)|\(meeting.id)") {
+            exempt.insert(kept)
+        }
+        if !apps.contains(where: { !hidden.contains($0.bundleID) }) {
+            for app in apps where hidden.contains(app.bundleID) {
+                if let meeting = CallMeetingMatcher.match(bundleID: app.bundleID, at: now, in: meetings, requireUnderWay: true),
+                   !dismissed.contains("\(app.bundleID)|\(meeting.id)") {
+                    exempt.insert(app.bundleID)
+                }
+            }
+        }
         let state = tracker.update(now: now, holders: apps, hidden: hidden.subtracting(exempt))
         let live = if case .live = state { true } else { false }
         if isLive, !live { restoreMute() }
@@ -167,7 +185,14 @@ public final class CallService {
             matched = fresh()
         } else if let current = matched {
             var kept = current
-            if let edited = meetings.first(where: { $0.joinURL == current.joinURL && $0.title == current.title }) {
+            // The same occurrence, or an edited copy that could be this
+            // meeting now — never a later occurrence of a recurring series,
+            // which shares its link and title.
+            let edited = meetings.first { $0.id == current.id } ?? meetings.first {
+                $0.joinURL == current.joinURL && $0.title == current.title
+                    && $0.start.addingTimeInterval(-CallMeetingMatcher.lead) <= now
+            }
+            if let edited {
                 kept = CallMeeting(id: edited.id, title: edited.title, start: edited.start, end: edited.end,
                                    joinURL: current.joinURL, service: current.service)
             }
@@ -178,6 +203,14 @@ public final class CallService {
         }
         matchedApp = bundleID
         exemptApp = isHidden && matched != nil ? bundleID : nil
+    }
+
+    /// "Not a call" on the live call's meeting (review, 2026-10-22): no
+    /// longer shown as that meeting, so hiding its app takes it away.
+    public func dismissCurrent() {
+        guard let app = matchedApp, let meeting = matched else { return }
+        dismissed.insert("\(app)|\(meeting.id)")
+        if exemptApp == app { exemptApp = nil }
     }
 
     public func toggleMute() {

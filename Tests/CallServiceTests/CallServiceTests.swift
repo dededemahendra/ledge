@@ -391,3 +391,89 @@ private final class Rig {
     rig.camera.isCameraOn = true
     #expect(rig.refresh(to: 3).isCameraOn)
 }
+
+// MARK: - Review fixes (2026-10-22)
+
+/// A daily standup that overruns: tomorrow's occurrence, same link and
+/// title, must not become this call's meeting.
+@MainActor @Test func anOverrunningRecurringMeetingKeepsTodaysEnd() {
+    let rig = Rig(holders: [300])
+    rig.minutes(to: 14, meetings: [event("s@0", start: 0, end: 15)])
+    let update = rig.minutes(from: 14 + 1.0 / 60, to: 17, meetings: [event("s@1440", start: 1440, end: 1455)])
+    #expect(update.meeting?.end == t0.addingTimeInterval(15 * 60))
+}
+
+@MainActor @Test func afterAnOverrunningRecurringMeetingTheNextStillTakesOver() {
+    let rig = Rig(holders: [300])
+    rig.minutes(to: 14, meetings: [event("s@0", start: 0, end: 15)])
+    let later = [event("s@1440", start: 1440, end: 1455), event("b", start: 15, end: 45, url: "https://meet.google.com/bbb-bbbb-bbb")]
+    #expect(rig.minutes(from: 14 + 1.0 / 60, to: 17, meetings: later).meeting?.id == "b")
+}
+
+/// A mic switch during a meeting in a hidden browser: the call and the
+/// user's mute carry on.
+@MainActor @Test func aGapReadInAHiddenMeetingKeepsTheCallAndTheMute() {
+    let rig = Rig(holders: [300])
+    let hidden: Set<String> = [chrome.bundleID]
+    let meetings = [event("m", start: 0, end: 30)]
+    rig.minutes(to: 5, hidden: hidden, meetings: meetings)
+    rig.service.toggleMute()
+    rig.holders = []
+    rig.source.announce()
+    _ = rig.service.refresh(at: t0.addingTimeInterval(5 * 60 + 0.5), hidden: hidden, meetings: meetings)
+    rig.holders = [300]
+    let update = rig.minutes(from: 5 + 1.0 / 60, to: 6, hidden: hidden, meetings: meetings)
+    #expect(update.state == .live(app: chrome, since: t0))
+    #expect(rig.devices.device("a").isMuted)
+}
+
+@MainActor @Test func pastTheEndAGapReadDoesNotLoseAHiddenMeeting() {
+    let rig = Rig(holders: [300])
+    let hidden: Set<String> = [chrome.bundleID]
+    let meetings = [event("m", start: 0, end: 30)]
+    rig.minutes(to: 35, hidden: hidden, meetings: meetings)
+    rig.holders = []
+    rig.source.announce()
+    _ = rig.service.refresh(at: t0.addingTimeInterval(35 * 60 + 0.5), hidden: hidden, meetings: meetings)
+    rig.holders = [300]
+    #expect(rig.minutes(from: 35 + 1.0 / 60, to: 36, hidden: hidden, meetings: meetings).state != .idle)
+}
+
+/// A forgotten tab in a hidden browser never takes over a real call in
+/// the meeting's own app.
+@MainActor @Test func aHiddenBrowserNeverTakesOverAVisibleAppsCall() {
+    let rig = Rig(holders: [300])
+    let hidden: Set<String> = [chrome.bundleID]
+    let meetings = [event("z", start: 10, end: 40, url: "https://us02web.zoom.us/j/1")]
+    rig.minutes(to: 5, hidden: hidden, meetings: meetings)
+    rig.holders = [300, 100]
+    #expect(rig.minutes(from: 5 + 1.0 / 60, to: 12, hidden: hidden, meetings: meetings).state == .live(app: zoom, since: t0.addingTimeInterval(5 * 60 + 1)))
+}
+
+/// Past the meeting's end, a hidden browser shown as the meeting goes
+/// after half an hour rather than staying for good.
+@MainActor @Test func aHiddenBrowsersMeetingGoesHalfAnHourAfterItsEnd() {
+    let rig = Rig(holders: [300])
+    let hidden: Set<String> = [chrome.bundleID]
+    let meetings = [event("m", start: 0, end: 30)]
+    #expect(rig.minutes(to: 59, hidden: hidden, meetings: meetings).state != .idle)
+    #expect(rig.minutes(from: 59 + 1.0 / 60, to: 61, hidden: hidden, meetings: meetings).state == .idle)
+}
+
+/// "Not a call" on a matched meeting takes the pill away.
+@MainActor @Test func notACallOnAMatchedMeetingTakesItAway() {
+    let rig = Rig(holders: [300])
+    let meetings = [event("m", start: 0, end: 30)]
+    rig.minutes(to: 10, meetings: meetings)
+    rig.service.dismissCurrent()
+    #expect(rig.minutes(from: 10 + 1.0 / 60, to: 11, hidden: [chrome.bundleID], meetings: meetings).state == .idle)
+}
+
+@MainActor @Test func notACallOnAHiddenBrowsersMeetingTakesItAway() {
+    let rig = Rig(holders: [300])
+    let hidden: Set<String> = [chrome.bundleID]
+    let meetings = [event("m", start: 0, end: 30)]
+    rig.minutes(to: 10, hidden: hidden, meetings: meetings)
+    rig.service.dismissCurrent()
+    #expect(rig.minutes(from: 10 + 1.0 / 60, to: 20, hidden: hidden, meetings: meetings).state == .idle)
+}
