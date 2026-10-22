@@ -22,6 +22,7 @@ public final class AppSettings {
         public static let showsClockTimers = "showsClockTimers"
         public static let showsLiveActivities = "showsLiveActivities"
         public static let showsOnLockScreen = "showsOnLockScreen"
+        public static let checksForUpdates = "checksForUpdates"
         public static let mediaSources = "mediaSources"
         public static let calendarLeadMinutes = "calendarLeadMinutes"
         public static let disabledCalendarIDs = "disabledCalendarIDs"
@@ -65,6 +66,8 @@ public final class AppSettings {
     public var showsLiveActivities: Bool { didSet { save(showsLiveActivities, Key.showsLiveActivities) } }
     /// The island over the lock screen, look only (2026-10-21).
     public var showsOnLockScreen: Bool { didSet { save(showsOnLockScreen, Key.showsOnLockScreen) } }
+    /// Asks GitHub once a day for a newer Ledge (2026-10-22).
+    public var checksForUpdates: Bool { didSet { save(checksForUpdates, Key.checksForUpdates) } }
     /// Enabled music apps' bundle identifiers.
     public var mediaSources: Set<String> { didSet { save(Array(mediaSources).sorted(), Key.mediaSources) } }
     public var calendarLeadMinutes: Int { didSet { save(calendarLeadMinutes, Key.calendarLeadMinutes) } }
@@ -87,6 +90,7 @@ public final class AppSettings {
         showsClockTimers = defaults.object(forKey: Key.showsClockTimers) as? Bool ?? true
         showsLiveActivities = defaults.object(forKey: Key.showsLiveActivities) as? Bool ?? true
         showsOnLockScreen = defaults.object(forKey: Key.showsOnLockScreen) as? Bool ?? true
+        checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? true
         mediaSources = (defaults.object(forKey: Key.mediaSources) as? [String]).map(Set.init)
             ?? Set(Self.knownMediaSources.map(\.id))
         calendarLeadMinutes = defaults.object(forKey: Key.calendarLeadMinutes) as? Int ?? 5

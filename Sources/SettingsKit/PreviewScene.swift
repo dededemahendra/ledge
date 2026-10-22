@@ -6,7 +6,7 @@ import LedgeSettings
 /// puts a private island into a scene; `PreviewDirector` picks which.
 public enum PreviewScene: String, CaseIterable, Sendable {
     case volume, brightness, capsLock, battery, headphones, focus, timer, liveActivity
-    case meeting, reminder, nowPlaying, songCaption, hoverCard, lockScreen
+    case meeting, reminder, nowPlaying, songCaption, hoverCard, lockScreen, update
 
     /// The caption under the island: the option's own name.
     public var title: String {
@@ -24,6 +24,7 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .songCaption:         return "Song title on track change"
         case .hoverCard:           return "Open the island on hover"
         case .lockScreen:          return "Show on the lock screen"
+        case .update:              return "Check for updates"
         }
     }
 
@@ -43,6 +44,7 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .reminder:               return settings.showsReminders
         case .songCaption:            return settings.showsSongCaption
         case .lockScreen:             return settings.showsOnLockScreen
+        case .update:                 return settings.checksForUpdates
         case .nowPlaying, .hoverCard: return true
         }
     }
