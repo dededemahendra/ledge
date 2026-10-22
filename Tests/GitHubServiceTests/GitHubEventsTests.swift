@@ -47,6 +47,22 @@ private func comment(_ id: String, _ who: String) -> GitHubComment {
     #expect(GitHubEvents.between(pushed, passed) == [.checksPassed(passed.mine[0])])
 }
 
+@Test func aPassIsToldOncePerCommitAndAFailureEachTime() {
+    var passed: Set<String> = []
+    var previous: GitHubSnapshot?
+    var told: [String] = []
+    for round in [snap(0, mine: [pr(checks: .pending)]), snap(1, mine: [pr(checks: .passed)]),
+                  snap(2, mine: [pr(checks: .pending)]), snap(3, mine: [pr(checks: .passed)]),
+                  snap(4, mine: [pr(checks: .failed)]), snap(5, mine: [pr(checks: .pending)]),
+                  snap(6, mine: [pr(checks: .failed)]), snap(7, mine: [pr(sha: "bbb", checks: .pending)]),
+                  snap(8, mine: [pr(sha: "bbb", checks: .passed)])] {
+        told += GitHubEvents.between(previous, round, passed: &passed).map(name)
+        previous = round
+    }
+    #expect(told == ["checksPassed", "checksFailed", "checksFailed", "checksPassed"],
+            "a late check passing again is quiet; a re-run failing again is told; a new commit's pass is told")
+}
+
 /// Review Focus 5.
 @Test func reviewsAndCommentsFromOthersAreNewsAndTheUsersOwnAreNot() {
     let before = snap(0, mine: [pr()])

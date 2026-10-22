@@ -89,6 +89,23 @@ public enum GitHubEvents {
         return events
     }
 
+    /// As `between(_:_:)`, remembering the commits whose checks have passed
+    /// (2026-10-22): a pass is told once per PR head commit even when the
+    /// rollup goes back to pending in between, as when a late check joins;
+    /// a failure is told each time, since a re-run that fails again is news.
+    /// `passed` keeps only the PRs' current commits.
+    public static func between(_ old: GitHubSnapshot?, _ new: GitHubSnapshot, passed: inout Set<String>) -> [GitHubEvent] {
+        func key(_ pr: GitHubPR) -> String { "\(pr.id) \(pr.headSHA ?? "")" }
+        let seen = passed
+        let events = between(old, new).filter { event in
+            if case .checksPassed(let pr) = event { return !seen.contains(key(pr)) }
+            return true
+        }
+        passed = passed.intersection(new.mine.map(key))
+            .union(new.mine.filter { $0.checks?.state == .passed }.map(key))
+        return events
+    }
+
     /// What is going on now: the user's PRs whose checks are pending, then
     /// their runs outside PRs.
     public static func running(in snapshot: GitHubSnapshot) -> [GitHubRunning] {
