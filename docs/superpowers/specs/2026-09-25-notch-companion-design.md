@@ -1228,3 +1228,12 @@ repos pushed to in the last day, five at most (ETags), compared with the last go
 every 20 s while something runs, backing off on failure, waiting out a rate limit, and stopping after a 401 until the user tries again. The login is a pasted
 token from the Keychain, else `gh auth token`. Besides the daily update check, this is the app's only network
 traffic, and only while connected.
+
+**Polish (2026-10-22, later).** The user found the first cut basic and chose,
+from mockups: a panel with a hero card (what is running, else failed, else a
+review request, with a segmented bar of its checks and a clock) over two rows;
+a running ring with a segment per check; blips with the person's avatar and a
+badge, or a colour disc for checks and runs, and captions that lead with the
+PR's title (a GitHub blip's caption is bold up to its first separator); and an
+account card in Settings. Avatars come from GitHub's image server, no token,
+memory only. Design: `2026-10-22-github-island-polish-design.md`.

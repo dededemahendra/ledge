@@ -4,8 +4,9 @@ import GitHubService
 import LedgeSettings
 import SettingsKit
 
-/// Settings › GitHub (2026-10-22): the connection, then one switch for each
-/// moment the island tells, with the preview strip.
+/// Settings › GitHub (2026-10-22; polished the same day at the user's
+/// call): the preview strip, an account card (or a welcome card before
+/// connecting), then the moments in two groups.
 struct GitHubSettings: View {
     let settings: AppSettings
     let model: AppModel
@@ -34,16 +35,19 @@ struct GitHubSettings: View {
     }
 
     var body: some View {
-        Form {
+        let wantsTokenBinding = Binding(get: { wantsToken }, set: { wantsToken = $0 })
+        return Form {
             Section {
                 PreviewStrip(director: director, height: PreviewStrip.shortHeight) { model.previewContent() }
                     .asPaneHeader()
             }
             Section {
                 TimelineView(.periodic(from: .now, by: 2)) { _ in
-                    GitHubConnectionRow(settings: settings, model: model, wantsToken: Binding(
-                        get: { wantsToken }, set: { wantsToken = $0 }
-                    ))
+                    if settings.githubConnected {
+                        GitHubAccountCard(model: model, wantsToken: wantsTokenBinding)
+                    } else {
+                        GitHubWelcomeCard(model: model, wantsToken: wantsTokenBinding)
+                    }
                 }
                 if model.githubNeedsToken || wantsToken || model.githubStatus == .signInAgain {
                     SettingsRow("Token", detail: "A token with the repo and read:org scopes, from github.com › Settings › Developer settings.",
@@ -61,27 +65,31 @@ struct GitHubSettings: View {
                         }
                     }
                 }
-            } header: {
-                Text("Connection")
             } footer: {
-                Text("While connected, Ledge asks api.github.com every minute, or every 20 seconds while something runs. Your token stays with gh or in your Keychain.")
+                Text("While connected, Ledge asks api.github.com every minute, or every 20 seconds while something runs, and fetches people's pictures from GitHub's image server. Your token stays with gh or in your Keychain.")
             }
             Section {
-                moment("Checks running", "An amber ring and a clock while checks run on your PRs.",
+                moment("Checks running", "A ring that fills check by check, and a clock.",
                        symbol: "circle.dotted", color: .systemYellow, \.githubChecksRunning, .githubRunning)
                 moment("Checks finished", "Passed or failed, once for each commit.",
                        symbol: "checkmark.circle.fill", color: .systemGreen, \.githubChecksFinished, .githubChecks)
-                moment("Reviews and comments", "Approvals, change requests and comments on your PRs, bots included.",
+                moment("Reviews and comments", "Approvals, change requests and comments, bots included.",
                        symbol: "bubble.left.fill", color: .systemOrange, \.githubReviews, .githubReviews)
-                moment("Merges and closes", "When someone else merges or closes one of your PRs.",
+                moment("Merges and closes", "When someone else merges or closes one.",
                        symbol: "arrow.triangle.merge", color: .systemPurple, \.githubMerges, .githubMerges)
+            } header: {
+                Text("Your pull requests")
+            }
+            .opacity(settings.githubConnected ? 1 : 0.55)
+            Section {
                 moment("Review requests", "When someone asks for your review.",
                        symbol: "eye.fill", color: .systemBlue, \.githubReviewRequests, .githubRequests)
-                moment("Your runs outside PRs", "Workflow runs you start with a push, a tag or a deploy.",
+                moment("Your runs outside PRs", "Runs you start with a push, a tag or a deploy.",
                        symbol: "play.circle.fill", color: .systemGray, \.githubMyRuns, .githubRuns)
             } header: {
-                Text("Tell me when")
+                Text("Around you")
             }
+            .opacity(settings.githubConnected ? 1 : 0.55)
         }
     }
 
@@ -94,19 +102,58 @@ struct GitHubSettings: View {
     }
 }
 
-/// What the connection is doing, and the buttons for it.
-struct GitHubConnectionRow: View {
-    let settings: AppSettings
+/// Before connecting (2026-10-22): what this is, and the two ways in.
+struct GitHubWelcomeCard: View {
     let model: AppModel
     let wantsToken: Binding<Bool>
 
     var body: some View {
-        SettingsRow(title, detail: detail, symbol: "arrow.triangle.branch", color: Color(white: 0.2)) {
-            HStack(spacing: 8) {
-                if !settings.githubConnected {
-                    Button("Use a token") { wantsToken.wrappedValue = true }
-                    Button("Connect") { model.connectGitHub() }
-                } else {
+        VStack(spacing: 6) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color(white: 0.22)))
+            Text("Your pull requests on the island")
+                .font(.headline)
+                .padding(.top, 2)
+            Text("Checks as they run and finish, reviews, merges and review requests, across all your repos. Ledge asks GitHub only once you connect.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+            HStack(spacing: 10) {
+                Button("Connect with gh") { model.connectGitHub() }
+                    .buttonStyle(.borderedProminent)
+                Button("Use a token…") { wantsToken.wrappedValue = true }
+            }
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+    }
+}
+
+/// Once connected (2026-10-22): who, how, when last checked, and the
+/// buttons; then the line of what is going on, or what is wrong.
+struct GitHubAccountCard: View {
+    let model: AppModel
+    let wantsToken: Binding<Bool>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                picture
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 8) {
                     if model.githubSource == .gh, model.githubStatus != .signInAgain, !wantsToken.wrappedValue {
                         Button("Use a token") { wantsToken.wrappedValue = true }
                     }
@@ -118,39 +165,72 @@ struct GitHubConnectionRow: View {
                     Button("Disconnect") { model.disconnectGitHub() }
                 }
             }
+            if case .ok = model.githubStatus, let stats = model.githubStats {
+                HStack(spacing: 14) {
+                    stat(stats.open, stats.open == 1 ? "open PR" : "open PRs", nil)
+                    stat(stats.failing, "failing", .systemRed)
+                    stat(stats.running, "running", .systemYellow)
+                    stat(stats.waiting, "waiting for your review", .systemBlue)
+                }
+                .font(.callout)
+                .padding(.leading, 46)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder private var picture: some View {
+        if let image = model.githubAvatar.flatMap(NSImage.init(data:)) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+                .frame(width: 34, height: 34)
+                .clipShape(Circle())
+        } else {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color(white: 0.22)))
+        }
+    }
+
+    private func stat(_ value: Int, _ label: String, _ color: NSColor?) -> some View {
+        HStack(spacing: 4) {
+            Text("\(value)")
+                .fontWeight(.semibold)
+                .monospacedDigit()
+                .foregroundStyle(color.map { Color(nsColor: $0) } ?? .primary)
+            Text(label)
+                .foregroundStyle(.secondary)
         }
     }
 
     private var title: String {
-        guard settings.githubConnected else { return "Not connected" }
         if model.githubNeedsToken { return "No GitHub login found" }
         switch model.githubStatus {
-        case .off, .checking:
-            return "Connecting…"
-        case .signInAgain:
-            return "Sign in again"
-        case .ok, .failed, .rateLimited:
-            let via = model.githubSource == .gh ? "from gh" : "with a token"
-            guard let login = model.githubLogin else { return "Could not reach GitHub (\(via))" }
-            return "Connected as \(login) (\(via))"
+        case .off, .checking: return "Connecting…"
+        case .signInAgain: return "Sign in again"
+        case .ok, .failed, .rateLimited: return model.githubLogin ?? "Could not reach GitHub"
         }
     }
 
-    private var detail: String? {
-        guard settings.githubConnected else { return "Ledge uses your gh login, or a token you paste here." }
+    private var subtitle: String {
         if model.githubNeedsToken { return "Log in with gh auth login in Terminal, or paste a token, then Try again." }
+        let via = model.githubSource == .gh ? "Connected through gh" : "Connected with a token"
         var lines: [String] = []
         switch model.githubStatus {
-        case .ok(let at): lines.append("Last checked at \(time(at)).")
+        case .ok(let at): lines.append("\(via) · checked at \(time(at))")
         case .failed: lines.append("Could not reach GitHub just now. Ledge tries again shortly.")
         case .rateLimited(let until): lines.append("GitHub asked Ledge to wait until \(time(until)).")
         case .signInAgain: lines.append("GitHub no longer takes this login. Log in again with gh auth login, or paste a new token, then Try again.")
-        case .off, .checking: break
+        case .off, .checking: lines.append(via)
         }
         if model.githubHidesOrganisations {
             lines.append("Some organisations hide their PRs from this token; authorise it for them on GitHub.")
         }
-        return lines.isEmpty ? nil : lines.joined(separator: " ")
+        return lines.joined(separator: " ")
     }
 
     private func time(_ date: Date) -> String {
