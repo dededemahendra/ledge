@@ -320,10 +320,11 @@ public final class NotchController {
     }
 
     /// A song caption belongs to media leading; a meeting blip
-    /// (2026-09-29) carries its own — "Title · 10:00". Any other blip
+    /// (2026-09-29) carries its own — "Title · 10:00". An update notice
+    /// (2026-10-22) carries its own too. Any other blip
     /// pre-empting the island takes it whole.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading)
     }
 
     public var isLiveActivityLeading: Bool {
@@ -357,6 +358,13 @@ public final class NotchController {
 
     /// `AppModel` inserts the meeting reminder with this id.
     public static let calendarActivityID = "calendar"
+
+    /// `AppModel` inserts the update notice with this id (2026-10-22).
+    public static let updateActivityID = "update"
+
+    public var isUpdateLeading: Bool {
+        activities.first?.id == Self.updateActivityID
+    }
 
     /// `AppModel` inserts the iPhone Live Activity with this id
     /// (2026-10-01): a match's crests and figures, or the phone glyph.

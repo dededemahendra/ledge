@@ -4,6 +4,7 @@ import HUDService
 import PowerService
 import DeviceService
 import FocusService
+import UpdateService
 
 /// What a strip says under the island (2026-10-22): the option's name,
 /// and why a sample stands in where the user has nothing of their own.
@@ -123,6 +124,14 @@ public enum PreviewStage {
             showMedia(c, content)
             c.setLocked(true)
             return mediaCaption(scene, content)
+        case .update:
+            let version = content.availableUpdate ?? PreviewSample.updateVersion
+            c.setActivities([NotchController.ActivityDisplay(
+                id: NotchController.updateActivityID, title: UpdateNotice.title(version), compactText: version,
+                symbolName: UpdateNotice.symbolName, tint: .positive
+            )], overflow: 0)
+            c.setCaption(UpdateNotice.caption(version))
+            return caption(scene, sample: content.availableUpdate == nil ? "no update out" : nil)
         }
     }
 

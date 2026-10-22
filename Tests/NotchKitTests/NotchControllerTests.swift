@@ -990,3 +990,16 @@ private func matchScore() -> NotchController.ActivityDisplay.Score {
     c.setLocked(false)
     #expect(c.swipe(.next) && c.panel == .calendar)
 }
+
+/// An update blip (2026-10-22) carries its caption line and its link.
+@MainActor
+@Test func anUpdateBlipLeadsWithItsCaptionAndLink() {
+    let c = makeController()
+    let page = URL(string: "https://github.com/dededemahendra/ledge/releases/tag/v0.1.2")!
+    c.setActivities([.init(id: NotchController.updateActivityID, title: "Ledge 0.1.2 is available", compactText: "0.1.2",
+                           symbolName: "arrow.down.circle.fill", tint: .positive, url: page)], overflow: 0)
+    c.setCaption("Ledge 0.1.2 is available · Download")
+    #expect(c.isUpdateLeading && c.hasCaption)
+    #expect(c.captionText == "Ledge 0.1.2 is available · Download")
+    #expect(c.linkURL == page)
+}

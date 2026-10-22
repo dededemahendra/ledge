@@ -149,3 +149,11 @@ private func record(
     #expect(ActivityKind.media < ActivityKind.hud)
     #expect(ActivityKind.hud > ActivityKind.power)
 }
+
+/// An update (2026-10-22): below every other blip, above a Clock timer,
+/// eight seconds to read like a meeting.
+@Test func anUpdateIsTheQuietestBlip() {
+    #expect(ActivityKind.update.priority == 35)
+    #expect(ActivityKind.update.defaultTTL == 8)
+    #expect(ActivityKind.update < .notification && ActivityKind.update > .timer)
+}

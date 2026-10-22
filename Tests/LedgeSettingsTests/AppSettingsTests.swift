@@ -51,3 +51,12 @@ private func fresh() -> (AppSettings, UserDefaults) {
     #expect(changes == 1)
     #expect(!AppSettings(defaults: defaults).showsOnLockScreen)
 }
+
+/// Checking for updates (2026-10-22): on by default, remembered off.
+@MainActor
+@Test func checkingForUpdatesIsOnByDefaultAndRemembered() {
+    let (s, defaults) = fresh()
+    #expect(s.checksForUpdates)
+    s.checksForUpdates = false
+    #expect(!AppSettings(defaults: defaults).checksForUpdates)
+}

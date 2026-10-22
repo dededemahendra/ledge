@@ -47,12 +47,15 @@ public struct PreviewContent: Sendable, Equatable {
     public var volume: Double?
     /// A Clock timer running now, as the island shows it.
     public var timer: NotchController.ActivityDisplay?
+    /// A newer version that is really out, for the update scene.
+    public var availableUpdate: String?
 
     public init(
         media: MediaPresentation? = nil, mediaSource: String? = nil,
         nextEvent: UpcomingEvent? = nil, nextReminder: UpcomingEvent? = nil,
         batteryPercent: Int? = nil, headphones: Headphones? = nil, focus: Focus? = nil,
-        volume: Double? = nil, timer: NotchController.ActivityDisplay? = nil
+        volume: Double? = nil, timer: NotchController.ActivityDisplay? = nil,
+        availableUpdate: String? = nil
     ) {
         self.media = media
         self.mediaSource = mediaSource
@@ -63,6 +66,7 @@ public struct PreviewContent: Sendable, Equatable {
         self.focus = focus
         self.volume = volume
         self.timer = timer
+        self.availableUpdate = availableUpdate
     }
 }
 
@@ -73,6 +77,7 @@ public enum PreviewSample {
         isPlaying: true, elapsed: 74, duration: 243, anchor: Date(timeIntervalSinceReferenceDate: 0)
     )
     public static let volume = 0.62
+    public static let updateVersion = "0.1.2"
     public static let brightness = 0.7
     public static let batteryPercent = 87
     public static let headphones = PreviewContent.Headphones(name: "AirPods Pro", left: 80, right: 80, case: 60)

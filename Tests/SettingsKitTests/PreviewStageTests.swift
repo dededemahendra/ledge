@@ -98,3 +98,15 @@ private func island() -> NotchController {
     #expect(!PreviewScene.volume.isOn(in: s) && !PreviewScene.brightness.isOn(in: s), "one switch for both")
     #expect(PreviewScene.nowPlaying.isOn(in: s) && PreviewScene.hoverCard.isOn(in: s), "no switch of their own")
 }
+
+/// The update scene: the real available version, or a labelled sample.
+@MainActor
+@Test func theUpdateSceneShowsTheVersionAndItsCaption() {
+    let c = island()
+    let sample = PreviewStage.apply(.update, content: PreviewContent(), to: c)
+    #expect(sample.text == "Check for updates · Sample: no update out")
+    #expect(c.activities.first?.compactText == "0.1.2")
+    #expect(c.captionText == "Ledge 0.1.2 is available · Download")
+    let real = PreviewStage.apply(.update, content: PreviewContent(availableUpdate: "0.2.0"), to: c)
+    #expect(real.sampleReason == nil && c.activities.first?.compactText == "0.2.0")
+}
