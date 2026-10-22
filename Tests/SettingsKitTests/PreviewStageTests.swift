@@ -119,18 +119,18 @@ private func island() -> NotchController {
     #expect(checks.text == "Checks finished · Sample: not connected")
     #expect(c.activities.first?.id == NotchController.githubActivityID)
     #expect(c.activities.first?.compactText == "Failed")
-    #expect(c.captionText == "#12 Fix the date picker · test (macos)")
+    #expect(c.captionText == "Fix the date picker · test (macos) · web")
     _ = PreviewStage.apply(.githubRunning, content: PreviewContent(), to: c)
     #expect(c.activities.first?.id == NotchController.githubRunActivityID)
     #expect(c.activities.first?.compactText == "2:14")
     _ = PreviewStage.apply(.githubRequests, content: PreviewContent(), to: c)
-    #expect(c.captionText == "sam asks for your review · #7 site")
+    #expect(c.captionText == "Tidy the footer · sam · site")
     _ = PreviewStage.apply(.githubRuns, content: PreviewContent(), to: c)
     #expect(c.captionText == "Deploy · web")
     let mine = GitHubPR(id: "PR_1", number: 4, title: "update notice", url: URL(string: "https://github.com/dede/ledge/pull/4")!, repo: "ledge")
     let real = PreviewStage.apply(.githubMerges, content: PreviewContent(pullRequest: mine), to: c)
     #expect(real.sampleReason == nil)
-    #expect(c.captionText == "#4 update notice · ledge")
+    #expect(c.captionText == "update notice · sam · ledge")
 }
 
 @MainActor
