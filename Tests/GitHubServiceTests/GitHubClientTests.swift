@@ -144,6 +144,11 @@ import Foundation
     #expect(await avatars.image(at: url) == Data("PNG".utf8))
     #expect(seen.all.count == 1, "the second comes from memory")
     #expect(seen.all.first?.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(seen.all.first?.httpShouldHandleCookies == false)
+    for refused in ["http://avatars.githubusercontent.com/u/1", "https://evilgithubusercontent.com/u/1", "https://githubusercontent.com/u/1"] {
+        #expect(await avatars.image(at: URL(string: refused)!) == nil, "\(refused)")
+    }
+    #expect(seen.all.count == 1, "none of those is asked for")
     #expect(await avatars.image(at: URL(string: "https://example.com/me.png")!) == nil)
     #expect(seen.all.count == 1, "nothing is asked of anywhere else")
     let broken = GitHubAvatars(fetch: fetch { _ in (404, [:], "") })
@@ -158,4 +163,15 @@ import Foundation
     }
     _ = await avatars.image(at: URL(string: "https://avatars.githubusercontent.com/u/0")!)
     #expect(seen.all.count == GitHubAvatars.limit + 2, "the first was dropped, so it is asked for again")
+}
+
+@Test func anAvatarThatEndsUpElsewhereOrIsHugeIsDropped() async {
+    let url = URL(string: "https://avatars.githubusercontent.com/u/1")!
+    let moved = GitHubAvatars(fetch: { _ in
+        (Data("PNG".utf8), HTTPURLResponse(url: URL(string: "https://example.com/me.png")!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    })
+    #expect(await moved.image(at: url) == nil)
+    let huge = GitHubAvatars(fetch: fetch { _ in (200, [:], String(repeating: "x", count: GitHubAvatars.maximumBytes + 1)) })
+    #expect(await huge.image(at: url) == nil)
+    #expect(GitHubAvatars.isGitHubImage(url) && !GitHubAvatars.isGitHubImage(URL(string: "https://example.com/x")!))
 }
