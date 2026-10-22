@@ -9,6 +9,34 @@
 They chose to skip the questions ("just start"), so every behaviour below is
 *my call* unless stated, and is open to their correction.
 
+## Scope now (2026-10-23)
+
+The user can only test Zoom and Meet for now. This round builds the meeting's
+own mute for **Zoom** and **Meet in a browser**. The FaceTime and WhatsApp parts
+(caller's name, hang-up, their own mute) wait until those calls can be tested,
+and are kept below for then.
+
+**Found live (Task 1 probe, 2026-10-23):**
+
+- **Zoom** (`us.zoom.xos`). The menu bar's "Meeting" menu has an `AXMenuItem`
+  with identifier `onMuteAudio:`. Its title is "Unmute audio" while muted and
+  "Mute audio" while not. The identifier doesn't depend on the language; only
+  the state read from the title does. The meeting window is identified
+  `zm.meeting.window.main`.
+- **Meet in Dia** (Chromium; the tree is exposed after setting
+  `AXManualAccessibility`). The Meet window's title contains "Meet - ". It
+  holds an `AXButton` titled "Turn off microphone" while unmuted and "Turn on
+  microphone" while muted, next to "Turn off camera" and "Leave call". It is
+  found only while the Meet tab is the window's front tab, since background
+  tabs expose no page.
+
+**Cost** *(my call)*:
+
+- The control is found once per call by walking the tree, off the main
+  thread.
+- Its element is then kept, and only its title is read each second (one call).
+- A failed read means the control is found again from scratch.
+
 ## Goal
 
 The call card controls the call itself, not just the Mac's mic:
