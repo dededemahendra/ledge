@@ -45,9 +45,11 @@ baseline and announces nothing.
 **What counts as an event:**
 
 - Checks: GitHub's rollup on a PR's latest commit (Actions and outside
-  statuses such as a Pages preview or a review bot's status). A result is
-  announced once per PR head commit: passed for `SUCCESS`, failed for
-  `FAILURE` or `ERROR`, naming the first failing check. A result for an older
+  statuses such as a Pages preview or a review bot's status). A pass is
+  announced once per PR head commit, even when the rollup goes back to pending
+  in between (a late check joining); a failure each time the checks end failed
+  (a re-run that fails again is news). Passed is `SUCCESS`, failed is `FAILURE`
+  or `ERROR`, naming the first failing check. A result for an older
   commit never shows; a force-push starts the running item again.
 - Reviews and comments: a review or comment ID not seen before, not written by
   the user. A review is approved, changes requested, or commented.
