@@ -133,6 +133,18 @@ import Foundation
       {"__typename":"CheckRun","name":"f","status":"QUEUED","conclusion":null}]}}
     """#.utf8))
     #expect(GitHubQuery.checks(rollup)?.segments == [.passed, .passed, .failed, .failed, .running, .running])
+    #expect(GitHubQuery.checks(rollup)?.failedName == "b", "the first failed one is named, a status or a cancelled run")
+}
+
+@Test func aCancelledCheckIsNamedWhenItIsTheFailure() throws {
+    let rollup = try JSONDecoder().decode(GitHubQuery.Wire.Rollup.self, from: Data(#"""
+    {"state":"FAILURE","contexts":{"nodes":[
+      {"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"SUCCESS"},
+      {"__typename":"CheckRun","name":"deploy","status":"COMPLETED","conclusion":"CANCELLED","detailsUrl":"https://github.com/o/r/runs/9"}]}}
+    """#.utf8))
+    let checks = GitHubQuery.checks(rollup)
+    #expect(checks?.failedName == "deploy")
+    #expect(checks?.failedURL?.absoluteString == "https://github.com/o/r/runs/9")
 }
 
 /// Review Focus 2.

@@ -345,6 +345,9 @@ final class AppModel {
     private var githubAvatarOrder: [URL] = []
     /// The blip still waiting for its picture; a newer blip replaces it.
     private var githubBlipTask: Task<Void, Never>?
+    /// The caption the last GitHub blip put up, so taking the blip away
+    /// takes its caption too, and nobody else's (2026-10-22).
+    private var githubCaptionShown: String?
     /// Bumped on disconnect: a blip or picture from before it is dropped.
     private var githubGeneration = 0
 
@@ -445,6 +448,7 @@ final class AppModel {
         githubRunShown = nil
         queue.remove(kind: .githubRun)
         queue.remove(kind: .github)
+        clearGitHubCaption()
         publish()
         publishGitHubPanel()
     }
@@ -488,8 +492,17 @@ final class AppModel {
                 symbolName: blip.symbolName, artwork: avatar, tint: blip.tintName.map { .system($0) }, url: blip.url
             ))
             self.publish()
+            self.githubCaptionShown = blip.caption
             self.showCaption(blip.caption, for: ActivityKind.github.defaultTTL ?? NotchController.captionDuration)
         }
+    }
+
+    /// Clears the caption only while it is still the GitHub blip's: a
+    /// song, meeting or update caption that replaced it stays (2026-10-22).
+    private func clearGitHubCaption() {
+        defer { githubCaptionShown = nil }
+        guard let shown = githubCaptionShown, presenter.controller.caption == shown else { return }
+        presenter.setCaption(nil)
     }
 
     /// A picture from memory, else from GitHub's image server within
@@ -550,6 +563,7 @@ final class AppModel {
         }
         if locked, queue.ordered.contains(where: { $0.kind == .github }) {
             queue.remove(kind: .github)
+            clearGitHubCaption()
             publish()
         }
         let now = Date()
