@@ -34,9 +34,20 @@ shell on the main actor, with the judgement in pure, testable parts.
 **Who holds the mic.** CoreAudio's process objects list every process using
 audio (`kAudioHardwarePropertyProcessObjectList` on the system object). For
 each one it reports `kAudioProcessPropertyPID`, `kAudioProcessPropertyBundleID`
-and `kAudioProcessPropertyIsRunningInput`. Ledge listens for changes to the
-list and to each process's `IsRunningInput`, and reads the set of PIDs that
-hold the mic. It does not poll.
+and `kAudioProcessPropertyIsRunningInput`.
+
+*(Amended after the live check.)* A process's own `IsRunningInput` never
+notifies when it changes; only the process list and each input device's
+`kAudioDevicePropertyDeviceIsRunningSomewhere` do. A browser's audio process
+outlives its tab, so listening per process left a closed Meet's call (and its
+mute) on. Ledge therefore:
+
+- listens to the process list, the device list and each input device's
+  running flag, reading again a beat after a device flips;
+- reads the holders again on every refresh while anything holds the mic, a
+  call is on, or the list couldn't be read;
+- reads once a second while any input device is running, since a call can
+  start on a mic that is already running without anything being announced.
 
 **Which app that is** *(my call)*. A holder counts only when it resolves to a
 regular app (`NSRunningApplication.activationPolicy == .regular`):

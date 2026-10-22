@@ -97,10 +97,18 @@ public enum CallMeetingMatcher {
             .min { abs($0.start.timeIntervalSince(now)) < abs($1.start.timeIntervalSince(now)) }
     }
 
-    /// The next event to start within `nextWithin`, other than `id`.
-    public static func next(after now: Date, in candidates: [MeetingCandidate], excluding id: String?) -> MeetingCandidate? {
+    /// The next event to start within `nextWithin`, other than the call's
+    /// own meeting — nor a copy of it in another calendar (a shared team
+    /// calendar), which has its own id but the same start and link or title.
+    public static func next(after now: Date, in candidates: [MeetingCandidate], excluding meeting: CallMeeting?) -> MeetingCandidate? {
         candidates
-            .filter { $0.id != id && $0.start > now && $0.start.timeIntervalSince(now) <= nextWithin }
+            .filter { candidate in
+                guard let meeting else { return true }
+                let isCopy = candidate.start == meeting.start
+                    && (candidate.joinURL == meeting.joinURL || candidate.title == meeting.title)
+                return candidate.id != meeting.id && !isCopy
+            }
+            .filter { $0.start > now && $0.start.timeIntervalSince(now) <= nextWithin }
             .min { $0.start < $1.start }
     }
 }

@@ -66,7 +66,19 @@ private func event(_ id: String, start: Double, end: Double, url: String? = "htt
 @Test func nextIsWithinTenMinutesAndNeverTheMatchedOne() {
     #expect(CallMeetingMatcher.next(after: t0, in: [event("b", start: 9, end: 30)], excluding: nil)?.id == "b")
     #expect(CallMeetingMatcher.next(after: t0, in: [event("b", start: 11, end: 30)], excluding: nil) == nil)
-    #expect(CallMeetingMatcher.next(after: t0, in: [event("b", start: 9, end: 30)], excluding: "b") == nil)
+    let b = event("b", start: 9, end: 30)
+    let matchedB = CallMeeting(id: b.id, title: b.title, start: b.start, end: b.end, joinURL: b.joinURL!, service: .meet)
+    #expect(CallMeetingMatcher.next(after: t0, in: [b], excluding: matchedB) == nil)
     #expect(CallMeetingMatcher.next(after: t0, in: [event("c", start: 5, end: 30, url: nil)], excluding: nil)?.id == "c",
             "an event without a link still counts as next")
+}
+
+/// The same meeting in two calendars (a shared team calendar) has two ids;
+/// the copy is not "next" (tidy-up, 2026-10-22).
+@Test func aMeetingCopiedInAnotherCalendarIsNotItsOwnNext() {
+    let mine = event("m", start: 5, end: 35)
+    let matched = CallMeeting(id: mine.id, title: mine.title, start: mine.start, end: mine.end, joinURL: mine.joinURL!,
+                              service: .meet)
+    let copy = event("m-team-calendar", start: 5, end: 35)
+    #expect(CallMeetingMatcher.next(after: t0, in: [mine, copy], excluding: matched) == nil)
 }

@@ -2,14 +2,6 @@ import CoreAudio
 import Foundation
 import os
 
-/// Which processes hold the mic right now (2026-10-22), from CoreAudio's
-/// process objects. Reads again whenever the process list changes or an
-/// input device starts or stops running somewhere — CoreAudio announces
-/// those, but not a process's own "running input", which never notifies
-/// (checked 2026-10-22: a process's running flags stay silent while its
-/// device's flips every time). What neither announces, `CallService`
-/// catches by calling `refresh()` while anything holds the mic.
-/// `holderPIDs` is `nil` when the list can't be read.
 /// Who holds the mic (2026-10-22). A protocol so the service can be tested
 /// on a source that, like CoreAudio, doesn't announce every change.
 @MainActor
@@ -29,6 +21,13 @@ public protocol MicHolderSource: AnyObject {
     func refresh()
 }
 
+/// Which processes hold the mic right now (2026-10-22), from CoreAudio's
+/// process objects. Reads again whenever the process list changes or an
+/// input device starts or stops running somewhere — CoreAudio announces
+/// those, but not a process's own "running input", which never notifies
+/// (checked 2026-10-22: a process's running flags stay silent while its
+/// device's flips every time). What neither announces, `CallService`
+/// catches by calling `refresh()` while anything holds the mic.
 @MainActor
 final class MicHolders: MicHolderSource {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "call")
@@ -42,7 +41,6 @@ final class MicHolders: MicHolderSource {
         let block: AudioObjectPropertyListenerBlock
     }
 
-    /// Nothing until started; `nil` only once a read has failed.
     /// Nothing until started; `nil` only once a read has failed.
     private(set) var holderPIDs: [pid_t]? = []
     private(set) var isMicRunning = false

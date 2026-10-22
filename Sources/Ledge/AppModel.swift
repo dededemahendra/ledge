@@ -1304,9 +1304,9 @@ final class AppModel {
         case .live(let app, let since):
             let icon = update.meeting.map { serviceIcon($0.service) } ?? callIcon(for: app)
             callLiveApp = app
-            let next = CallMeetingMatcher.next(after: now, in: candidates, excluding: update.meeting?.id)
+            let next = CallMeetingMatcher.next(after: now, in: candidates, excluding: update.meeting)
                 .flatMap { next in events.first { $0.id == next.id } }
-                .map { "\($0.title) at \($0.startTimeText())" }
+                .map(nextMeetingText)
             presenter.setCallPanel(CallPanelData(
                 appName: app.name, icon: icon, since: since, isMuted: update.isMuted, canMute: update.canMute,
                 micName: update.micName, meetingTitle: update.meeting?.title, meetingEnd: update.meeting?.end,
@@ -1320,7 +1320,7 @@ final class AppModel {
                 artwork: icon, tint: .positive, url: URL(string: "ledge://call")
             )
             guard record.title != callShown?.title || record.compactText != callShown?.compactText
-                    || record.symbolName != callShown?.symbolName else { return }
+                    || record.symbolName != callShown?.symbolName || record.artwork != callShown?.artwork else { return }
             callShown = record
             queue.insert(record)
             publish()
@@ -1345,6 +1345,17 @@ final class AppModel {
             queue.remove(kind: .call)
             publish()
         }
+    }
+
+    /// "1:1 at 15:00", formatted once per event rather than every tick
+    /// (tidy-up, 2026-10-22). An event's id includes its start.
+    private var nextMeetingTextCache: (id: String, title: String, text: String)?
+
+    private func nextMeetingText(_ event: MeetingEvent) -> String {
+        if let cached = nextMeetingTextCache, cached.id == event.id, cached.title == event.title { return cached.text }
+        let text = "\(event.title) at \(event.startTimeText())"
+        nextMeetingTextCache = (event.id, event.title, text)
+        return text
     }
 
     private func callIcon(for app: CallAppInfo) -> Data? {

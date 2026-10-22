@@ -10,7 +10,8 @@ private let chrome = CallAppInfo(bundleID: "com.google.Chrome", name: "Google Ch
 @MainActor
 private final class FakeCamera: CameraSource {
     var isCameraOn = false
-    func refresh() {}
+    private(set) var reads = 0
+    func refresh() { reads += 1 }
 }
 
 /// A calendar event `start` to `end` minutes from `t0`.
@@ -476,4 +477,12 @@ private final class Rig {
     rig.minutes(to: 10, hidden: hidden, meetings: meetings)
     rig.service.dismissCurrent()
     #expect(rig.minutes(from: 10 + 1.0 / 60, to: 20, hidden: hidden, meetings: meetings).state == .idle)
+}
+
+/// CoreMediaIO's first read takes tens of milliseconds; done at start, it
+/// never lands on the frame a call's pill animates in (tidy-up, 2026-10-22).
+@MainActor @Test func startWarmsTheCamera() {
+    let rig = Rig()
+    rig.service.start()
+    #expect(rig.camera.reads == 1)
 }

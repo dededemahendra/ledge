@@ -86,6 +86,9 @@ public final class CallService {
     public func start() {
         restoreSavedRecord()
         holders.start()
+        // CoreMediaIO's first read takes tens of milliseconds: pay it here,
+        // not on the frame a call's pill animates in.
+        camera.refresh()
     }
 
     public func stop() {
