@@ -4,6 +4,7 @@ import Foundation
 import NotchKit
 import LedgeSettings
 import HUDService
+import GitHubService
 
 @MainActor
 private func island() -> NotchController {
@@ -109,4 +110,34 @@ private func island() -> NotchController {
     #expect(c.captionText == "Ledge 0.1.2 is available · Download")
     let real = PreviewStage.apply(.update, content: PreviewContent(availableUpdate: "0.2.0"), to: c)
     #expect(real.sampleReason == nil && c.activities.first?.compactText == "0.2.0")
+}
+
+@MainActor
+@Test func theGitHubScenesShowTheirMoments() {
+    let c = island()
+    let checks = PreviewStage.apply(.githubChecks, content: PreviewContent(), to: c)
+    #expect(checks.text == "Checks finished · Sample: not connected")
+    #expect(c.activities.first?.id == NotchController.githubActivityID)
+    #expect(c.activities.first?.compactText == "Failed")
+    #expect(c.captionText == "#12 Fix the date picker · test (macos)")
+    _ = PreviewStage.apply(.githubRunning, content: PreviewContent(), to: c)
+    #expect(c.activities.first?.id == NotchController.githubRunActivityID)
+    #expect(c.activities.first?.compactText == "2:14")
+    _ = PreviewStage.apply(.githubRequests, content: PreviewContent(), to: c)
+    #expect(c.captionText == "sam asks for your review · #7 site")
+    _ = PreviewStage.apply(.githubRuns, content: PreviewContent(), to: c)
+    #expect(c.captionText == "Deploy · web")
+    let mine = GitHubPR(id: "PR_1", number: 4, title: "update notice", url: URL(string: "https://github.com/dede/ledge/pull/4")!, repo: "ledge")
+    let real = PreviewStage.apply(.githubMerges, content: PreviewContent(pullRequest: mine), to: c)
+    #expect(real.sampleReason == nil)
+    #expect(c.captionText == "#4 update notice · ledge")
+}
+
+@MainActor
+@Test func theGitHubScenesFollowTheirSwitches() {
+    let settings = AppSettings(defaults: UserDefaults(suiteName: "ledge.tests.\(UUID().uuidString)")!)
+    #expect(PreviewScene.githubReviews.isOn(in: settings))
+    settings.githubReviews = false
+    #expect(!PreviewScene.githubReviews.isOn(in: settings))
+    #expect(PreviewScene.githubRunning.title == "Checks running")
 }

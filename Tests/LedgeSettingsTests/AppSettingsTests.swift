@@ -60,3 +60,15 @@ private func fresh() -> (AppSettings, UserDefaults) {
     s.checksForUpdates = false
     #expect(!AppSettings(defaults: defaults).checksForUpdates)
 }
+
+@MainActor
+@Test func gitHubStartsDisconnectedWithEveryMomentOn() {
+    let (s, defaults) = fresh()
+    #expect(!s.githubConnected)
+    #expect(s.githubChecksFinished && s.githubChecksRunning && s.githubReviews)
+    #expect(s.githubMerges && s.githubReviewRequests && s.githubMyRuns)
+    s.githubConnected = true
+    s.githubReviews = false
+    let again = AppSettings(defaults: defaults)
+    #expect(again.githubConnected && !again.githubReviews && again.githubMerges)
+}

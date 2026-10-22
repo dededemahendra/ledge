@@ -32,7 +32,7 @@ let package = Package(
         .testTarget(name: "FocusServiceTests", dependencies: ["FocusService"]),
         .testTarget(name: "LiveActivityServiceTests", dependencies: ["LiveActivityService"]),
         .testTarget(name: "LedgeSettingsTests", dependencies: ["LedgeSettings"]),
-        .testTarget(name: "SettingsKitTests", dependencies: ["SettingsKit", "NotchKit", "LedgeSettings", "HUDService"]),
+        .testTarget(name: "SettingsKitTests", dependencies: ["SettingsKit", "NotchKit", "LedgeSettings", "HUDService", "GitHubService"]),
         .testTarget(name: "UpdateServiceTests", dependencies: ["UpdateService"]),
         .testTarget(name: "GitHubServiceTests", dependencies: ["GitHubService"]),
         .testTarget(

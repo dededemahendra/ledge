@@ -7,6 +7,7 @@ import LedgeSettings
 public enum PreviewScene: String, CaseIterable, Sendable {
     case volume, brightness, capsLock, battery, headphones, focus, timer, liveActivity
     case meeting, reminder, nowPlaying, songCaption, hoverCard, lockScreen, update
+    case githubRunning, githubChecks, githubReviews, githubMerges, githubRequests, githubRuns
 
     /// The caption under the island: the option's own name.
     public var title: String {
@@ -25,6 +26,12 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .hoverCard:           return "Open the island on hover"
         case .lockScreen:          return "Show on the lock screen"
         case .update:              return "Check for updates"
+        case .githubRunning:       return "Checks running"
+        case .githubChecks:        return "Checks finished"
+        case .githubReviews:       return "Reviews and comments"
+        case .githubMerges:        return "Merges and closes"
+        case .githubRequests:      return "Review requests"
+        case .githubRuns:          return "Your runs outside PRs"
         }
     }
 
@@ -45,6 +52,12 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .songCaption:            return settings.showsSongCaption
         case .lockScreen:             return settings.showsOnLockScreen
         case .update:                 return settings.checksForUpdates
+        case .githubRunning:          return settings.githubChecksRunning
+        case .githubChecks:           return settings.githubChecksFinished
+        case .githubReviews:          return settings.githubReviews
+        case .githubMerges:           return settings.githubMerges
+        case .githubRequests:         return settings.githubReviewRequests
+        case .githubRuns:             return settings.githubMyRuns
         case .nowPlaying, .hoverCard: return true
         }
     }

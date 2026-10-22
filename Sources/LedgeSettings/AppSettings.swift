@@ -23,6 +23,13 @@ public final class AppSettings {
         public static let showsLiveActivities = "showsLiveActivities"
         public static let showsOnLockScreen = "showsOnLockScreen"
         public static let checksForUpdates = "checksForUpdates"
+        public static let githubConnected = "githubConnected"
+        public static let githubChecksFinished = "githubChecksFinished"
+        public static let githubChecksRunning = "githubChecksRunning"
+        public static let githubReviews = "githubReviews"
+        public static let githubMerges = "githubMerges"
+        public static let githubReviewRequests = "githubReviewRequests"
+        public static let githubMyRuns = "githubMyRuns"
         public static let mediaSources = "mediaSources"
         public static let calendarLeadMinutes = "calendarLeadMinutes"
         public static let disabledCalendarIDs = "disabledCalendarIDs"
@@ -68,6 +75,15 @@ public final class AppSettings {
     public var showsOnLockScreen: Bool { didSet { save(showsOnLockScreen, Key.showsOnLockScreen) } }
     /// Asks GitHub once a day for a newer Ledge (2026-10-22).
     public var checksForUpdates: Bool { didSet { save(checksForUpdates, Key.checksForUpdates) } }
+    /// GitHub on the island (2026-10-22): off until the user connects.
+    public var githubConnected: Bool { didSet { save(githubConnected, Key.githubConnected) } }
+    /// The moments the island tells, each on by default.
+    public var githubChecksFinished: Bool { didSet { save(githubChecksFinished, Key.githubChecksFinished) } }
+    public var githubChecksRunning: Bool { didSet { save(githubChecksRunning, Key.githubChecksRunning) } }
+    public var githubReviews: Bool { didSet { save(githubReviews, Key.githubReviews) } }
+    public var githubMerges: Bool { didSet { save(githubMerges, Key.githubMerges) } }
+    public var githubReviewRequests: Bool { didSet { save(githubReviewRequests, Key.githubReviewRequests) } }
+    public var githubMyRuns: Bool { didSet { save(githubMyRuns, Key.githubMyRuns) } }
     /// Enabled music apps' bundle identifiers.
     public var mediaSources: Set<String> { didSet { save(Array(mediaSources).sorted(), Key.mediaSources) } }
     public var calendarLeadMinutes: Int { didSet { save(calendarLeadMinutes, Key.calendarLeadMinutes) } }
@@ -91,6 +107,13 @@ public final class AppSettings {
         showsLiveActivities = defaults.object(forKey: Key.showsLiveActivities) as? Bool ?? true
         showsOnLockScreen = defaults.object(forKey: Key.showsOnLockScreen) as? Bool ?? true
         checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? true
+        githubConnected = defaults.object(forKey: Key.githubConnected) as? Bool ?? false
+        githubChecksFinished = defaults.object(forKey: Key.githubChecksFinished) as? Bool ?? true
+        githubChecksRunning = defaults.object(forKey: Key.githubChecksRunning) as? Bool ?? true
+        githubReviews = defaults.object(forKey: Key.githubReviews) as? Bool ?? true
+        githubMerges = defaults.object(forKey: Key.githubMerges) as? Bool ?? true
+        githubReviewRequests = defaults.object(forKey: Key.githubReviewRequests) as? Bool ?? true
+        githubMyRuns = defaults.object(forKey: Key.githubMyRuns) as? Bool ?? true
         mediaSources = (defaults.object(forKey: Key.mediaSources) as? [String]).map(Set.init)
             ?? Set(Self.knownMediaSources.map(\.id))
         calendarLeadMinutes = defaults.object(forKey: Key.calendarLeadMinutes) as? Int ?? 5
