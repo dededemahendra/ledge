@@ -524,7 +524,7 @@ struct UpdateRow: View {
 
 /// A switch that plays its scene in the strip when it is turned on.
 @MainActor
-private func playing(_ keyPath: ReferenceWritableKeyPath<AppSettings, Bool>, _ scene: PreviewScene,
+func playing(_ keyPath: ReferenceWritableKeyPath<AppSettings, Bool>, _ scene: PreviewScene,
                      settings: AppSettings, director: PreviewDirector) -> Binding<Bool> {
     Binding(
         get: { settings[keyPath: keyPath] },
@@ -536,7 +536,7 @@ private func playing(_ keyPath: ReferenceWritableKeyPath<AppSettings, Bool>, _ s
 }
 
 /// A strip as the first section of a pane, without the section's card.
-private extension View {
+extension View {
     func asPaneHeader() -> some View {
         listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
     }

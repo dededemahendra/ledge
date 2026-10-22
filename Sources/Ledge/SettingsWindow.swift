@@ -87,7 +87,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
 /// The sections, as the sidebar lists them.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, island, media, calendar, permissions, about
+    case general, island, media, calendar, github, permissions, about
 
     var id: String { rawValue }
 
@@ -97,6 +97,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .island:      return "Island"
         case .media:       return "Media"
         case .calendar:    return "Calendar"
+        case .github:      return "GitHub"
         case .permissions: return "Permissions"
         case .about:       return "About"
         }
@@ -108,6 +109,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .island:      return "rectangle.topthird.inset.filled"
         case .media:       return "music.note"
         case .calendar:    return "calendar"
+        case .github:      return "arrow.triangle.branch"
         case .permissions: return "hand.raised.fill"
         case .about:       return "info.circle.fill"
         }
@@ -119,6 +121,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .island:      return Color(nsColor: .systemBlue)
         case .media:       return Color(nsColor: .systemPink)
         case .calendar:    return Color(nsColor: .systemRed)
+        case .github:      return Color(white: 0.2)
         case .permissions: return Color(nsColor: .systemGreen)
         case .about:       return Color(nsColor: .systemGray)
         }
@@ -151,7 +154,7 @@ struct SettingsView: View {
                     } icon: {
                         SettingsTile(symbol: section.symbol, color: section.tile)
                     }
-                    .badge(section == .permissions ? issueCount : (section == .about && model.hasUpdate ? 1 : 0))
+                    .badge(badge(for: section, issues: issueCount))
                     .tag(section)
                 }
                 .listStyle(.sidebar)
@@ -164,6 +167,7 @@ struct SettingsView: View {
                 case .island:      IslandSettings(settings: settings, model: model)
                 case .media:       MediaSettings(settings: settings, model: model)
                 case .calendar:    CalendarSettings(settings: settings, model: model)
+                case .github:      GitHubSettings(settings: settings, model: model)
                 case .permissions: PermissionsSettings(model: model)
                 case .about:       AboutSettings(model: model)
                 }
@@ -172,5 +176,16 @@ struct SettingsView: View {
             .navigationTitle(selection.section.title)
         }
         .frame(minWidth: 720, minHeight: 560)
+    }
+
+    /// Permissions count what is missing; About an update; GitHub a
+    /// login it no longer takes (2026-10-22).
+    private func badge(for section: SettingsSection, issues: Int) -> Int {
+        switch section {
+        case .permissions: return issues
+        case .about:       return model.hasUpdate ? 1 : 0
+        case .github:      return model.githubNeedsAttention ? 1 : 0
+        default:           return 0
+        }
     }
 }
