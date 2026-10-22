@@ -212,20 +212,39 @@ struct GitHubAccountCard: View {
         switch model.githubStatus {
         case .off, .checking: return "Connecting…"
         case .signInAgain: return "Sign in again"
-        case .ok, .failed, .rateLimited: return model.githubLogin ?? "Could not reach GitHub"
+        case .ok: return model.githubLogin ?? "Connected"
+        case .failed: return model.githubLogin ?? "Could not connect"
+        case .rateLimited: return model.githubLogin ?? "GitHub asked Ledge to wait"
+        }
+    }
+
+    /// How the login came, once known (2026-10-22).
+    private var via: String? {
+        switch model.githubSource {
+        case .gh?: "through gh"
+        case .keychain?: "with a token"
+        case nil: nil
         }
     }
 
     private var subtitle: String {
         if model.githubNeedsToken { return "Log in with gh auth login in Terminal, or paste a token, then Try again." }
-        let via = model.githubSource == .gh ? "Connected through gh" : "Connected with a token"
         var lines: [String] = []
         switch model.githubStatus {
-        case .ok(let at): lines.append("\(via) · checked at \(time(at))")
-        case .failed: lines.append("Could not reach GitHub just now. Ledge tries again shortly.")
-        case .rateLimited(let until): lines.append("GitHub asked Ledge to wait until \(time(until)).")
-        case .signInAgain: lines.append("GitHub no longer takes this login. Log in again with gh auth login, or paste a new token, then Try again.")
-        case .off, .checking: lines.append(via)
+        case .off, .checking:
+            switch model.githubSource {
+            case .gh?: lines.append("Using your gh login.")
+            case .keychain?: lines.append("Using your token.")
+            case nil: lines.append("Looking for your gh login.")
+            }
+        case .ok(let at):
+            lines.append(via.map { "Connected \($0) · checked at \(time(at))" } ?? "Checked at \(time(at))")
+        case .failed:
+            lines.append(model.githubLogin == nil ? "Ledge tries again shortly." : "Could not reach GitHub just now. Ledge tries again shortly.")
+        case .rateLimited(let until):
+            lines.append(model.githubLogin == nil ? "Ledge asks again at \(time(until))." : "GitHub asked Ledge to wait until \(time(until)).")
+        case .signInAgain:
+            lines.append("GitHub no longer takes this login. Log in again with gh auth login, or paste a new token, then Try again.")
         }
         if model.githubHidesOrganisations {
             lines.append("Some organisations hide their PRs from this token; authorise it for them on GitHub.")
