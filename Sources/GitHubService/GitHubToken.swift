@@ -32,6 +32,12 @@ public enum GitHubToken {
             process.standardOutput = out
             process.standardError = FileHandle.nullDevice
             do { try process.run() } catch { return nil }
+            // `gh` waiting on something (a keychain prompt) must not hold
+            // Settings on "Connecting…" for ever (2026-10-22).
+            nonisolated(unsafe) let running = process
+            DispatchQueue.global().asyncAfter(deadline: .now() + 10) {
+                if running.isRunning { running.terminate() }
+            }
             let data = out.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             return process.terminationStatus == 0 ? parse(ghOutput: String(decoding: data, as: UTF8.self)) : nil

@@ -37,6 +37,20 @@ public final class GitHubMonitor {
 
     public var isRunning: Bool { client != nil }
 
+    /// The longest a round may go unrefreshed before the island stops
+    /// showing it (2026-10-22): past the longest backoff, five minutes.
+    public static let staleAfter: TimeInterval = 6 * 60
+
+    /// The last good round while it can still be shown: not after GitHub
+    /// refused the login, and not once it is older than `staleAfter`,
+    /// so a ring never ticks on old news (2026-10-22). `snapshot` itself
+    /// stays the baseline for comparing the next round.
+    public func current(at date: Date) -> GitHubSnapshot? {
+        guard status != .signInAgain, let snapshot,
+              date.timeIntervalSince(snapshot.takenAt) < Self.staleAfter else { return nil }
+        return snapshot
+    }
+
     /// Starts over with `client`: the first round is a quiet baseline.
     public func start(_ client: GitHubClient) {
         prepare(client)
@@ -57,6 +71,9 @@ public final class GitHubMonitor {
     /// after a 401, which needs `start` with a new client.
     public func checkNow() {
         guard client != nil, status != .signInAgain else { return }
+        // GitHub asked to wait (2026-10-22): a wake or Check now does not
+        // jump the queue.
+        if case .rateLimited(let until) = status, until > now() { return }
         restart()
     }
 

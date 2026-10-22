@@ -1224,7 +1224,7 @@ Nothing GitHub shows on the lock screen; what was missed shows once after
 unlock. Full design: `2026-10-22-github-island-design.md`.
 
 **How.** `GitHubService`: one GraphQL query a round plus the user's runs in
-repos pushed to today (ETags), compared with the last good round; every 60 s,
-every 20 s while something runs, backing off on failure. The login is a pasted
-token from the Keychain, else `gh auth token`. This lifts the "one network
-request" line: a second destination, only while connected.
+repos pushed to in the last day, five at most (ETags), compared with the last good round; every 60 s,
+every 20 s while something runs, backing off on failure, waiting out a rate limit, and stopping after a 401 until the user tries again. The login is a pasted
+token from the Keychain, else `gh auth token`. Besides the daily update check, this is the app's only network
+traffic, and only while connected.

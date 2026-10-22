@@ -563,8 +563,9 @@ public struct NotchRootView: View {
                 // A long caption widens the island under the ears; they
                 // keep a one-activity ear's 38 pt at the ends, as the
                 // Dynamic Island keeps its own (2026-10-21). On a MacBook
-                // they drifted up to 43 pt in towards the notch.
-                edgeSlot: controller.captionText == nil ? nil : NotchMetrics.activityEarWidth,
+                // they drifted up to 43 pt in towards the notch. A longer
+                // trailing word widens them to fit (2026-10-22).
+                edgeSlot: controller.captionText == nil ? nil : controller.captionedEarSlot,
                 leading: { leadingEar },
                 trailing: { trailingEar }
             )

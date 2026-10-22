@@ -325,6 +325,7 @@ final class AppModel {
     private var githubRunShown: ActivityRecord?
     private var githubPanelShown: GitHubPanelData?
     private var githubWasLocked = false
+    private var githubWasShowing = false
     /// What happened while the screen was locked: one blip after unlock.
     private var githubMissed: [GitHubEvent] = []
     private var githubConnecting: Task<Void, Never>?
@@ -343,7 +344,8 @@ final class AppModel {
     /// The sidebar badge: GitHub no longer takes the login.
     var githubNeedsAttention: Bool { github.status == .signInAgain }
 
-    private var githubSnapshot: GitHubSnapshot? { githubProbeSnapshot ?? github.snapshot }
+    /// Fresh only: see `GitHubMonitor.current(at:)` (2026-10-22).
+    private var githubSnapshot: GitHubSnapshot? { githubProbeSnapshot ?? github.current(at: Date()) }
 
     func connectGitHub() {
         githubNeedsToken = false
@@ -474,8 +476,11 @@ final class AppModel {
             queue.remove(kind: .githubRun)
             publish()
         }
-        if locked != githubWasLocked {
+        // The panel follows a lock, and a round going stale or fresh again.
+        let showing = githubSnapshot != nil
+        if locked != githubWasLocked || showing != githubWasShowing {
             githubWasLocked = locked
+            githubWasShowing = showing
             publishGitHubPanel()
         }
     }
