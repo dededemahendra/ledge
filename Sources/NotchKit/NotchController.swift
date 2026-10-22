@@ -604,6 +604,15 @@ public final class NotchController {
         return ceil(width) + 16
     }
 
+    /// The ears' slot at the island's ends while a caption shows
+    /// (2026-10-22): a one-activity ear's 38 pt, as the Dynamic Island
+    /// keeps its own, unless the trailing text needs more ("Approved",
+    /// "Comment", "2h 10m"). The island's width already makes room for it.
+    public var captionedEarSlot: CGFloat {
+        max(NotchMetrics.activityEarWidth,
+            isPreviewingUpcoming ? earWidth(forText: upcoming?.compactText) : leadingEarWidth)
+    }
+
     /// `AppModel` inserts every volume/brightness record with this id
     /// (`ActivityKind.hud.rawValue` — a string, not the enum, since `NotchKit`
     /// has no dependency on `ActivityKit`; the same cross-module convention

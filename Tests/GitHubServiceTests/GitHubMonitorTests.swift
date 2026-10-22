@@ -89,3 +89,38 @@ private final class Clock {
     flaky.stop()
     #expect(flaky.status == .off && flaky.snapshot == nil && !flaky.isRunning)
 }
+
+@MainActor
+@Test func aRoundGoesStaleAfterSixMinutesAndAfterARefusedLogin() async {
+    let clock = Clock()
+    let calls = Counter()
+    let monitor = GitHubMonitor(now: { clock.now })
+    monitor.prepare(GitHubClient(token: "t", userAgent: "Ledge", fetch: fetch { request in
+        if request.url!.path().hasSuffix("/actions/runs") { return (200, [:], runsReply) }
+        return calls.next() == 0 ? (200, [:], mineReply) : (401, [:], "")
+    }))
+    _ = await monitor.round()
+    #expect(monitor.current(at: fixtureNow.addingTimeInterval(5 * 60))?.login == "dede")
+    #expect(monitor.current(at: fixtureNow.addingTimeInterval(7 * 60)) == nil, "older than six minutes")
+    clock.now = fixtureNow.addingTimeInterval(60)
+    _ = await monitor.round()
+    #expect(monitor.status == .signInAgain)
+    #expect(monitor.current(at: fixtureNow.addingTimeInterval(61)) == nil, "a refused login shows nothing")
+    #expect(monitor.snapshot != nil, "the baseline is kept")
+}
+
+@MainActor
+@Test func checkNowWaitsOutARateLimit() async {
+    let clock = Clock()
+    let monitor = GitHubMonitor(now: { clock.now })
+    let reset = Int(fixtureNow.timeIntervalSince1970) + 600
+    monitor.prepare(GitHubClient(token: "t", userAgent: "Ledge", fetch: fetch { _ in
+        (403, ["X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "\(reset)"], "")
+    }))
+    clock.now = fixtureNow
+    _ = await monitor.round()
+    guard case .rateLimited = monitor.status else { Issue.record("expected rateLimited, got \(monitor.status)"); return }
+    monitor.checkNow()
+    guard case .rateLimited = monitor.status else { Issue.record("checkNow should not restart"); return }
+    monitor.stop()
+}

@@ -1065,3 +1065,15 @@ private let gitHubPanel = GitHubPanelData(rows: [
     c.setHovered(true)
     #expect(c.state == .activity)
 }
+
+@MainActor
+@Test func aLongWordUnderACaptionGetsTheRoomItNeeds() {
+    let c = makeController()
+    c.setActivities([.init(id: NotchController.githubActivityID, title: "Approved", compactText: "Approved",
+                           symbolName: "checkmark.seal.fill")], overflow: 0)
+    c.setCaption("sam · #12 web")
+    #expect(c.captionedEarSlot > NotchMetrics.activityEarWidth)
+    #expect(c.parameters.width >= c.metrics.notchRect.width + 2 * c.captionedEarSlot)
+    c.setActivities([.init(id: NotchController.calendarActivityID, title: "Design review", compactText: "5m")], overflow: 0)
+    #expect(c.captionedEarSlot == NotchMetrics.activityEarWidth, "a short word keeps the 38 pt ends")
+}

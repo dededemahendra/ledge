@@ -131,7 +131,8 @@ struct GitHubConnectionRow: View {
             return "Sign in again"
         case .ok, .failed, .rateLimited:
             let via = model.githubSource == .gh ? "from gh" : "with a token"
-            return model.githubLogin.map { "Connected as \($0) (\(via))" } ?? "Connected (\(via))"
+            guard let login = model.githubLogin else { return "Could not reach GitHub (\(via))" }
+            return "Connected as \(login) (\(via))"
         }
     }
 
