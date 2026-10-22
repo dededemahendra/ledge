@@ -1715,3 +1715,15 @@ so none of these is verified:
 
 Not checkable on the Mac mini: a MacBook's notch on the lock screen, and a
 display change (lid closed or opened) while locked.
+
+## GitHub on the island (2026-10-22)
+
+Pending until the user reports them:
+
+1. Settings › GitHub › Connect with `gh` logged in: "Connected as <login> (from gh)" within a few seconds, then "Last checked at".
+2. A push to a PR of the user's: the amber ring and clock while checks run; a green or red blip when they finish; a click opens the PR or the failed check.
+3. A review or comment from someone else (a bot counts): the blip, its caption, the link.
+4. Hovering the running item opens the GitHub panel; a swipe on the empty peek does too; rows open on GitHub.
+5. Locked while something lands: nothing on the lock screen; one blip after unlock.
+6. Disconnect: the ring, blip and panel go, and no further requests.
+7. A pasted token (with `gh` logged out): connects "with a token"; a revoked token shows "Sign in again" and the sidebar badge.

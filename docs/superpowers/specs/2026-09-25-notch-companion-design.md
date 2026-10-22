@@ -1210,3 +1210,21 @@ is announced once per version with an island blip (click: the release page) and
 shown in Settings › About until updated. Settings › General › Check for updates
 turns it off. Nothing is downloaded or installed. Design:
 `2026-10-22-update-notice-design.md`.
+
+## GitHub on the island (2026-10-22)
+
+**What.** Once the user connects GitHub (Settings › GitHub; off by default),
+the island tells them about their own work across all their repos: checks
+running on their PRs (a sticky amber ring and a clock, `ActivityKind.githubRun`,
+priority 18), and as a blip (`ActivityKind.github`, priority 38, 8 s) checks
+passing or failing, reviews, comments, merges and closes by someone else, review
+requests, and runs they started outside a PR finishing. A round's news is one
+blip, the most important with "+N more". The open island has a GitHub panel.
+Nothing GitHub shows on the lock screen; what was missed shows once after
+unlock. Full design: `2026-10-22-github-island-design.md`.
+
+**How.** `GitHubService`: one GraphQL query a round plus the user's runs in
+repos pushed to today (ETags), compared with the last good round; every 60 s,
+every 20 s while something runs, backing off on failure. The login is a pasted
+token from the Keychain, else `gh auth token`. This lifts the "one network
+request" line: a second destination, only while connected.
