@@ -11,6 +11,7 @@ import TimerService
 import FocusService
 import LiveActivityService
 import SettingsKit
+import UpdateService
 import LedgeSettings
 import OSLog
 
@@ -188,10 +189,22 @@ final class AppModel {
                 self?.refreshTimer()
                 self?.refreshCharging()
                 self?.refreshLiveActivityOnHover()
+                self?.showPendingUpdate()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         pruneTimer = timer
+
+        // Updates (2026-10-22): a minute after launch, then once a day.
+        let firstCheck = Timer(timeInterval: 60, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkForUpdates() }
+        }
+        let daily = Timer(timeInterval: 24 * 60 * 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkForUpdates() }
+        }
+        RunLoop.main.add(firstCheck, forMode: .common)
+        RunLoop.main.add(daily, forMode: .common)
+        updateTimers = [firstCheck, daily]
     }
 
     func stop() {
@@ -199,6 +212,8 @@ final class AppModel {
         tasks.removeAll()
         pruneTimer?.invalidate()
         pruneTimer = nil
+        updateTimers.forEach { $0.invalidate() }
+        updateTimers.removeAll()
         clearMediaTask?.cancel()
         clearMediaTask = nil
         hud.stop()
@@ -206,6 +221,72 @@ final class AppModel {
         power.stop()
         media.stop()
         device.stop()
+    }
+
+    // MARK: - Updates (2026-10-22)
+
+    /// What the last update check found, for Settings › About.
+    enum UpdateStatus: Equatable {
+        case notChecked, off, checking
+        case upToDate(Date)
+        case available(ReleaseInfo, Date)
+        case failed(Date)
+    }
+
+    private(set) var updateStatus: UpdateStatus = .notChecked
+    var hasUpdate: Bool { if case .available = updateStatus { true } else { false } }
+    private var updateTimers: [Timer] = []
+    /// Found while locked: shown at the first tick after unlock.
+    private var pendingUpdate: ReleaseInfo?
+    private static let lastAnnouncedKey = "lastAnnouncedUpdate"
+    private static let runningVersion = AppVersion(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") ?? AppVersion("0")!
+
+    /// One check now: the timers, About's Check now, and the debug probe,
+    /// which pretends to be `version`, announces regardless and remembers
+    /// nothing. Off, it makes no request.
+    func checkForUpdates(pretending version: AppVersion? = nil) {
+        guard settings.checksForUpdates || version != nil else {
+            updateStatus = .off
+            return
+        }
+        updateStatus = .checking
+        let checker = UpdateChecker(currentVersion: version ?? Self.runningVersion)
+        let lastAnnounced = version == nil
+            ? UserDefaults.standard.string(forKey: Self.lastAnnouncedKey).flatMap(AppVersion.init) : nil
+        Task { @MainActor [weak self] in
+            let finding = await checker.check(lastAnnounced: lastAnnounced)
+            self?.apply(finding, remember: version == nil)
+        }
+    }
+
+    private func apply(_ finding: UpdateFinding?, remember: Bool) {
+        let now = Date()
+        switch finding {
+        case nil:
+            updateStatus = .failed(now)
+        case .upToDate?:
+            updateStatus = .upToDate(now)
+        case .available(let release, let announce)?:
+            updateStatus = .available(release, now)
+            guard announce else { return }
+            if remember { UserDefaults.standard.set(release.version.description, forKey: Self.lastAnnouncedKey) }
+            pendingUpdate = release
+            showPendingUpdate()
+        }
+    }
+
+    /// The update blip, once, on an unlocked screen.
+    private func showPendingUpdate() {
+        guard let release = pendingUpdate, !presenter.isLocked else { return }
+        pendingUpdate = nil
+        let version = release.version.description
+        queue.insert(ActivityRecord(
+            id: NotchController.updateActivityID, kind: .update, insertedAt: Date(),
+            ttl: ActivityKind.update.defaultTTL, title: UpdateNotice.title(version),
+            compactText: version, symbolName: UpdateNotice.symbolName, tint: .positive, url: release.pageURL
+        ))
+        showCaption(UpdateNotice.caption(version), for: ActivityKind.update.defaultTTL ?? NotchController.captionDuration)
+        publish()
     }
 
     // MARK: - Settings previews (2026-10-22)
@@ -232,7 +313,8 @@ final class AppModel {
             headphones: lastHeadphones.flatMap { $0.name == output ? $0 : nil },
             focus: lastFocus,
             volume: lastVolume,
-            timer: controller.activities.first { $0.id == NotchController.timerActivityID }
+            timer: controller.activities.first { $0.id == NotchController.timerActivityID },
+            availableUpdate: { if case .available(let release, _) = updateStatus { return release.version.description }; return nil }()
         )
     }
 
@@ -288,6 +370,11 @@ final class AppModel {
         calendar.setLeadTime(TimeInterval(settings.calendarLeadMinutes * 60))
         calendar.setDisabledCalendars(settings.disabledCalendarIDs)
         LoginItem.setEnabled(settings.launchAtLogin)
+        if !settings.checksForUpdates {
+            updateStatus = .off
+        } else if updateStatus == .off {
+            checkForUpdates()
+        }
     }
 
     /// The Calendar pane's list.
@@ -422,7 +509,9 @@ final class AppModel {
         // favourite star follows the track the same way.
         if title != captionedTitle {
             captionedTitle = title
-            if settings.showsSongCaption {
+            // A meeting or update blip owns the caption line for its
+            // lifetime (2026-10-22): a track change under it posts none.
+            if settings.showsSongCaption, !presenter.controller.isCalendarLeading, !presenter.controller.isUpdateLeading {
                 showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
             }
             favorites.trackChanged(bundleIdentifier: payload.bundleIdentifier)
@@ -689,6 +778,10 @@ final class AppModel {
             return
         }
         #if DEBUG
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/update" {
+            checkForUpdates(pretending: AppVersion("0.0.0"))
+            return
+        }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/settings" {
             let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
             onSnapshotSettings?(dir)
