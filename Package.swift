@@ -36,7 +36,7 @@ let package = Package(
         .testTarget(name: "SettingsKitTests", dependencies: ["SettingsKit", "NotchKit", "LedgeSettings", "HUDService", "GitHubService"]),
         .testTarget(name: "UpdateServiceTests", dependencies: ["UpdateService"]),
         .testTarget(name: "GitHubServiceTests", dependencies: ["GitHubService"]),
-        .testTarget(name: "CallServiceTests", dependencies: ["CallService"]),
+        .testTarget(name: "CallServiceTests", dependencies: ["CallService", "ActivityKit"]),
         .testTarget(
             name: "MediaServiceTests",
             dependencies: ["MediaService"],
