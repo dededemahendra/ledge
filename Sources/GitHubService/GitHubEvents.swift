@@ -92,7 +92,7 @@ public enum GitHubEvents {
     /// As `between(_:_:)`, remembering the commits whose checks have passed
     /// (2026-10-22): a pass is told once per PR head commit even when the
     /// rollup goes back to pending in between, as when a late check joins;
-    /// a failure is told each time, since a re-run that fails again is news.
+    /// a failure is told each time, since a re-run that fails again is news, and clears the memory, so a re-run that then passes is told too.
     /// `passed` keeps only the PRs' current commits.
     public static func between(_ old: GitHubSnapshot?, _ new: GitHubSnapshot, passed: inout Set<String>) -> [GitHubEvent] {
         func key(_ pr: GitHubPR) -> String { "\(pr.id) \(pr.headSHA ?? "")" }
@@ -102,6 +102,7 @@ public enum GitHubEvents {
             return true
         }
         passed = passed.intersection(new.mine.map(key))
+            .subtracting(new.mine.filter { $0.checks?.state == .failed }.map(key))
             .union(new.mine.filter { $0.checks?.state == .passed }.map(key))
         return events
     }
