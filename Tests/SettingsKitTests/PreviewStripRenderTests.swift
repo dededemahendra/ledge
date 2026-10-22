@@ -56,3 +56,17 @@ private func islandBox(_ strip: PreviewStrip, width: CGFloat) -> CGRect {
         #expect(abs(box.minY - want.minY) < 1.5 && abs(box.maxY - want.maxY) < 1.5, "\(name): \(box), want \(want)")
     }
 }
+
+/// In a pane narrower than the island's 640 pt canvas, the strip takes the
+/// pane's width and crops the canvas; it does not widen the pane.
+@MainActor
+@Test func aNarrowStripCropsTheCanvasInsteadOfWideningThePane() {
+    let director = PreviewDirector(scenes: [.battery], isOn: { _ in true })
+    let strip = PreviewStrip(director: director, height: PreviewStrip.shortHeight,
+                             metrics: NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32)),
+                             wallpaper: nil) { PreviewContent() }
+    let renderer = ImageRenderer(content: strip)
+    renderer.proposedSize = ProposedViewSize(width: 300, height: nil)
+    renderer.scale = 1
+    #expect(renderer.cgImage?.width == 300)
+}

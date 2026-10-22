@@ -38,7 +38,7 @@ public struct PreviewStrip: View {
         let controller = Self.makeController(metrics: metrics ?? Self.hostMetrics())
         // The first scene goes on now, so the strip is right on its first
         // frame (and in a headless render, which runs no `onChange`).
-        let first = director.staged.map { PreviewStage.apply($0, content: content(), to: controller, options: options) }
+        let first = director.stagedUntracked.map { PreviewStage.apply($0, content: content(), to: controller, options: options) }
         _controller = State(initialValue: controller)
         _caption = State(initialValue: first)
     }
@@ -50,10 +50,12 @@ public struct PreviewStrip: View {
                 .fill(Color.black.opacity(0.3))
                 .frame(height: 18)
             if director.staged == .lockScreen {
-                Text(Date.now, format: .dateTime.hour().minute())
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .padding(.top, 46)
+                TimelineView(.everyMinute) { context in
+                    Text(context.date, format: .dateTime.hour().minute())
+                        .font(.system(size: 34, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.92))
+                }
+                .padding(.top, 46)
             }
             // The island's own fixed canvas, centred and cropped by the strip.
             NotchRootView(controller: controller)

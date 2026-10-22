@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Observation
 @testable import SettingsKit
 
 private let t0 = Date(timeIntervalSinceReferenceDate: 800_000_000)
@@ -25,6 +26,8 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 800_000_000)
     d.tick(at: t0 + 10)
     #expect(d.scene == .capsLock, "pointing holds it, however long")
     d.leave(.capsLock, now: t0 + 11)
+    #expect(d.scene == .capsLock, "held for the grace")
+    d.tick(at: t0 + 11 + PreviewDirector.leaveGrace)
     #expect(d.scene == .volume && !d.isShowingOff)
 }
 
@@ -97,4 +100,30 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 800_000_000)
     #expect(d.staged == .hoverCard)
     d.switchedOn(.songCaption, now: t0 + 3)
     #expect(d.replays == 1, "a different scene is a scene change, not a replay")
+}
+
+/// Crossing the gap between two rows does not flash the cycle.
+@MainActor
+@Test func crossingTheGapBetweenRowsKeepsTheStripOnTheRows() {
+    let d = PreviewDirector(scenes: [.volume, .capsLock, .battery], isOn: { _ in true }, now: t0)
+    d.point(at: .capsLock, now: t0)
+    d.leave(.capsLock, now: t0 + 1)
+    d.tick(at: t0 + 1.1)
+    #expect(d.scene == .capsLock)
+    d.point(at: .battery, now: t0 + 1.15)
+    d.tick(at: t0 + 1.5)
+    #expect(d.scene == .battery)
+}
+
+private final class Flag: @unchecked Sendable { var value = false }
+
+/// A strip's first frame reads the scene without observing it.
+@MainActor
+@Test func readingTheUntrackedSceneDoesNotObserveIt() {
+    let d = PreviewDirector(scenes: [.volume, .battery], isOn: { _ in true }, now: t0)
+    let changed = Flag()
+    withObservationTracking { _ = d.stagedUntracked } onChange: { changed.value = true }
+    d.point(at: .battery, now: t0)
+    #expect(d.stagedUntracked == .battery)
+    #expect(!changed.value)
 }
