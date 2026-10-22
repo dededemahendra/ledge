@@ -21,6 +21,8 @@ public final class AppSettings {
         public static let showsFocus = "showsFocus"
         public static let showsClockTimers = "showsClockTimers"
         public static let showsLiveActivities = "showsLiveActivities"
+        public static let showsCalls = "showsCalls"
+        public static let hiddenCallApps = "hiddenCallApps"
         public static let showsOnLockScreen = "showsOnLockScreen"
         public static let checksForUpdates = "checksForUpdates"
         public static let githubConnected = "githubConnected"
@@ -71,6 +73,11 @@ public final class AppSettings {
     public var showsFocus: Bool { didSet { save(showsFocus, Key.showsFocus) } }
     public var showsClockTimers: Bool { didSet { save(showsClockTimers, Key.showsClockTimers) } }
     public var showsLiveActivities: Bool { didSet { save(showsLiveActivities, Key.showsLiveActivities) } }
+    /// Calls on the island (2026-10-22): the app on the mic and how long.
+    public var showsCalls: Bool { didSet { save(showsCalls, Key.showsCalls) } }
+    /// Apps marked "Not a call" on the call card, by bundle id, in the
+    /// order they were hidden (2026-10-22).
+    public var hiddenCallApps: [String] { didSet { save(hiddenCallApps, Key.hiddenCallApps) } }
     /// The island over the lock screen, look only (2026-10-21).
     public var showsOnLockScreen: Bool { didSet { save(showsOnLockScreen, Key.showsOnLockScreen) } }
     /// Asks GitHub once a day for a newer Ledge (2026-10-22).
@@ -105,6 +112,8 @@ public final class AppSettings {
         showsFocus = defaults.object(forKey: Key.showsFocus) as? Bool ?? true
         showsClockTimers = defaults.object(forKey: Key.showsClockTimers) as? Bool ?? true
         showsLiveActivities = defaults.object(forKey: Key.showsLiveActivities) as? Bool ?? true
+        showsCalls = defaults.object(forKey: Key.showsCalls) as? Bool ?? true
+        hiddenCallApps = defaults.object(forKey: Key.hiddenCallApps) as? [String] ?? []
         showsOnLockScreen = defaults.object(forKey: Key.showsOnLockScreen) as? Bool ?? true
         checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? true
         githubConnected = defaults.object(forKey: Key.githubConnected) as? Bool ?? false
@@ -124,6 +133,14 @@ public final class AppSettings {
 
     public func setCalendar(_ id: String, enabled: Bool) {
         if enabled { disabledCalendarIDs.remove(id) } else { disabledCalendarIDs.insert(id) }
+    }
+
+    public func hideCallApp(_ bundleID: String) {
+        if !hiddenCallApps.contains(bundleID) { hiddenCallApps.append(bundleID) }
+    }
+
+    public func unhideCallApp(_ bundleID: String) {
+        hiddenCallApps.removeAll { $0 == bundleID }
     }
 
     public func isMediaSourceEnabled(_ id: String) -> Bool { mediaSources.contains(id) }

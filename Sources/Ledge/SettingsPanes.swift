@@ -84,7 +84,7 @@ struct IslandSettings: View {
         self.settings = settings
         self.model = model
         _director = State(initialValue: PreviewDirector(
-            scenes: [.volume, .brightness, .capsLock, .battery, .headphones, .focus, .timer,
+            scenes: [.volume, .brightness, .capsLock, .battery, .headphones, .focus, .timer, .call,
                      .liveActivity, .meeting, .reminder, .lockScreen],
             isOn: { $0.isOn(in: settings) }
         ))
@@ -116,8 +116,32 @@ struct IslandSettings: View {
                     "moon.fill", .systemIndigo, \.showsFocus, .focus)
                 row("Clock timers and stopwatch", "A timer or stopwatch running in the Clock app.",
                     "timer", .systemOrange, \.showsClockTimers, .timer)
+                row("Calls", "The app and how long, while the mic is on",
+                    "phone.fill", .systemGreen, \.showsCalls, .call)
             } header: {
                 Text("What happens on the Mac")
+            }
+            if !settings.hiddenCallApps.isEmpty {
+                Section {
+                    ForEach(settings.hiddenCallApps, id: \.self) { bundleID in
+                        SettingsRow(Self.appName(bundleID), detail: "Marked “Not a call”", scene: .call, director: director) {
+                            AppIcon(bundleIdentifier: bundleID)
+                        } control: {
+                            Button {
+                                settings.unhideCallApp(bundleID)
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Show its calls again")
+                        }
+                    }
+                } header: {
+                    Text("Not calls")
+                } footer: {
+                    Text("Apps that hold the mic without being a call. Remove one to show it on the island again.")
+                }
             }
             Section {
                 row("Live Activities", "Scores and deliveries from your iPhone.",
@@ -146,6 +170,12 @@ struct IslandSettings: View {
                 Text("While the Mac is locked the island shows what it shows unlocked, meeting and reminder titles included, for anyone at the Mac to see. Resting on it opens the card to look at; nothing on it can be pressed until you unlock.")
             }
         }
+    }
+
+    /// A hidden call app's name, from the app itself when it is installed.
+    private static func appName(_ bundleID: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return bundleID }
+        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 
     private func row(_ title: String, _ detail: String, _ symbol: String, _ color: NSColor,

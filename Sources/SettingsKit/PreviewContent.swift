@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NotchKit
 import GitHubService
@@ -99,6 +100,18 @@ public enum PreviewSample {
         id: NotchController.timerActivityID, title: "Timer", compactText: "4:32",
         symbolName: "stopwatch", barFill: 0.6, tint: .system("orange")
     )
+    /// A call (2026-10-22): FaceTime's own icon when it can be found, else
+    /// the green mic, at "12:04".
+    @MainActor public static let call = NotchController.ActivityDisplay(
+        id: NotchController.callActivityID, title: "On a call · FaceTime", compactText: "12:04",
+        symbolName: "mic.fill", artwork: facetimeIcon(), tint: .positive
+    )
+    @MainActor private static func facetimeIcon() -> Data? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.FaceTime") else { return nil }
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        icon.size = NSSize(width: 64, height: 64)
+        return icon.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
+    }
     @MainActor public static let liveActivity = NotchController.ActivityDisplay(
         id: NotchController.liveActivityID, title: "Live Activity",
         score: .init(home: .init(name: "HOME", value: "2", crest: nil),

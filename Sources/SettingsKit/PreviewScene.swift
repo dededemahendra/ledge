@@ -5,7 +5,7 @@ import LedgeSettings
 /// for each option that makes the island do something. `PreviewStage`
 /// puts a private island into a scene; `PreviewDirector` picks which.
 public enum PreviewScene: String, CaseIterable, Sendable {
-    case volume, brightness, capsLock, battery, headphones, focus, timer, liveActivity
+    case volume, brightness, capsLock, battery, headphones, focus, timer, call, liveActivity
     case meeting, reminder, nowPlaying, songCaption, hoverCard, lockScreen, update
     case githubRunning, githubChecks, githubReviews, githubMerges, githubRequests, githubRuns
 
@@ -18,6 +18,7 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .headphones:          return "Headphones and speakers"
         case .focus:               return "Focus"
         case .timer:               return "Clock timers and stopwatch"
+        case .call:                return "Calls"
         case .liveActivity:        return "Live Activities"
         case .meeting:             return "Calendar events"
         case .reminder:            return "Reminders with a time"
@@ -46,6 +47,7 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .headphones:             return settings.showsDevices
         case .focus:                  return settings.showsFocus
         case .timer:                  return settings.showsClockTimers
+        case .call:                   return settings.showsCalls
         case .liveActivity:           return settings.showsLiveActivities
         case .meeting:                return settings.showsCalendarEvents
         case .reminder:               return settings.showsReminders

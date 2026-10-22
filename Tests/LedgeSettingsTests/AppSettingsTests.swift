@@ -15,6 +15,7 @@ private func fresh() -> (AppSettings, UserDefaults) {
     let (s, _) = fresh()
     #expect(s.launchAtLogin && s.showsSongCaption && s.showsVolumeBrightness && s.showsCapsLock && s.showsBattery)
     #expect(s.showsDevices && s.showsCalendarEvents && s.showsReminders && s.showsFocus && s.showsClockTimers && s.showsLiveActivities)
+    #expect(s.showsCalls)
     #expect(s.hoverDwell == 0.2)
     #expect(s.calendarLeadMinutes == 5)
     #expect(s.mediaSources == Set(AppSettings.knownMediaSources.map(\.id)))
@@ -71,4 +72,25 @@ private func fresh() -> (AppSettings, UserDefaults) {
     s.githubReviews = false
     let again = AppSettings(defaults: defaults)
     #expect(again.githubConnected && !again.githubReviews && again.githubMerges)
+}
+
+@MainActor
+@Test func callsAreOnAndNothingIsHiddenByDefault() {
+    let (s, _) = fresh()
+    #expect(s.showsCalls)
+    #expect(s.hiddenCallApps == [])
+}
+
+/// "Not a call" (2026-10-22): hidden once however often it is pressed,
+/// remembered, and brought back from Settings.
+@MainActor
+@Test func hidingACallAppSavesOnceAndUnhidingRemovesIt() {
+    let (s, defaults) = fresh()
+    s.hideCallApp("us.zoom.xos")
+    s.hideCallApp("us.zoom.xos")
+    #expect(s.hiddenCallApps == ["us.zoom.xos"])
+    let again = AppSettings(defaults: defaults)
+    #expect(again.hiddenCallApps == ["us.zoom.xos"])
+    again.unhideCallApp("us.zoom.xos")
+    #expect(again.hiddenCallApps == [])
 }

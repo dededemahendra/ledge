@@ -99,6 +99,9 @@ public enum PreviewStage {
         case .timer:
             c.setActivities([content.timer ?? PreviewSample.timer], overflow: 0)
             return caption(scene, sample: content.timer == nil ? "no timer running" : nil)
+        case .call:
+            c.setActivities([PreviewSample.call], overflow: 0)
+            return caption(scene, sample: "no call on")
         case .liveActivity:
             c.setActivities([PreviewSample.liveActivity], overflow: 0)
             return caption(scene, sample: "no Live Activity running")
