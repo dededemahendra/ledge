@@ -5,6 +5,20 @@ import Testing
 
 private let t0 = Date(timeIntervalSince1970: 1_000)
 private let zoom = CallAppInfo(bundleID: "us.zoom.xos", name: "zoom.us", pid: 100)
+private let chrome = CallAppInfo(bundleID: "com.google.Chrome", name: "Google Chrome", pid: 300)
+
+@MainActor
+private final class FakeCamera: CameraSource {
+    var isCameraOn = false
+    func refresh() {}
+}
+
+/// A calendar event `start` to `end` minutes from `t0`.
+private func event(_ id: String, start: Double, end: Double, url: String = "https://meet.google.com/abc-defg-hij",
+                   title: String = "Design review") -> MeetingCandidate {
+    MeetingCandidate(id: id, title: title, start: t0.addingTimeInterval(start * 60), end: t0.addingTimeInterval(end * 60),
+                     joinURL: URL(string: url))
+}
 
 /// Input devices that take Ledge's actions as a real one would.
 @MainActor
@@ -81,11 +95,14 @@ private final class Rig {
         set { source.truth = newValue }
     }
     let devices: FakeDevices
+    let camera = FakeCamera()
     let defaults = UserDefaults(suiteName: UUID().uuidString)!
     lazy var service = CallService(
         holders: source,
         devices: devices,
-        lookup: ProcessLookup(regularApp: { $0 == 100 ? zoom : nil }, responsiblePID: { _ in nil }, parentPID: { _ in nil }),
+        camera: camera,
+        lookup: ProcessLookup(regularApp: { [100: zoom, 300: chrome][$0] }, responsiblePID: { _ in nil },
+                              parentPID: { _ in nil }),
         defaults: defaults,
         ownPID: 9
     )
@@ -98,12 +115,24 @@ private final class Rig {
     /// Refreshes every quarter second over `seconds` after `t0`, returning
     /// the last update.
     @discardableResult
-    func refresh(from: Double = 0, to: Double, hidden: Set<String> = []) -> CallUpdate {
-        var update = service.refresh(at: t0.addingTimeInterval(from), hidden: hidden)
+    func refresh(from: Double = 0, to: Double, hidden: Set<String> = [], meetings: [MeetingCandidate] = []) -> CallUpdate {
+        var update = service.refresh(at: t0.addingTimeInterval(from), hidden: hidden, meetings: meetings)
         var t = from + 0.25
         while t <= to + 0.0001 {
-            update = service.refresh(at: t0.addingTimeInterval(t), hidden: hidden)
+            update = service.refresh(at: t0.addingTimeInterval(t), hidden: hidden, meetings: meetings)
             t += 0.25
+        }
+        return update
+    }
+
+    /// Refreshes once a second over `from` to `to` minutes after `t0`.
+    @discardableResult
+    func minutes(from: Double = 0, to: Double, hidden: Set<String> = [], meetings: [MeetingCandidate] = []) -> CallUpdate {
+        var update = service.refresh(at: t0.addingTimeInterval(from * 60), hidden: hidden, meetings: meetings)
+        var t = from * 60 + 1
+        while t <= to * 60 + 0.0001 {
+            update = service.refresh(at: t0.addingTimeInterval(t), hidden: hidden, meetings: meetings)
+            t += 1
         }
         return update
     }
@@ -282,4 +311,83 @@ private final class Rig {
     let update = rig.refresh(from: 2.25, to: 2.25)
     #expect(update.isMuted)
     #expect(update.micName == "MacBook Air Microphone")
+}
+
+// MARK: - Meetings (2026-10-22)
+
+@MainActor @Test func withNoMeetingsTheCallIsUnchanged() {
+    let update = Rig().refresh(to: 3)
+    #expect(update.state == .live(app: zoom, since: t0))
+    #expect(update.meeting == nil)
+}
+
+@MainActor @Test func aMatchSticksPastTheEnd() {
+    let rig = Rig(holders: [300])
+    #expect(rig.minutes(to: 35, meetings: [event("m", start: 0, end: 30)]).meeting?.id == "m")
+}
+
+/// Joining 15 minutes early: "On a call" until the meeting's window opens.
+@MainActor @Test func aCallJoinedEarlyMatchesWhenTheWindowOpens() {
+    let rig = Rig(holders: [300])
+    let meetings = [event("m", start: 15, end: 45)]
+    #expect(rig.minutes(to: 4, meetings: meetings).meeting == nil)
+    #expect(rig.minutes(from: 4 + 1.0 / 60, to: 5, meetings: meetings).meeting?.id == "m")
+}
+
+@MainActor @Test func backToBackMovesToTheNextOnceTheFirstHasEnded() {
+    let rig = Rig(holders: [300])
+    let meetings = [event("a", start: 0, end: 30), event("b", start: 30, end: 60, url: "https://meet.google.com/bbb-bbbb-bbb")]
+    #expect(rig.minutes(to: 29, meetings: meetings).meeting?.id == "a")
+    #expect(rig.minutes(from: 29 + 1.0 / 60, to: 31, meetings: meetings).meeting?.id == "b")
+}
+
+@MainActor @Test func whileTheFirstIsUnderWayTheNextNeverTakesOver() {
+    let rig = Rig(holders: [300])
+    let meetings = [event("a", start: 0, end: 40), event("b", start: 30, end: 60, url: "https://meet.google.com/bbb-bbbb-bbb")]
+    #expect(rig.minutes(to: 35, meetings: meetings).meeting?.id == "a")
+}
+
+@MainActor @Test func anExtendedMeetingUpdatesItsEnd() {
+    let rig = Rig(holders: [300])
+    rig.minutes(to: 1, meetings: [event("a", start: 0, end: 30)])
+    let update = rig.minutes(from: 1 + 1.0 / 60, to: 2, meetings: [event("a2", start: 0, end: 45)])
+    #expect(update.meeting?.end == t0.addingTimeInterval(45 * 60))
+}
+
+@MainActor @Test func aDeletedMeetingKeepsItsLastCopy() {
+    let rig = Rig(holders: [300])
+    rig.minutes(to: 1, meetings: [event("a", start: 0, end: 30)])
+    #expect(rig.minutes(from: 1 + 1.0 / 60, to: 2, meetings: []).meeting?.id == "a")
+}
+
+@MainActor @Test func aHandOverMatchesAgain() {
+    let rig = Rig(holders: [100])
+    // A browser fits both links; the Meet starts nearer the hand-over.
+    let meetings = [event("z", start: 0, end: 30, url: "https://us02web.zoom.us/j/1"), event("m", start: 1, end: 30)]
+    #expect(rig.minutes(to: 1, meetings: meetings).meeting?.service == .zoom)
+    rig.holders = [300]
+    #expect(rig.minutes(from: 1 + 1.0 / 60, to: 2, meetings: meetings).meeting?.service == .meet)
+}
+
+/// A browser hidden for a forgotten tab shows during a meeting, not before.
+@MainActor @Test func aHiddenBrowserShowsOnceAMeetIsUnderWay() {
+    let rig = Rig(holders: [300])
+    let hidden: Set<String> = [chrome.bundleID]
+    let meetings = [event("m", start: 5, end: 30)]
+    #expect(rig.minutes(to: 4.9, hidden: hidden, meetings: meetings).state == .idle)
+    #expect(rig.minutes(from: 4.9 + 1.0 / 60, to: 5.1, hidden: hidden, meetings: meetings).meeting?.id == "m")
+    let alone = Rig(holders: [300])
+    #expect(alone.minutes(to: 6, hidden: hidden).state == .idle)
+}
+
+@MainActor @Test func aHiddenBrowserStaysThroughTheMeetingsEnd() {
+    let rig = Rig(holders: [300])
+    let update = rig.minutes(to: 33, hidden: [chrome.bundleID], meetings: [event("m", start: 0, end: 30)])
+    #expect(update.state == .live(app: chrome, since: t0))
+}
+
+@MainActor @Test func theCameraComesThrough() {
+    let rig = Rig()
+    rig.camera.isCameraOn = true
+    #expect(rig.refresh(to: 3).isCameraOn)
 }

@@ -8,12 +8,18 @@ public struct CallUpdate: Sendable, Equatable {
     public let isMuted: Bool
     public let canMute: Bool
     public let micName: String?
+    /// The calendar meeting this call is, when it is one (2026-10-22).
+    public let meeting: CallMeeting?
+    public let isCameraOn: Bool
 
-    public init(state: CallState, isMuted: Bool, canMute: Bool, micName: String?) {
+    public init(state: CallState, isMuted: Bool, canMute: Bool, micName: String?, meeting: CallMeeting? = nil,
+                isCameraOn: Bool = false) {
         self.state = state
         self.isMuted = isMuted
         self.canMute = canMute
         self.micName = micName
+        self.meeting = meeting
+        self.isCameraOn = isCameraOn
     }
 }
 
@@ -33,6 +39,7 @@ public final class CallService {
 
     private let holders: MicHolderSource
     private let devices: InputDeviceIO
+    private let camera: CameraSource
     private let lookup: ProcessLookup
     private let defaults: UserDefaults
     private let ownPID: pid_t
@@ -51,10 +58,18 @@ public final class CallService {
     private var lastIdleRead = Date.distantPast
     private var lastOwedTry = Date.distantPast
 
+    /// The live call's meeting, the app it was matched for, and a hidden
+    /// app kept showing for as long as that match lasts (2026-10-22).
+    private var matched: CallMeeting?
+    private var matchedApp: String?
+    private var exemptApp: String?
+
     public init(holders: MicHolderSource? = nil, devices: InputDeviceIO = CoreAudioInputDevices(),
-                lookup: ProcessLookup = .live, defaults: UserDefaults = .standard, ownPID: pid_t = getpid()) {
+                camera: CameraSource? = nil, lookup: ProcessLookup = .live, defaults: UserDefaults = .standard,
+                ownPID: pid_t = getpid()) {
         self.holders = holders ?? MicHolders()
         self.devices = devices
+        self.camera = camera ?? CameraWatcher()
         self.lookup = lookup
         self.defaults = defaults
         self.ownPID = ownPID
@@ -73,7 +88,7 @@ public final class CallService {
         isLive = false
     }
 
-    public func refresh(at now: Date, hidden: Set<String>) -> CallUpdate {
+    public func refresh(at now: Date, hidden: Set<String>, meetings: [MeetingCandidate] = []) -> CallUpdate {
         // Read again each time while a call is on (its grace included),
         // while anything holds the mic, or while the list couldn't be read:
         // CoreAudio doesn't announce an app letting go when its process
@@ -103,11 +118,24 @@ public final class CallService {
         let apps = pids
             .compactMap { CallApp.resolve($0, ownPID: ownPID, lookup: lookup) }
             .filter { seen.insert($0.bundleID).inserted }
-        let state = tracker.update(now: now, holders: apps, hidden: hidden)
+        // A hidden app still shows while it is a meeting under way, and for
+        // as long as that match then lasts.
+        let exempt = Set(apps.map(\.bundleID).filter { bundleID in
+            hidden.contains(bundleID) && ((bundleID == exemptApp && matched != nil)
+                || CallMeetingMatcher.match(bundleID: bundleID, at: now, in: meetings, requireUnderWay: true) != nil)
+        })
+        let state = tracker.update(now: now, holders: apps, hidden: hidden.subtracting(exempt))
         let live = if case .live = state { true } else { false }
         if isLive, !live { restoreMute() }
         isLive = live
-        guard live else { return CallUpdate(state: state, isMuted: false, canMute: false, micName: nil) }
+        guard case .live(let app, _) = state else {
+            matched = nil
+            matchedApp = nil
+            exemptApp = nil
+            return CallUpdate(state: state, isMuted: false, canMute: false, micName: nil)
+        }
+        updateMeeting(for: app.bundleID, at: now, in: meetings, isHidden: hidden.contains(app.bundleID))
+        camera.refresh()
 
         var states = micStates()
         if wantsMute {
@@ -121,7 +149,35 @@ public final class CallService {
             if plan.changes != changes { changes = plan.changes }
         }
         return CallUpdate(state: state, isMuted: InputMutePlan.isMuted(states, changes: changes),
-                          canMute: InputMutePlan.canMute(states), micName: InputMutePlan.micName(states))
+                          canMute: InputMutePlan.canMute(states), micName: InputMutePlan.micName(states),
+                          meeting: matched, isCameraOn: camera.isCameraOn)
+    }
+
+    /// Keeps the live call's meeting (2026-10-22): matched afresh for a new
+    /// app; looked for again on every refresh until it has one (a call
+    /// joined early takes its meeting when the window opens); once matched,
+    /// kept past its end, re-read by link and title so an edit shows; and
+    /// once ended, given up for the next meeting in its window (back to
+    /// back in the same app).
+    private func updateMeeting(for bundleID: String, at now: Date, in meetings: [MeetingCandidate], isHidden: Bool) {
+        func fresh() -> CallMeeting? {
+            CallMeetingMatcher.match(bundleID: bundleID, at: now, in: meetings, requireUnderWay: isHidden)
+        }
+        if matchedApp != bundleID || matched == nil {
+            matched = fresh()
+        } else if let current = matched {
+            var kept = current
+            if let edited = meetings.first(where: { $0.joinURL == current.joinURL && $0.title == current.title }) {
+                kept = CallMeeting(id: edited.id, title: edited.title, start: edited.start, end: edited.end,
+                                   joinURL: current.joinURL, service: current.service)
+            }
+            if kept.end <= now, let next = fresh(), next.id != kept.id {
+                kept = next
+            }
+            matched = kept
+        }
+        matchedApp = bundleID
+        exemptApp = isHidden && matched != nil ? bundleID : nil
     }
 
     public func toggleMute() {
