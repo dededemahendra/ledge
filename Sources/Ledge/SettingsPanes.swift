@@ -152,15 +152,38 @@ struct IslandSettings: View {
 
 struct MediaSettings: View {
     let settings: AppSettings
+    let model: AppModel
+    private var _director: State<PreviewDirector>
+    private var director: PreviewDirector { _director.wrappedValue }
+
+    init(settings: AppSettings, model: AppModel) {
+        self.settings = settings
+        self.model = model
+        _director = State(initialValue: PreviewDirector(scenes: [.nowPlaying], isOn: { $0.isOn(in: settings) }))
+    }
 
     var body: some View {
-        Form {
+        let content = model.previewContent()
+        return Form {
+            Section {
+                PreviewStrip(director: director, height: PreviewStrip.shortHeight) { model.previewContent() }
+                    .asPaneHeader()
+            }
             Section {
                 ForEach(AppSettings.knownMediaSources, id: \.id) { source in
-                    Toggle(source.name, isOn: Binding(
-                        get: { settings.isMediaSourceEnabled(source.id) },
-                        set: { settings.setMediaSource(source.id, enabled: $0) }
-                    ))
+                    SettingsRow(source.name, detail: status(of: source.id, content: content),
+                                scene: .nowPlaying, director: director) {
+                        AppIcon(bundleIdentifier: source.id)
+                    } control: {
+                        Toggle(source.name, isOn: Binding(
+                            get: { settings.isMediaSourceEnabled(source.id) },
+                            set: { on in
+                                settings.setMediaSource(source.id, enabled: on)
+                                if on { director.switchedOn(.nowPlaying) }
+                            }
+                        ))
+                        .labelsHidden()
+                    }
                 }
             } header: {
                 Text("Now playing from")
@@ -169,11 +192,42 @@ struct MediaSettings: View {
             }
         }
     }
+
+    /// "Playing now", "Installed" or "Not installed".
+    private func status(of bundleIdentifier: String, content: PreviewContent) -> String {
+        if content.mediaSource == bundleIdentifier, content.media?.isPlaying == true { return "Playing now." }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) == nil
+            ? "Not installed." : "Installed."
+    }
+}
+
+/// An app's own icon, or a plain tile when it is not installed (2026-10-22).
+struct AppIcon: View {
+    let bundleIdentifier: String
+
+    var body: some View {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 22, height: 22)
+        } else {
+            SettingsTile(symbol: "music.note", color: Color(nsColor: .systemGray), size: 22)
+        }
+    }
 }
 
 struct CalendarSettings: View {
     let settings: AppSettings
     let model: AppModel
+    private var _director: State<PreviewDirector>
+    private var director: PreviewDirector { _director.wrappedValue }
+
+    init(settings: AppSettings, model: AppModel) {
+        self.settings = settings
+        self.model = model
+        _director = State(initialValue: PreviewDirector(scenes: [.meeting, .reminder], isOn: { $0.isOn(in: settings) }))
+    }
 
     var body: some View {
         let calendars = model.availableCalendars
@@ -181,13 +235,26 @@ struct CalendarSettings: View {
         let lists = CalendarInfo.grouped(calendars.filter { $0.kind == .reminder })
         Form {
             Section {
-                Picker("Remind me before an event", selection: Binding(
-                    get: { settings.calendarLeadMinutes },
-                    set: { settings.calendarLeadMinutes = $0 }
-                )) {
-                    ForEach(AppSettings.calendarLeadChoices, id: \.self) { minutes in
-                        Text(minutes == 1 ? "1 minute" : "\(minutes) minutes").tag(minutes)
+                PreviewStrip(director: director, height: PreviewStrip.shortHeight,
+                             options: .init(leadMinutes: settings.calendarLeadMinutes)) { model.previewContent() }
+                    .asPaneHeader()
+            }
+            Section {
+                SettingsRow("Remind me before an event", detail: "How long before an event its blip appears.",
+                            symbol: "bell.badge.fill", color: Color(nsColor: .systemRed), scene: .meeting, director: director) {
+                    Picker("Remind me before an event", selection: Binding(
+                        get: { settings.calendarLeadMinutes },
+                        set: { minutes in
+                            settings.calendarLeadMinutes = minutes
+                            director.switchedOn(.meeting)
+                        }
+                    )) {
+                        ForEach(AppSettings.calendarLeadChoices, id: \.self) { minutes in
+                            Text(minutes == 1 ? "1 minute" : "\(minutes) minutes").tag(minutes)
+                        }
                     }
+                    .labelsHidden()
+                    .fixedSize()
                 }
             } footer: {
                 Text("And again as it starts. A click on the blip joins the call, or opens the event in Calendar or Reminders.")
@@ -207,7 +274,7 @@ struct CalendarSettings: View {
                     ForEach(events, id: \.source) { group in
                         AccountLabel(group.source)
                         ForEach(group.calendars) { calendar in
-                            CalendarToggle(calendar: calendar, settings: settings)
+                            CalendarToggle(calendar: calendar, settings: settings, scene: .meeting, director: director)
                         }
                     }
                 } header: {
@@ -221,7 +288,7 @@ struct CalendarSettings: View {
                     ForEach(lists, id: \.source) { group in
                         AccountLabel(group.source)
                         ForEach(group.calendars) { list in
-                            CalendarToggle(calendar: list, settings: settings)
+                            CalendarToggle(calendar: list, settings: settings, scene: .reminder, director: director)
                         }
                     }
                 } header: {
@@ -248,23 +315,30 @@ struct AccountLabel: View {
     }
 }
 
-/// One calendar row: its colour dot, its name, its switch. A calendar
-/// added later starts on.
+/// One calendar or list (2026-10-22): its colour, its name, its switch.
+/// Pointing at it shows a meeting or reminder blip; a calendar added later
+/// starts on.
 struct CalendarToggle: View {
     let calendar: CalendarInfo
     let settings: AppSettings
+    let scene: PreviewScene
+    let director: PreviewDirector
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { settings.isCalendarEnabled(calendar.id) },
-            set: { settings.setCalendar(calendar.id, enabled: $0) }
-        )) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(calendar.color.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? Color.secondary)
-                    .frame(width: 9, height: 9)
-                Text(calendar.title)
-            }
+        SettingsRow(calendar.title, scene: scene, director: director) {
+            Circle()
+                .fill(calendar.color.map { Color(red: $0.red, green: $0.green, blue: $0.blue) } ?? Color.secondary)
+                .frame(width: 10, height: 10)
+                .frame(width: 22, height: 22)
+        } control: {
+            Toggle(calendar.title, isOn: Binding(
+                get: { settings.isCalendarEnabled(calendar.id) },
+                set: { on in
+                    settings.setCalendar(calendar.id, enabled: on)
+                    if on { director.switchedOn(scene) }
+                }
+            ))
+            .labelsHidden()
         }
     }
 }

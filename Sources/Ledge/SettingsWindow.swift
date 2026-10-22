@@ -154,7 +154,7 @@ struct SettingsView: View {
                 switch selection.section {
                 case .general:     GeneralSettings(settings: settings, model: model)
                 case .island:      IslandSettings(settings: settings, model: model)
-                case .media:       MediaSettings(settings: settings)
+                case .media:       MediaSettings(settings: settings, model: model)
                 case .calendar:    CalendarSettings(settings: settings, model: model)
                 case .permissions: PermissionsSettings(model: model)
                 case .about:       AboutSettings()
