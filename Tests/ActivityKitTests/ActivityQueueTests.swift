@@ -171,3 +171,9 @@ private func record(
     let record = ActivityRecord(id: "github-run", kind: .githubRun, insertedAt: Date(), ttl: nil, title: "Checks running", badge: 2)
     #expect(record.badge == 2)
 }
+
+@Test func aRecordCarriesItsSegments() {
+    let record = ActivityRecord(id: "github-run", kind: .githubRun, insertedAt: Date(), ttl: nil, title: "Checks running",
+                                segments: [.passed, .running])
+    #expect(record.segments == [.passed, .running])
+}

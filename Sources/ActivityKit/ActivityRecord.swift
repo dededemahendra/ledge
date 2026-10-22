@@ -59,6 +59,11 @@ public struct ActivityScore: Sendable, Equatable {
     }
 }
 
+/// One check's state, for the GitHub running item's ring (2026-10-22).
+public enum ActivitySegment: String, Sendable, Equatable {
+    case passed, failed, running
+}
+
 /// One thing the island is currently saying.
 public struct ActivityRecord: Sendable, Equatable, Identifiable {
     public let id: String
@@ -97,6 +102,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// A small count on the leading glyph (2026-10-22): how many GitHub
     /// checks and runs are going. `nil` draws none.
     public let badge: Int?
+    /// The ring's segments, a check each (2026-10-22); `nil` draws none.
+    public let segments: [ActivitySegment]?
 
     public init(
         id: String,
@@ -114,7 +121,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         parts: [ActivityPart]? = nil,
         score: ActivityScore? = nil,
         lines: [String] = [],
-        badge: Int? = nil
+        badge: Int? = nil,
+        segments: [ActivitySegment]? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -132,6 +140,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.score = score
         self.lines = lines
         self.badge = badge
+        self.segments = segments
     }
 
     public var isSticky: Bool { ttl == nil }
