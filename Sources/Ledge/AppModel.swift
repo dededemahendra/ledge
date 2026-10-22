@@ -12,6 +12,7 @@ import FocusService
 import LiveActivityService
 import SettingsKit
 import UpdateService
+import GitHubService
 import LedgeSettings
 import OSLog
 
@@ -190,6 +191,7 @@ final class AppModel {
                 self?.refreshCharging()
                 self?.refreshLiveActivityOnHover()
                 self?.showPendingUpdate()
+                self?.refreshGitHub()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -205,6 +207,13 @@ final class AppModel {
         RunLoop.main.add(firstCheck, forMode: .common)
         RunLoop.main.add(daily, forMode: .common)
         updateTimers = [firstCheck, daily]
+
+        // GitHub asks at once on wake (2026-10-22).
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.github.checkNow() }
+        }
     }
 
     func stop() {
@@ -216,6 +225,11 @@ final class AppModel {
         updateTimers.removeAll()
         checkTask?.cancel()
         checkTask = nil
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+        wakeObserver = nil
+        githubConnecting?.cancel()
+        githubConnecting = nil
+        github.stop()
         clearMediaTask?.cancel()
         clearMediaTask = nil
         hud.stop()
@@ -304,6 +318,215 @@ final class AppModel {
         publish()
     }
 
+    // MARK: - GitHub (2026-10-22)
+
+    private let github = GitHubMonitor()
+    private var githubClock = RunningClock()
+    private var githubRunShown: ActivityRecord?
+    private var githubPanelShown: GitHubPanelData?
+    private var githubWasLocked = false
+    /// What happened while the screen was locked: one blip after unlock.
+    private var githubMissed: [GitHubEvent] = []
+    private var githubConnecting: Task<Void, Never>?
+    private var wakeObserver: NSObjectProtocol?
+    /// The debug probe's made-up rounds stand in for GitHub's while it plays.
+    private var githubProbeSnapshot: GitHubSnapshot?
+    private static let githubKeychain = GitHubKeychain(service: "\(Bundle.main.bundleIdentifier ?? "Ledge").github")
+
+    /// Where the login came from, once connected.
+    private(set) var githubSource: GitHubTokenSource?
+    /// Connected in Settings, but there is neither a pasted token nor `gh`.
+    private(set) var githubNeedsToken = false
+    var githubStatus: GitHubMonitor.Status { github.status }
+    var githubLogin: String? { github.snapshot?.login }
+    var githubHidesOrganisations: Bool { github.snapshot?.hidesSomeOrganisations ?? false }
+    /// The sidebar badge: GitHub no longer takes the login.
+    var githubNeedsAttention: Bool { github.status == .signInAgain }
+
+    private var githubSnapshot: GitHubSnapshot? { githubProbeSnapshot ?? github.snapshot }
+
+    func connectGitHub() {
+        githubNeedsToken = false
+        if settings.githubConnected { startGitHub() } else { settings.githubConnected = true }
+    }
+
+    /// Stops asking, and forgets a pasted token.
+    func disconnectGitHub() {
+        Self.githubKeychain.delete()
+        settings.githubConnected = false
+    }
+
+    /// A token pasted in Settings: kept in the Keychain, then used.
+    func saveGitHubToken(_ token: String) {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, Self.githubKeychain.save(trimmed) else { return }
+        connectGitHub()
+    }
+
+    /// Settings' Check now, or Try again after GitHub refused the login
+    /// (which reads the login again: the user may have signed in anew).
+    func checkGitHubNow() {
+        if github.status == .signInAgain || githubNeedsToken || !github.isRunning { startGitHub() } else { github.checkNow() }
+    }
+
+    /// A pasted token wins over `gh`'s: pasting one is the user choosing it.
+    private func startGitHub() {
+        githubConnecting?.cancel()
+        githubNeedsToken = false
+        githubConnecting = Task { @MainActor [weak self] in
+            let pasted = Self.githubKeychain.read()
+            let fromGH = pasted == nil ? await GitHubToken.fromGH() : nil
+            guard let self, !Task.isCancelled, self.settings.githubConnected else { return }
+            self.githubConnecting = nil
+            guard let token = pasted ?? fromGH else {
+                self.githubNeedsToken = true
+                return
+            }
+            self.githubSource = pasted != nil ? .keychain : .gh
+            self.github.onRound = { [weak self] snapshot, events in self?.handleGitHubRound(snapshot, events) }
+            self.github.start(GitHubClient(token: token, userAgent: "Ledge/\(Self.runningVersion)"))
+        }
+    }
+
+    private func stopGitHub() {
+        githubConnecting?.cancel()
+        githubConnecting = nil
+        github.stop()
+        githubSource = nil
+        githubNeedsToken = false
+        githubMissed = []
+        githubClock = RunningClock()
+        githubRunShown = nil
+        queue.remove(kind: .githubRun)
+        queue.remove(kind: .github)
+        publish()
+        publishGitHubPanel()
+    }
+
+    private func handleGitHubRound(_ snapshot: GitHubSnapshot, _ events: [GitHubEvent]) {
+        let wanted = events.filter(isWanted)
+        if presenter.isLocked {
+            githubMissed += wanted
+        } else if let blip = GitHubNotice.burst(wanted) {
+            showGitHub(blip)
+        }
+        publishGitHubPanel()
+    }
+
+    private func isWanted(_ event: GitHubEvent) -> Bool {
+        switch event {
+        case .checksPassed, .checksFailed: return settings.githubChecksFinished
+        case .reviewed, .commented:        return settings.githubReviews
+        case .merged, .closed:             return settings.githubMerges
+        case .reviewRequested:             return settings.githubReviewRequests
+        case .runPassed, .runFailed:       return settings.githubMyRuns
+        }
+    }
+
+    private func showGitHub(_ blip: GitHubBlip) {
+        queue.insert(ActivityRecord(
+            id: NotchController.githubActivityID, kind: .github, insertedAt: Date(),
+            ttl: ActivityKind.github.defaultTTL, title: blip.title, compactText: blip.word,
+            symbolName: blip.symbolName, tint: blip.tintName.map { .system($0) }, url: blip.url
+        ))
+        publish()
+        showCaption(blip.caption, for: ActivityKind.github.defaultTTL ?? NotchController.captionDuration)
+    }
+
+    /// Every tick: what was missed while locked, the running item's clock,
+    /// and the lock screen rule (no GitHub there at all).
+    private func refreshGitHub() {
+        let locked = presenter.isLocked
+        if !locked, !githubMissed.isEmpty {
+            let missed = githubMissed
+            githubMissed = []
+            if let blip = GitHubNotice.burst(missed) { showGitHub(blip) }
+        }
+        if locked, queue.ordered.contains(where: { $0.kind == .github }) {
+            queue.remove(kind: .github)
+            publish()
+        }
+        let now = Date()
+        let running = locked ? [] : (githubSnapshot.map(GitHubEvents.running(in:)) ?? []).filter {
+            $0.source == .checks ? settings.githubChecksRunning : settings.githubMyRuns
+        }
+        if let lead = githubClock.lead(of: running, now: now) {
+            let record = ActivityRecord(
+                id: NotchController.githubRunActivityID, kind: .githubRun,
+                insertedAt: githubRunShown?.insertedAt ?? now, ttl: nil,
+                title: lead.item.source == .run ? "Run going" : "Checks running", detail: lead.item.caption,
+                compactText: TimerText.format(seconds: now.timeIntervalSince(lead.since).rounded(.down)),
+                tint: .system(GitHubNotice.runningTintName), url: lead.item.url,
+                badge: lead.count > 1 ? lead.count : nil
+            )
+            // Republished only when what the island draws changes.
+            if record.compactText != githubRunShown?.compactText || record.badge != githubRunShown?.badge
+                || record.url != githubRunShown?.url {
+                githubRunShown = record
+                queue.insert(record)
+                publish()
+            }
+        } else if githubRunShown != nil {
+            githubRunShown = nil
+            queue.remove(kind: .githubRun)
+            publish()
+        }
+        if locked != githubWasLocked {
+            githubWasLocked = locked
+            publishGitHubPanel()
+        }
+    }
+
+    /// The panel's list, or none: not connected, nothing to list, or locked.
+    private func publishGitHubPanel() {
+        var data: GitHubPanelData?
+        if !presenter.isLocked, let snapshot = githubSnapshot {
+            let list = GitHubPanelRows.make(snapshot)
+            if !list.rows.isEmpty {
+                data = GitHubPanelData(
+                    rows: list.rows.map { GitHubPanelData.Row(id: $0.id, mark: Self.panelMark($0.mark), title: $0.title, repo: $0.repo, url: $0.url) },
+                    more: list.more, moreURL: GitHubPanelRows.moreURL
+                )
+            }
+        }
+        guard data != githubPanelShown else { return }
+        githubPanelShown = data
+        presenter.setGitHubPanel(data)
+    }
+
+    private static func panelMark(_ mark: GitHubRow.Mark) -> GitHubPanelData.Row.Mark {
+        switch mark {
+        case .running: .running
+        case .passed:  .passed
+        case .failed:  .failed
+        case .none:    .none
+        case .review:  .review
+        }
+    }
+
+    #if DEBUG
+    /// `ledge://probe/github`, debug builds only (2026-10-22): plays
+    /// `GitHubSample.story` through the island a step every three seconds,
+    /// as real rounds would land, with no network; the last step stays half
+    /// a minute so the panel can be hovered.
+    private func playGitHubStory() {
+        let story = GitHubSample.story(login: "you", start: Date())
+        Task { @MainActor [weak self] in
+            var previous: GitHubSnapshot?
+            for snapshot in story {
+                guard let self else { return }
+                self.githubProbeSnapshot = snapshot
+                self.handleGitHubRound(snapshot, GitHubEvents.between(previous, snapshot))
+                previous = snapshot
+                try? await Task.sleep(for: .seconds(3))
+            }
+            try? await Task.sleep(for: .seconds(30))
+            self?.githubProbeSnapshot = nil
+            self?.publishGitHubPanel()
+        }
+    }
+    #endif
+
     // MARK: - Settings previews (2026-10-22)
 
     /// What only arrives as events, kept for the Settings previews: the
@@ -329,7 +552,8 @@ final class AppModel {
             focus: lastFocus,
             volume: lastVolume,
             timer: controller.activities.first { $0.id == NotchController.timerActivityID },
-            availableUpdate: { if case .available(let release, _) = updateStatus { return release.version.description }; return nil }()
+            availableUpdate: { if case .available(let release, _) = updateStatus { return release.version.description }; return nil }(),
+            pullRequest: githubSnapshot?.mine.first
         )
     }
 
@@ -394,6 +618,15 @@ final class AppModel {
         } else if updateStatus == .off {
             checkForUpdates()
         }
+        // GitHub (2026-10-22): connect when switched on, stop when off;
+        // a switch for a moment applies from the next round, and at once
+        // to the running item and the panel.
+        if settings.githubConnected {
+            if !github.isRunning, githubConnecting == nil, !githubNeedsToken { startGitHub() }
+        } else if github.isRunning || githubConnecting != nil || githubNeedsToken {
+            stopGitHub()
+        }
+        publishGitHubPanel()
     }
 
     /// The Calendar pane's list.
@@ -530,7 +763,7 @@ final class AppModel {
             captionedTitle = title
             // A meeting or update blip owns the caption line for its
             // lifetime (2026-10-22): a track change under it posts none.
-            if settings.showsSongCaption, !presenter.controller.isCalendarLeading, !presenter.controller.isUpdateLeading {
+            if settings.showsSongCaption, !presenter.controller.isCalendarLeading, !presenter.controller.isUpdateLeading, !presenter.controller.isGitHubLeading {
                 showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
             }
             favorites.trackChanged(bundleIdentifier: payload.bundleIdentifier)
@@ -799,6 +1032,11 @@ final class AppModel {
         #if DEBUG
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/update" {
             checkForUpdates(pretending: AppVersion("0.0.0"))
+            return
+        }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/github" {
+            Self.log.notice("probe: github story")
+            playGitHubStory()
             return
         }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/settings" {
@@ -1158,7 +1396,8 @@ final class AppModel {
                           away: .init(name: $0.away.name, value: $0.away.value, crest: $0.away.crest),
                           status: $0.status, clock: $0.clock, title: $0.title)
                 },
-                lines: record.lines
+                lines: record.lines,
+                badge: record.badge
             )
         }
         // `setActivities` sets the count itself — do not also call
