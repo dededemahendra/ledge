@@ -47,7 +47,7 @@ Explicitly out of scope, and not to be added without a new design round:
 - Camera mirror, camera guard, mic mute
 - Support for external or notch-less displays as the island's host (lifted
   2026-10-21: see "Screens without a notch" below)
-- Distribution of any kind
+- Distribution of any kind (lifted 2026-10-22: see "Downloadable release" below)
 
 Alcove itself has none of the first group; adding them is scope creep dressed as
 parity.
@@ -1182,3 +1182,13 @@ only: hover opens the card display-only; no click, tap, swipe or button does
 anything. Settings › Island › "Show on the lock screen" turns it off. Without
 the SkyLight calls, or with the switch off, it hides while locked as before.
 Design: `2026-10-21-lock-screen-island-design.md`.
+
+## Downloadable release (2026-10-22)
+
+Lifts the §2 non-goal "Distribution of any kind" (user's call). The repo is
+public and each version is a GitHub release with a disk image built by
+`make dmg`. The app is signed with the self-signed "Ledge Dev" certificate and
+not notarised, so a downloader allows it once in System Settings › Privacy &
+Security; the README's Install section says how. There is no licence: the code
+can be read, not reused. Everything else stays personal: no auto-update, no
+localisation, macOS 27 on Apple silicon only.
