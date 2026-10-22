@@ -1684,3 +1684,34 @@ Checked by the user, since it means driving the pointer: the hover preview
 from the top edge, the open card with no strip above its content, a volume
 change with the card open (the strip grows to 32 pt, then goes), and the
 now-playing pill taking over from a blip while music plays. All as designed.
+
+## The island on the lock screen (2026-10-21)
+
+Before the build, a throwaway probe (not in the repo) put a panel in a private
+window-server space at absolute level 400: the user saw it on the Mac mini's lock
+screen for as long as it was locked, and its own tracking area got the pointer
+and a click there. `screencapture` cannot capture the lock screen, so every
+check below is by eye.
+
+The build (`lock-screen-island`, merged 2026-10-22) was installed and launched.
+`make test` passed apart from the two brightness tests that need a built-in
+panel. The live checks were handed to the user and not yet reported at merge,
+so none of these is verified:
+
+1. With music playing, locked: the island at the top centre of the lock screen.
+2. Resting on it while locked opens the card, display-only. Hover reaches Ledge
+   only if macOS still feeds it the pointer while locked; if not, the card
+   cannot open there, which the design accepts.
+3. Clicking the island or a card row while locked does nothing.
+4. Unlocking with the card open keeps it open, controls back.
+5. Nothing playing, locked, pointer at the top centre: the island appears over
+   the lock screen, not under it (the window is put back in its space on every
+   order-in).
+6. Sleep and wake while locked: the island is still there.
+7. Settings › Island › "Show on the lock screen" off: nothing while locked, the
+   pop back on unlock.
+8. Unlocked, the island over Spotlight, a full-screen video and the screen
+   saver, and whether it gets in the way of anything.
+
+Not checkable on the Mac mini: a MacBook's notch on the lock screen, and a
+display change (lid closed or opened) while locked.
