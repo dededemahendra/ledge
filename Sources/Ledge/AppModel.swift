@@ -1293,13 +1293,25 @@ final class AppModel {
     private func refreshCall() {
         guard settings.showsCalls else { return }
         let now = Date()
-        let update = call.refresh(at: now, hidden: Set(settings.hiddenCallApps))
+        // The calendar's meetings (2026-10-22), whatever the "Calendar
+        // events" switch says: that switch is about blips.
+        let events = calendar.availability.isAvailable ? calendar.upcoming(at: now, limit: 50, allowing: [.event]) : []
+        let candidates = events.map {
+            MeetingCandidate(id: $0.id, title: $0.title, start: $0.start, end: $0.end, joinURL: $0.joinURL)
+        }
+        let update = call.refresh(at: now, hidden: Set(settings.hiddenCallApps), meetings: candidates)
         switch update.state {
         case .live(let app, let since):
-            let icon = callIcon(for: app)
+            let icon = update.meeting.map { serviceIcon($0.service) } ?? callIcon(for: app)
             callLiveApp = app
-            presenter.setCallPanel(CallPanelData(appName: app.name, icon: icon, since: since, isMuted: update.isMuted,
-                                                 canMute: update.canMute, micName: update.micName))
+            let next = CallMeetingMatcher.next(after: now, in: candidates, excluding: update.meeting?.id)
+                .flatMap { next in events.first { $0.id == next.id } }
+                .map { "\($0.title) at \($0.startTimeText())" }
+            presenter.setCallPanel(CallPanelData(
+                appName: app.name, icon: icon, since: since, isMuted: update.isMuted, canMute: update.canMute,
+                micName: update.micName, meetingTitle: update.meeting?.title, meetingEnd: update.meeting?.end,
+                isCameraOn: update.isCameraOn, nextMeeting: next
+            ))
             let record = ActivityRecord(
                 id: NotchController.callActivityID, kind: .call, insertedAt: callShown?.insertedAt ?? now, ttl: nil,
                 title: "On a call · \(app.name)",
@@ -1337,11 +1349,35 @@ final class AppModel {
 
     private func callIcon(for app: CallAppInfo) -> Data? {
         if let cached = callIcons[app.bundleID] { return cached }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID) else { return nil }
+        let png = Self.appIconPNG(app.bundleID)
+        callIcons[app.bundleID] = png
+        return png
+    }
+
+    private static func appIconPNG(_ bundleID: String) -> Data? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
         let icon = NSWorkspace.shared.icon(forFile: url.path)
         icon.size = NSSize(width: 64, height: 64)
-        let png = icon.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
-        callIcons[app.bundleID] = png
+        return icon.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
+    }
+
+    /// A meeting service's icon (2026-10-22): its own Mac app's when one is
+    /// installed, else its glyph on a tile of its colour — Meet's always,
+    /// having no Mac app. No third-party logo is bundled.
+    private var serviceIcons: [MeetingService: Data] = [:]
+
+    private func serviceIcon(_ service: MeetingService) -> Data? {
+        if let cached = serviceIcons[service] { return cached }
+        let installed = (CallMeetingMatcher.apps[service] ?? []).lazy.compactMap(Self.appIconPNG).first
+        let tileColour: NSColor = switch service {
+        case .meet:     NSColor(red: 0, green: 0xA6 / 255.0, blue: 0x7E / 255.0, alpha: 1)
+        case .zoom:     NSColor(red: 0x0B / 255.0, green: 0x5C / 255.0, blue: 1, alpha: 1)
+        case .teams:    NSColor(red: 0x5B / 255.0, green: 0x5F / 255.0, blue: 0xC7 / 255.0, alpha: 1)
+        case .webex:    NSColor(red: 0, green: 0x8E / 255.0, blue: 0xD8 / 255.0, alpha: 1)
+        case .facetime: .systemGreen
+        }
+        let png = installed ?? CallTile.png(symbol: "video.fill", color: tileColour)
+        if let png { serviceIcons[service] = png }
         return png
     }
     private let clock = ClockTimerObserver()
