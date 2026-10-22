@@ -80,3 +80,21 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 800_000_000)
     d.tick(at: t0 + 1.5)
     #expect(d.staged == .hoverCard)
 }
+
+/// Flipping the switch of the row the pointer rests on replays its scene,
+/// two-step hover included.
+@MainActor
+@Test func aSwitchTurnedOnForTheSceneShowingPlaysItAgainFromTheStart() {
+    let d = PreviewDirector(scenes: [.songCaption, .hoverCard], isOn: { _ in true }, now: t0)
+    d.hoverDwell = 0.5
+    d.point(at: .hoverCard, now: t0)
+    d.tick(at: t0 + 2)
+    #expect(d.staged == .hoverCard && d.replays == 0)
+    d.switchedOn(.hoverCard, now: t0 + 2)
+    #expect(d.replays == 1, "the strip is told to play it again")
+    #expect(d.staged == .nowPlaying, "the hover starts over with its pause")
+    d.tick(at: t0 + 2.5)
+    #expect(d.staged == .hoverCard)
+    d.switchedOn(.songCaption, now: t0 + 3)
+    #expect(d.replays == 1, "a different scene is a scene change, not a replay")
+}
