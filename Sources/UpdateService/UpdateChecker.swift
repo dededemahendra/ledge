@@ -2,14 +2,20 @@ import Foundation
 
 /// Asks GitHub for the latest release (2026-10-22): the app's only network
 /// request. No cookies or cache, a `Ledge/<version>` User-Agent, a 15 s
-/// timeout; anything but a readable 200 is "could not check". `fetch` is
-/// injected so the tests can answer it.
+/// timeout and 30 s in all; anything but a readable 200 is "could not
+/// check". `fetch` is injected so the tests can answer it.
 public struct UpdateChecker: Sendable {
     public typealias Fetch = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
     public static let latestReleaseURL = URL(string: "https://api.github.com/repos/dededemahendra/ledge/releases/latest")!
 
-    private static let ephemeral = URLSession(configuration: .ephemeral)
+    private static let ephemeral: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        // A reply that trickles in would otherwise hold the app's one check
+        // slot for days (2026-10-22).
+        configuration.timeoutIntervalForResource = 30
+        return URLSession(configuration: configuration)
+    }()
     public static let session: Fetch = { request in try await ephemeral.data(for: request) }
 
     let currentVersion: AppVersion
