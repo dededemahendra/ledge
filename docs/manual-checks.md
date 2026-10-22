@@ -1727,3 +1727,6 @@ Pending until the user reports them:
 5. Locked while something lands: nothing on the lock screen; one blip after unlock.
 6. Disconnect: the ring, blip and panel go, and no further requests.
 7. A pasted token (with `gh` logged out): connects "with a token"; a revoked token shows "Sign in again" and the sidebar badge.
+8. The panel's hero card: checks running with the segmented bar and a ticking clock; checks failed; a review request with the asker's picture. A debug build's `ledge://probe/github-panel` pins it open on a sample.
+9. A blip from a person (a review, a comment) shows their picture with a badge; checks and runs show a colour disc.
+10. Settings › GitHub: the account card with your picture and the line of counts; before connecting, the welcome card.
