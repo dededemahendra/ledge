@@ -372,21 +372,15 @@ struct PermissionsSettings: View {
                 }
                 Section {
                     ForEach(model.permissionRows) { row in
-                        HStack {
-                            Image(systemName: row.isGranted ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(row.isGranted ? Color(nsColor: .systemGreen) : .secondary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.name)
-                                Text(row.detail)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if !row.isGranted, let url = row.settingsURL {
-                                Button("Open Settings…") { NSWorkspace.shared.open(url) }
+                        let look = Self.look(row.id)
+                        SettingsRow(row.name, detail: row.detail, symbol: look.symbol, color: Color(nsColor: look.color)) {
+                            HStack(spacing: 8) {
+                                StatusPill(isOn: row.isGranted)
+                                if !row.isGranted, let url = row.settingsURL {
+                                    Button("Open Settings…") { NSWorkspace.shared.open(url) }
+                                }
                             }
                         }
-                        .padding(.vertical, 2)
                     }
                 } footer: {
                     Text("Ledge asks for nothing it does not need. Each grant unlocks one thing and can be turned off again in System Settings.")
@@ -394,32 +388,53 @@ struct PermissionsSettings: View {
             }
         }
     }
+
+    /// Each permission's tile (2026-10-22).
+    static func look(_ id: String) -> (symbol: String, color: NSColor) {
+        switch id {
+        case "ax":     return ("accessibility", .systemBlue)
+        case "cal":    return ("calendar", .systemRed)
+        case "fda":    return ("externaldrive.fill", .systemGray)
+        case "screen": return ("rectangle.dashed.badge.record", .systemPurple)
+        default:       return ("lock.fill", .systemGray)
+        }
+    }
 }
 
+/// About (2026-10-22): a header, and the way to the releases and the
+/// source. No update checker: the spec rules out auto-update.
 struct AboutSettings: View {
     var body: some View {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         return Form {
             Section {
-                HStack(spacing: 14) {
+                VStack(spacing: 6) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
                         .interpolation(.high)
-                        .frame(width: 64, height: 64)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Ledge").font(.title3.weight(.semibold))
-                        Text("Version \(version)").foregroundStyle(.secondary)
-                        Text("A companion for the notch.").font(.caption).foregroundStyle(.secondary)
-                    }
+                        .frame(width: 88, height: 88)
+                    Text("Ledge").font(.title2.weight(.semibold))
+                    Text("Version \(version)").foregroundStyle(.secondary)
+                    Text("A companion for the notch.").font(.callout).foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
             }
             Section {
-                Button("View on GitHub") {
-                    if let url = URL(string: "https://github.com/dededemahendra/ledge") { NSWorkspace.shared.open(url) }
+                SettingsRow("Latest release", detail: "The downloads page on GitHub.",
+                            symbol: "arrow.down.circle.fill", color: Color(nsColor: .systemGreen)) {
+                    Button("Open") { open("https://github.com/dededemahendra/ledge/releases/latest") }
+                }
+                SettingsRow("Source code", detail: "github.com/dededemahendra/ledge",
+                            symbol: "chevron.left.forwardslash.chevron.right", color: Color(nsColor: .systemGray)) {
+                    Button("Open") { open("https://github.com/dededemahendra/ledge") }
                 }
             }
         }
+    }
+
+    private func open(_ address: String) {
+        if let url = URL(string: address) { NSWorkspace.shared.open(url) }
     }
 }
 
