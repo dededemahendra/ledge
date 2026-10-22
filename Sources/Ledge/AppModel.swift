@@ -366,11 +366,14 @@ final class AppModel {
     /// Settings' Check now, or Try again after GitHub refused the login
     /// (which reads the login again: the user may have signed in anew).
     func checkGitHubNow() {
+        guard settings.githubConnected else { return }
         if github.status == .signInAgain || githubNeedsToken || !github.isRunning { startGitHub() } else { github.checkNow() }
     }
 
     /// A pasted token wins over `gh`'s: pasting one is the user choosing it.
+    /// Nothing is read until the user has connected (2026-10-22).
     private func startGitHub() {
+        guard settings.githubConnected else { return }
         githubConnecting?.cancel()
         githubNeedsToken = false
         githubConnecting = Task { @MainActor [weak self] in
