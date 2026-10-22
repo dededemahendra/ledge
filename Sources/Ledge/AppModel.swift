@@ -337,6 +337,16 @@ final class AppModel {
     /// Pictures already fetched, for drawing at once (2026-10-22).
     private var githubAvatarImages: [URL: Data] = [:]
     private var githubAvatarLoading: Set<URL> = []
+    /// Pictures that did not come this round: not asked for again until the
+    /// next one (2026-10-22), or a failing picture would be asked for over
+    /// and over.
+    private var githubAvatarFailed: Set<URL> = []
+    /// Oldest first, to keep `githubAvatarImages` to `GitHubAvatars.limit`.
+    private var githubAvatarOrder: [URL] = []
+    /// The blip still waiting for its picture; a newer blip replaces it.
+    private var githubBlipTask: Task<Void, Never>?
+    /// Bumped on disconnect: a blip or picture from before it is dropped.
+    private var githubGeneration = 0
 
     /// Where the login came from, once connected.
     private(set) var githubSource: GitHubTokenSource?
@@ -426,6 +436,12 @@ final class AppModel {
         githubMissed = []
         githubClock = RunningClock()
         githubAvatarImages = [:]
+        githubAvatarOrder = []
+        githubAvatarLoading = []
+        githubAvatarFailed = []
+        githubBlipTask?.cancel()
+        githubBlipTask = nil
+        githubGeneration += 1
         githubRunShown = nil
         queue.remove(kind: .githubRun)
         queue.remove(kind: .github)
@@ -434,6 +450,7 @@ final class AppModel {
     }
 
     private func handleGitHubRound(_ snapshot: GitHubSnapshot, _ events: [GitHubEvent]) {
+        githubAvatarFailed.removeAll()
         if let url = snapshot.avatarURL { loadGitHubAvatar(url) }
         let wanted = events.filter(isWanted)
         if presenter.isLocked {
@@ -455,12 +472,16 @@ final class AppModel {
     }
 
     /// A blip waits at most a second for its person's picture, then shows
-    /// its disc (2026-10-22).
+    /// its disc (2026-10-22). One at a time: a newer blip replaces one still
+    /// waiting, and nothing lands after a disconnect.
     private func showGitHub(_ blip: GitHubBlip) {
-        Task { @MainActor [weak self] in
+        githubBlipTask?.cancel()
+        let generation = githubGeneration
+        githubBlipTask = Task { @MainActor [weak self] in
             let avatar = await self?.githubAvatar(blip.avatarURL, within: 1)
-            // Locked while the picture came: no GitHub on the lock screen.
-            guard let self, !self.presenter.isLocked else { return }
+            // Replaced, disconnected, or locked while the picture came.
+            guard let self, !Task.isCancelled, generation == self.githubGeneration, !self.presenter.isLocked else { return }
+            self.githubBlipTask = nil
             self.queue.insert(ActivityRecord(
                 id: NotchController.githubActivityID, kind: .github, insertedAt: Date(),
                 ttl: ActivityKind.github.defaultTTL, title: blip.title, compactText: blip.word,
@@ -477,6 +498,7 @@ final class AppModel {
         guard let url else { return nil }
         if let data = githubAvatarImages[url] { return data }
         let avatars = githubAvatars
+        let generation = githubGeneration
         let data = await withTaskGroup(of: Data?.self) { group in
             group.addTask { await avatars.image(at: url) }
             group.addTask {
@@ -487,19 +509,33 @@ final class AppModel {
             group.cancelAll()
             return first
         }
-        if let data { githubAvatarImages[url] = data }
+        if let data, generation == githubGeneration { rememberGitHubAvatar(data, for: url) }
         return data
     }
 
-    /// Fetches a picture in the background, then redraws the panel;
-    /// Settings reads it from memory (2026-10-22).
+    /// Keeps at most `GitHubAvatars.limit` pictures, oldest out first
+    /// (2026-10-22).
+    private func rememberGitHubAvatar(_ data: Data, for url: URL) {
+        if githubAvatarImages[url] == nil { githubAvatarOrder.append(url) }
+        githubAvatarImages[url] = data
+        if githubAvatarOrder.count > GitHubAvatars.limit { githubAvatarImages[githubAvatarOrder.removeFirst()] = nil }
+    }
+
+    /// Fetches a picture in the background, then redraws the panel if it
+    /// came; one that did not is left until the next round (2026-10-22).
     private func loadGitHubAvatar(_ url: URL) {
-        guard githubAvatarImages[url] == nil, !githubAvatarLoading.contains(url) else { return }
+        guard githubAvatarImages[url] == nil, !githubAvatarLoading.contains(url), !githubAvatarFailed.contains(url) else { return }
         githubAvatarLoading.insert(url)
+        let generation = githubGeneration
         Task { @MainActor [weak self] in
-            _ = await self?.githubAvatar(url, within: 10)
-            self?.githubAvatarLoading.remove(url)
-            self?.publishGitHubPanel()
+            let data = await self?.githubAvatar(url, within: 10)
+            guard let self, generation == self.githubGeneration else { return }
+            self.githubAvatarLoading.remove(url)
+            if data == nil {
+                self.githubAvatarFailed.insert(url)
+            } else {
+                self.publishGitHubPanel()
+            }
         }
     }
 
