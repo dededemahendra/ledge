@@ -56,8 +56,9 @@ keeps the turning arc. The clock stays on the right.
 - The word on the right takes the event's colour (a comment's stays white).
 - The caption leads with the PR's title, then who or what, then the repo:
   `Fix the date picker · sam · web`; a run's is `Deploy · web`. The island
-  sets a caption in bold up to its first separator, the rest dim (song,
-  meeting and update captions have a single separator and look the same).
+  sets a GitHub blip's caption in bold up to its first separator, the rest
+  dim; every other caption keeps splitting at its last, so a reminder whose
+  title has one stays bold whole.
 - A blip waits at most a second for its avatar, then shows the disc.
 
 Avatars come from GitHub's image server (`*.githubusercontent.com`) with no
