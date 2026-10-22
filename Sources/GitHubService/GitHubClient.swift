@@ -121,8 +121,13 @@ public actor GitHubClient {
     }
 
     /// What a status says: nothing wrong (200, 304), a refused login, a
-    /// rate limit with its end, or GitHub being unavailable.
+    /// rate limit with its end, or GitHub being unavailable. A spent primary
+    /// limit counts whatever the status, since GraphQL answers it with a 200 (2026-10-22).
     static func failure(for response: HTTPURLResponse, now: Date) -> Failure? {
+        if response.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0",
+           let reset = response.value(forHTTPHeaderField: "X-RateLimit-Reset").flatMap(TimeInterval.init) {
+            return .rateLimited(until: Date(timeIntervalSince1970: reset))
+        }
         switch response.statusCode {
         case 200, 304:
             return nil

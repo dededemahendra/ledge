@@ -59,6 +59,8 @@ import Foundation
     #expect(await failure(403, ["X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1792641600"])
             == .rateLimited(until: Date(timeIntervalSince1970: 1792641600)))
     #expect(await failure(429, ["Retry-After": "30"]) == .rateLimited(until: fixtureNow.addingTimeInterval(30)))
+    #expect(await failure(200, ["X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1792641600"])
+            == .rateLimited(until: Date(timeIntervalSince1970: 1792641600)), "GraphQL keeps a 200 when the limit is spent")
     #expect(await failure(500) == .unavailable)
     #expect(await failure(200) == .unavailable, "an answer with no data is no answer")
     let offline = GitHubClient(token: "t", userAgent: "Ledge", fetch: { _ in throw URLError(.notConnectedToInternet) })
