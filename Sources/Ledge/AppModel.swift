@@ -386,6 +386,8 @@ final class AppModel {
         if !settings.checksForUpdates {
             checkTask?.cancel()
             checkTask = nil
+            // …and a blip still waiting for unlock (2026-10-22).
+            pendingUpdate = nil
             updateStatus = .off
         } else if updateStatus == .off {
             checkForUpdates()
