@@ -21,11 +21,12 @@ enum GitHubQuery {
         nodes { ...pr }
       }
     }
+    # Up to 100 checks a commit (2026-10-22): past 30, the ring and the bar undercounted.
     fragment pr on PullRequest {
       id number title url
       repository { name }
       author { login avatarUrl(size: 64) }
-      commits(last: 1) { nodes { commit { oid statusCheckRollup { state contexts(first: 30) { nodes {
+      commits(last: 1) { nodes { commit { oid statusCheckRollup { state contexts(first: 100) { nodes {
         __typename
         ... on CheckRun { name status conclusion startedAt detailsUrl }
         ... on StatusContext { context state createdAt targetUrl }
@@ -130,7 +131,7 @@ enum GitHubQuery {
         }
         let failing = contexts.first { context in
             context.__typename == "CheckRun"
-                ? ["FAILURE", "TIMED_OUT", "STARTUP_FAILURE"].contains(context.conclusion ?? "")
+                ? ["FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "CANCELLED", "ACTION_REQUIRED"].contains(context.conclusion ?? "")
                 : ["FAILURE", "ERROR"].contains(context.state ?? "")
         }
         // A segment per check, finished first (2026-10-22): an unknown

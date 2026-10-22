@@ -48,20 +48,23 @@ struct GitHubSettings: View {
                     } else {
                         GitHubWelcomeCard(model: model, wantsToken: wantsTokenBinding)
                     }
-                }
-                if model.githubNeedsToken || wantsToken || model.githubStatus == .signInAgain {
-                    SettingsRow("Token", detail: "A token with the repo and read:org scopes, from github.com › Settings › Developer settings.",
-                                symbol: "key.fill", color: Color(nsColor: .systemYellow)) {
-                        HStack(spacing: 8) {
-                            SecureField("Token", text: Binding(get: { token }, set: { token = $0 }))
-                                .labelsHidden()
-                                .frame(width: 180)
-                            Button("Save") {
-                                model.saveGitHubToken(token)
-                                token = ""
-                                wantsToken = false
+                    // Inside the timeline (2026-10-22): the model is not
+                    // observable, and the card can ask for a token before the
+                    // pane redraws.
+                    if model.githubNeedsToken || wantsToken || model.githubStatus == .signInAgain {
+                        SettingsRow("Token", detail: "A token with the repo and read:org scopes, from github.com › Settings › Developer settings.",
+                                    symbol: "key.fill", color: Color(nsColor: .systemYellow)) {
+                            HStack(spacing: 8) {
+                                SecureField("Token", text: Binding(get: { token }, set: { token = $0 }))
+                                    .labelsHidden()
+                                    .frame(width: 180)
+                                Button("Save") {
+                                    model.saveGitHubToken(token)
+                                    token = ""
+                                    wantsToken = false
+                                }
+                                .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
-                            .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                     }
                 }
