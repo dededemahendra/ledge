@@ -94,6 +94,9 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
     /// What an activity that is not a match says, line by line — shown
     /// in the open panel.
     public let lines: [String]
+    /// A small count on the leading glyph (2026-10-22): how many GitHub
+    /// checks and runs are going. `nil` draws none.
+    public let badge: Int?
 
     public init(
         id: String,
@@ -110,7 +113,8 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         url: URL? = nil,
         parts: [ActivityPart]? = nil,
         score: ActivityScore? = nil,
-        lines: [String] = []
+        lines: [String] = [],
+        badge: Int? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -127,6 +131,7 @@ public struct ActivityRecord: Sendable, Equatable, Identifiable {
         self.parts = parts
         self.score = score
         self.lines = lines
+        self.badge = badge
     }
 
     public var isSticky: Bool { ttl == nil }

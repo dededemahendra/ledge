@@ -1003,3 +1003,65 @@ private func matchScore() -> NotchController.ActivityDisplay.Score {
     #expect(c.captionText == "Ledge 0.1.2 is available · Download")
     #expect(c.linkURL == page)
 }
+
+private let gitHubPanel = GitHubPanelData(rows: [
+    .init(id: "PR_1", mark: .failed, title: "#4 update notice", repo: "ledge", url: URL(string: "https://github.com/dede/ledge/pull/4")!),
+])
+
+@MainActor
+@Test func aGitHubBlipCarriesItsCaption() {
+    let c = makeController()
+    c.setActivities([.init(id: NotchController.githubActivityID, title: "Checks failed", compactText: "Failed",
+                           symbolName: "xmark.circle.fill")], overflow: 0)
+    c.setCaption("#4 update notice · test (macos)")
+    #expect(c.state == .activity)
+    #expect(c.isGitHubLeading)
+    #expect(c.captionText == "#4 update notice · test (macos)")
+}
+
+@MainActor
+@Test func theGitHubPanelJoinsTheSwipeOrderAndGoesWithItsData() {
+    let c = makeController()
+    c.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    #expect(c.availablePanels == [.media])
+    c.setGitHubPanel(gitHubPanel)
+    #expect(c.availablePanels == [.media, .github])
+    c.setHovered(true)
+    #expect(c.state == .expanded && c.panel == .media)
+    #expect(c.swipe(.next))
+    #expect(c.panel == .github)
+    c.setGitHubPanel(nil)
+    #expect(c.panel == .media)
+}
+
+@MainActor
+@Test func hoveringTheRunningItemOpensTheGitHubPanel() {
+    let c = makeController()
+    c.setGitHubPanel(gitHubPanel)
+    c.setActivities([.init(id: NotchController.githubRunActivityID, title: "Checks running", compactText: "2:14", badge: 2)],
+                    overflow: 0)
+    #expect(c.activities.first?.badge == 2)
+    c.setHovered(true)
+    #expect(c.state == .expanded && c.panel == .github)
+    c.setHovered(false)
+    #expect(c.state == .activity)
+}
+
+@MainActor
+@Test func aSwipeOnTheEmptyPeekOpensTheGitHubPanel() {
+    let c = makeController()
+    c.setHovered(true)
+    #expect(c.state == .peek)
+    #expect(!c.swipe(.next), "nothing to open yet")
+    c.setGitHubPanel(gitHubPanel)
+    #expect(c.swipe(.next))
+    #expect(c.state == .expanded && c.panel == .github)
+}
+
+@MainActor
+@Test func withoutAPanelTheRunningItemStaysAnItem() {
+    let c = makeController()
+    c.setActivities([.init(id: NotchController.githubRunActivityID, title: "Checks running", compactText: "0:42")], overflow: 0)
+    c.setHovered(true)
+    #expect(c.state == .activity)
+}

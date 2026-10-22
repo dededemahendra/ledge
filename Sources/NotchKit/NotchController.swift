@@ -249,6 +249,9 @@ public final class NotchController {
         public let score: Score?
         /// What an activity that is not a match says, line by line.
         public let lines: [String]
+        /// A small count on the leading glyph (2026-10-22): how many GitHub
+        /// checks and runs are going. `nil` draws none.
+        public let badge: Int?
 
         public init(
             id: String,
@@ -262,7 +265,8 @@ public final class NotchController {
             url: URL? = nil,
             parts: [Part]? = nil,
             score: Score? = nil,
-            lines: [String] = []
+            lines: [String] = [],
+            badge: Int? = nil
         ) {
             self.id = id
             self.title = title
@@ -276,6 +280,7 @@ public final class NotchController {
             self.parts = parts
             self.score = score
             self.lines = lines
+            self.badge = badge
         }
     }
 
@@ -323,8 +328,9 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". An update notice
     /// (2026-10-22) carries its own too. Any other blip
     /// pre-empting the island takes it whole.
+    /// A GitHub blip (2026-10-22) carries its own as well.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading || isGitHubLeading)
     }
 
     public var isLiveActivityLeading: Bool {
@@ -366,6 +372,20 @@ public final class NotchController {
         activities.first?.id == Self.updateActivityID
     }
 
+    /// `AppModel` inserts a GitHub blip with this id, and the running
+    /// item with `githubRunActivityID` (2026-10-22).
+    public static let githubActivityID = "github"
+    public static let githubRunActivityID = "github-run"
+
+    public var isGitHubLeading: Bool {
+        activities.first?.id == Self.githubActivityID
+    }
+
+    /// A GitHub blip or the running item leads: hover opens the panel.
+    private var isAnyGitHubLeading: Bool {
+        isGitHubLeading || activities.first?.id == Self.githubRunActivityID
+    }
+
     /// `AppModel` inserts the iPhone Live Activity with this id
     /// (2026-10-01): a match's crests and figures, or the phone glyph.
     public static let liveActivityID = "live-activity"
@@ -402,6 +422,8 @@ public final class NotchController {
         case media, calendar
         /// The iPhone Live Activity's own card, copied (2026-10-01).
         case liveActivity
+        /// What is going on on GitHub (2026-10-22).
+        case github
     }
 
     public private(set) var panel: Panel = .media
@@ -420,12 +442,24 @@ public final class NotchController {
         recomputeState()
     }
 
+    /// What the GitHub panel lists; `nil` means no panel: not connected,
+    /// nothing to list, or the screen is locked (2026-10-22).
+    public private(set) var githubPanel: GitHubPanelData?
+
+    public func setGitHubPanel(_ data: GitHubPanelData?) {
+        guard data != githubPanel else { return }
+        githubPanel = data
+        if githubPanel == nil, panel == .github { panel = .media }
+        recomputeState()
+    }
+
     /// The modes there are right now, in swipe order.
     public var availablePanels: [Panel] {
         var panels: [Panel] = []
         if hasCard { panels.append(.liveActivity) }
         if media != nil { panels.append(.media) }
         if calendarMode != nil { panels.append(.calendar) }
+        if githubPanel != nil { panels.append(.github) }
         return panels
     }
 
@@ -451,6 +485,13 @@ public final class NotchController {
         if isPreviewingUpcoming, calendarMode != nil {
             lastSwipe = direction
             panel = .calendar
+            recomputeState()
+            return true
+        }
+        // The empty peek (2026-10-22): a swipe opens the GitHub panel.
+        if state == .peek, githubPanel != nil {
+            lastSwipe = direction
+            panel = .github
             recomputeState()
             return true
         }
@@ -670,6 +711,9 @@ public final class NotchController {
         isHovered = hovered
         // A live activity's card is what its hover opens.
         if hovered, hasCard, !isPinnedOpen { panel = .liveActivity }
+        // So does a GitHub item's, the way a Live Activity's card opens
+        // (2026-10-22).
+        if hovered, isAnyGitHubLeading, githubPanel != nil, !isPinnedOpen { panel = .github }
         // Leaving puts the card back on now-playing for next time, unless
         // it is pinned where it is.
         if !hovered, !isPinnedOpen { panel = .media }
@@ -883,6 +927,8 @@ public final class NotchController {
             // The calendar mode, swiped open from the preview.
             state = .expanded
         } else if isHovered, panel == .liveActivity, hasCard {
+            state = .expanded
+        } else if isHovered, panel == .github, githubPanel != nil {
             state = .expanded
         } else if activityCount > 0, !(isHovered && onlyChargingIsShowing && upcoming != nil) {
             state = .activity
