@@ -7,7 +7,7 @@ enum GitHubQuery {
     static let text = """
     query {
       me: viewer {
-        login
+        login avatarUrl(size: 96)
         repositories(first: 10, orderBy: {field: PUSHED_AT, direction: DESC}, ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]) {
           nodes { nameWithOwner pushedAt }
         }
@@ -24,14 +24,14 @@ enum GitHubQuery {
     fragment pr on PullRequest {
       id number title url
       repository { name }
-      author { login }
+      author { login avatarUrl(size: 64) }
       commits(last: 1) { nodes { commit { oid statusCheckRollup { state contexts(first: 30) { nodes {
         __typename
         ... on CheckRun { name status conclusion startedAt detailsUrl }
         ... on StatusContext { context state createdAt targetUrl }
       } } } } } }
-      reviews(last: 10) { nodes { id state submittedAt url author { login } } }
-      comments(last: 10) { nodes { id createdAt url author { login } } }
+      reviews(last: 10) { nodes { id state submittedAt url author { login avatarUrl(size: 64) } } }
+      comments(last: 10) { nodes { id createdAt url author { login avatarUrl(size: 64) } } }
     }
     """
 
@@ -41,8 +41,8 @@ enum GitHubQuery {
       nodes(ids: $ids) {
         ... on PullRequest {
           id state
-          mergedBy { login }
-          timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { actor { login } } } }
+          mergedBy { login avatarUrl(size: 64) }
+          timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { actor { login avatarUrl(size: 64) } } } }
         }
       }
     }
@@ -62,11 +62,13 @@ enum GitHubQuery {
         /// Newest first.
         let pushed: [Pushed]
         let hidesSomeOrganisations: Bool
+        let avatarURL: URL?
     }
 
     struct Outcome: Sendable, Equatable {
         let merged: Bool
         let by: String?
+        let byAvatarURL: URL?
     }
 
     /// `nil` when there is no data to read. Errors beside data (an
@@ -85,7 +87,8 @@ enum GitHubQuery {
                 guard let repo, let at = date(repo.pushedAt) else { return nil }
                 return Pushed(fullName: repo.nameWithOwner, at: at)
             },
-            hidesSomeOrganisations: hides
+            hidesSomeOrganisations: hides,
+            avatarURL: me.avatarUrl.flatMap(URL.init(string:))
         )
     }
 
@@ -96,8 +99,12 @@ enum GitHubQuery {
         for node in (wire.data?.nodes ?? []).compactMap({ $0 }) {
             guard let id = node.id else { continue }
             switch node.state ?? "" {
-            case "MERGED": outcomes[id] = Outcome(merged: true, by: node.mergedBy?.login)
-            case "CLOSED": outcomes[id] = Outcome(merged: false, by: node.timelineItems?.nodes?.compactMap { $0 }.last?.actor?.login)
+            case "MERGED":
+                outcomes[id] = Outcome(merged: true, by: node.mergedBy?.login,
+                                       byAvatarURL: node.mergedBy?.avatarUrl.flatMap(URL.init(string:)))
+            case "CLOSED":
+                let actor = node.timelineItems?.nodes?.compactMap { $0 }.last?.actor
+                outcomes[id] = Outcome(merged: false, by: actor?.login, byAvatarURL: actor?.avatarUrl.flatMap(URL.init(string:)))
             default: continue
             }
         }
@@ -126,11 +133,29 @@ enum GitHubQuery {
                 ? ["FAILURE", "TIMED_OUT", "STARTUP_FAILURE"].contains(context.conclusion ?? "")
                 : ["FAILURE", "ERROR"].contains(context.state ?? "")
         }
+        // A segment per check, finished first (2026-10-22): an unknown
+        // state counts as still going.
+        let segments = contexts.map { context -> CheckSegment in
+            if context.__typename == "CheckRun" {
+                guard context.status == "COMPLETED" else { return .running }
+                switch context.conclusion ?? "" {
+                case "FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "CANCELLED", "ACTION_REQUIRED": return .failed
+                case "SUCCESS", "NEUTRAL", "SKIPPED", "STALE": return .passed
+                default: return .running
+                }
+            }
+            switch context.state ?? "" {
+            case "SUCCESS": return .passed
+            case "FAILURE", "ERROR": return .failed
+            default: return .running
+            }
+        }
         return GitHubChecks(
             state: state,
             startedAt: going.min(),
             failedName: failing.flatMap { $0.name ?? $0.context },
-            failedURL: failing.flatMap { ($0.detailsUrl ?? $0.targetUrl).flatMap(URL.init(string:)) }
+            failedURL: failing.flatMap { ($0.detailsUrl ?? $0.targetUrl).flatMap(URL.init(string:)) },
+            segments: segments.filter { $0 == .passed } + segments.filter { $0 == .failed } + segments.filter { $0 == .running }
         )
     }
 
@@ -142,11 +167,11 @@ enum GitHubQuery {
 
         struct Problem: Decodable { let type: String?; let message: String? }
         struct Body: Decodable { let me: Me?; let mine: Search?; let asked: Search? }
-        struct Me: Decodable { let login: String; let repositories: Nodes<Repo>? }
+        struct Me: Decodable { let login: String; let avatarUrl: String?; let repositories: Nodes<Repo>? }
         struct Repo: Decodable { let nameWithOwner: String; let pushedAt: String? }
         struct Search: Decodable { let issueCount: Int?; let nodes: [PR?]? }
         struct Nodes<T: Decodable>: Decodable { let nodes: [T?]? }
-        struct Login: Decodable { let login: String? }
+        struct Login: Decodable { let login: String?; let avatarUrl: String? }
         struct Named: Decodable { let name: String? }
         struct CommitNode: Decodable { let commit: Commit? }
         struct Commit: Decodable { let oid: String?; let statusCheckRollup: Rollup? }
@@ -173,6 +198,7 @@ enum GitHubQuery {
                 let commit = (commits?.nodes ?? []).compactMap { $0 }.last?.commit
                 return GitHubPR(
                     id: id, number: number, title: title, url: url, repo: repo, author: author?.login,
+                    authorAvatarURL: author?.avatarUrl.flatMap(URL.init(string:)),
                     headSHA: commit?.oid,
                     checks: commit?.statusCheckRollup.flatMap(GitHubQuery.checks),
                     reviews: (reviews?.nodes ?? []).compactMap { review in
@@ -184,12 +210,14 @@ enum GitHubQuery {
                         default: .other
                         }
                         return GitHubReview(id: id, author: review.author?.login ?? "ghost", state: state,
-                                            at: GitHubQuery.date(review.submittedAt), url: review.url.flatMap(URL.init(string:)))
+                                            at: GitHubQuery.date(review.submittedAt), url: review.url.flatMap(URL.init(string:)),
+                                            avatarURL: review.author?.avatarUrl.flatMap(URL.init(string:)))
                     },
                     comments: (comments?.nodes ?? []).compactMap { comment in
                         guard let comment, let id = comment.id else { return nil }
                         return GitHubComment(id: id, author: comment.author?.login ?? "ghost",
-                                             at: GitHubQuery.date(comment.createdAt), url: comment.url.flatMap(URL.init(string:)))
+                                             at: GitHubQuery.date(comment.createdAt), url: comment.url.flatMap(URL.init(string:)),
+                                             avatarURL: comment.author?.avatarUrl.flatMap(URL.init(string:)))
                     }
                 )
             }

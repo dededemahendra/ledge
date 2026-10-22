@@ -16,7 +16,8 @@ import Foundation
     #expect(failed.checks?.failedName == "test (macos)")
     #expect(failed.checks?.failedURL?.absoluteString == "https://github.com/dede/ledge/runs/2")
     #expect(failed.reviews == [GitHubReview(id: "R_1", author: "coderabbitai", state: .approved, at: date("2026-10-22T03:05:00Z"),
-                                            url: URL(string: "https://github.com/dede/ledge/pull/4#pullrequestreview-1"))])
+                                            url: URL(string: "https://github.com/dede/ledge/pull/4#pullrequestreview-1"),
+                                            avatarURL: URL(string: "https://avatars.githubusercontent.com/in/347564?v=4"))])
     #expect(failed.comments.map(\.author) == ["coderabbitai", "ghost"])
     let running = snapshot.mine[1]
     #expect(running.checks?.state == .pending)
@@ -28,6 +29,11 @@ import Foundation
     #expect(snapshot.runs.first?.status == .running)
     #expect(snapshot.runs.first?.startedAt == date("2026-10-22T03:09:05Z"))
     #expect(!snapshot.hidesSomeOrganisations)
+    #expect(failed.checks?.segments == [.passed, .failed])
+    #expect(running.checks?.segments == [.running, .running])
+    #expect(snapshot.avatarURL?.absoluteString == "https://avatars.githubusercontent.com/u/1?v=4")
+    #expect(failed.comments.first?.avatarURL != nil && failed.comments.last?.avatarURL == nil, "a deleted account has no picture")
+    #expect(snapshot.requested.first?.authorAvatarURL?.absoluteString == "https://avatars.githubusercontent.com/u/2?v=4")
 }
 
 @Test func everyRequestGoesToGitHubWithTheToken() async throws {
@@ -100,7 +106,7 @@ import Foundation
     let gone = GitHubPR(id: "PR_0", number: 3, title: "old work", url: URL(string: "https://github.com/dede/ledge/pull/3")!, repo: "ledge")
     let previous = GitHubSnapshot(login: "dede", takenAt: fixtureNow.addingTimeInterval(-60), mine: [gone])
     let snapshot = try await client.round(previous: previous, now: fixtureNow).get()
-    #expect(snapshot.departed == [GitHubDeparture(pr: gone, merged: true, by: "octocat")])
+    #expect(snapshot.departed == [GitHubDeparture(pr: gone, merged: true, by: "octocat", byAvatarURL: URL(string: "https://avatars.githubusercontent.com/u/583231?v=4"))])
 }
 
 /// Review Focus 4.
@@ -113,4 +119,43 @@ import Foundation
     let snapshot = try await client.round(previous: nil, now: fixtureNow).get()
     #expect(snapshot.hidesSomeOrganisations)
     #expect(snapshot.mine.count == 2, "what GitHub did send is used")
+}
+
+/// Review Focus 1.
+@Test func checksAreSegmentedFinishedFirst() throws {
+    let rollup = try JSONDecoder().decode(GitHubQuery.Wire.Rollup.self, from: Data(#"""
+    {"state":"PENDING","contexts":{"nodes":[
+      {"__typename":"CheckRun","name":"a","status":"IN_PROGRESS","conclusion":null},
+      {"__typename":"StatusContext","context":"b","state":"ERROR"},
+      {"__typename":"CheckRun","name":"c","status":"COMPLETED","conclusion":"SKIPPED"},
+      {"__typename":"CheckRun","name":"d","status":"COMPLETED","conclusion":"CANCELLED"},
+      {"__typename":"StatusContext","context":"e","state":"SUCCESS"},
+      {"__typename":"CheckRun","name":"f","status":"QUEUED","conclusion":null}]}}
+    """#.utf8))
+    #expect(GitHubQuery.checks(rollup)?.segments == [.passed, .passed, .failed, .failed, .running, .running])
+}
+
+/// Review Focus 2.
+@Test func avatarsComeOnlyFromGitHubsImageServerWithNoToken() async {
+    let seen = Seen()
+    let avatars = GitHubAvatars(fetch: fetch(seen) { _ in (200, [:], "PNG") })
+    let url = URL(string: "https://avatars.githubusercontent.com/u/1?v=4")!
+    #expect(await avatars.image(at: url) == Data("PNG".utf8))
+    #expect(await avatars.image(at: url) == Data("PNG".utf8))
+    #expect(seen.all.count == 1, "the second comes from memory")
+    #expect(seen.all.first?.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(await avatars.image(at: URL(string: "https://example.com/me.png")!) == nil)
+    #expect(seen.all.count == 1, "nothing is asked of anywhere else")
+    let broken = GitHubAvatars(fetch: fetch { _ in (404, [:], "") })
+    #expect(await broken.image(at: url) == nil)
+}
+
+@Test func avatarsKeepOnlyTheLast64() async {
+    let seen = Seen()
+    let avatars = GitHubAvatars(fetch: fetch(seen) { _ in (200, [:], "PNG") })
+    for n in 0...GitHubAvatars.limit {
+        _ = await avatars.image(at: URL(string: "https://avatars.githubusercontent.com/u/\(n)")!)
+    }
+    _ = await avatars.image(at: URL(string: "https://avatars.githubusercontent.com/u/0")!)
+    #expect(seen.all.count == GitHubAvatars.limit + 2, "the first was dropped, so it is asked for again")
 }

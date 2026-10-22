@@ -66,7 +66,7 @@ public actor GitHubClient {
             if !gone.isEmpty, case .success(let data) = await post(GitHubQuery.departuresText, ids: gone.map(\.id), now: now) {
                 let outcomes = GitHubQuery.decodeDepartures(data)
                 departed = gone.compactMap { pr in
-                    outcomes[pr.id].map { GitHubDeparture(pr: pr, merged: $0.merged, by: $0.by) }
+                    outcomes[pr.id].map { GitHubDeparture(pr: pr, merged: $0.merged, by: $0.by, byAvatarURL: $0.byAvatarURL) }
                 }
             }
         }
@@ -74,7 +74,8 @@ public actor GitHubClient {
         return .success(GitHubSnapshot(
             login: answer.login, takenAt: now, mine: answer.mine, mineTotal: answer.mineTotal,
             requested: answer.requested, requestedTotal: answer.requestedTotal, runs: allRuns,
-            departed: departed, hidesSomeOrganisations: answer.hidesSomeOrganisations
+            departed: departed, hidesSomeOrganisations: answer.hidesSomeOrganisations,
+            avatarURL: answer.avatarURL
         ))
     }
 

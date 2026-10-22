@@ -11,7 +11,7 @@ func date(_ text: String) -> Date { try! Date(text, strategy: .iso8601) }
 /// one still running), one waiting for their review, two repos pushed to.
 let mineReply = #"""
 {"data":{
- "me":{"login":"dede","repositories":{"nodes":[
+ "me":{"login":"dede","avatarUrl":"https://avatars.githubusercontent.com/u/1?v=4","repositories":{"nodes":[
    {"nameWithOwner":"dede/ledge","pushedAt":"2026-10-22T03:00:00Z"},
    {"nameWithOwner":"dede/old","pushedAt":"2026-10-01T00:00:00Z"}]}},
  "mine":{"issueCount":2,"nodes":[
@@ -20,9 +20,9 @@ let mineReply = #"""
     "commits":{"nodes":[{"commit":{"oid":"aaa","statusCheckRollup":{"state":"FAILURE","contexts":{"nodes":[
        {"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-10-22T02:50:00Z","detailsUrl":"https://github.com/dede/ledge/runs/1"},
        {"__typename":"CheckRun","name":"test (macos)","status":"COMPLETED","conclusion":"FAILURE","startedAt":"2026-10-22T02:51:00Z","detailsUrl":"https://github.com/dede/ledge/runs/2"}]}}}}]},
-    "reviews":{"nodes":[{"id":"R_1","state":"APPROVED","submittedAt":"2026-10-22T03:05:00Z","url":"https://github.com/dede/ledge/pull/4#pullrequestreview-1","author":{"login":"coderabbitai"}}]},
+    "reviews":{"nodes":[{"id":"R_1","state":"APPROVED","submittedAt":"2026-10-22T03:05:00Z","url":"https://github.com/dede/ledge/pull/4#pullrequestreview-1","author":{"login":"coderabbitai","avatarUrl":"https://avatars.githubusercontent.com/in/347564?v=4"}}]},
     "comments":{"nodes":[
-       {"id":"C_1","createdAt":"2026-10-22T03:06:00Z","url":"https://github.com/dede/ledge/pull/4#issuecomment-1","author":{"login":"coderabbitai"}},
+       {"id":"C_1","createdAt":"2026-10-22T03:06:00Z","url":"https://github.com/dede/ledge/pull/4#issuecomment-1","author":{"login":"coderabbitai","avatarUrl":"https://avatars.githubusercontent.com/in/347564?v=4"}},
        {"id":"C_2","createdAt":"2026-10-22T03:07:00Z","url":null,"author":null}]}},
    {"id":"PR_2","number":5,"title":"github island","url":"https://github.com/dede/ledge/pull/5",
     "repository":{"name":"ledge"},"author":{"login":"dede"},
@@ -32,7 +32,7 @@ let mineReply = #"""
     "reviews":{"nodes":[]},"comments":{"nodes":[]}}]},
  "asked":{"issueCount":1,"nodes":[
    {"id":"PR_9","number":12,"title":"date picker","url":"https://github.com/acme/web/pull/12",
-    "repository":{"name":"web"},"author":{"login":"gede"},
+    "repository":{"name":"web"},"author":{"login":"gede","avatarUrl":"https://avatars.githubusercontent.com/u/2?v=4"},
     "commits":{"nodes":[{"commit":{"oid":"ccc","statusCheckRollup":null}}]},
     "reviews":{"nodes":[]},"comments":{"nodes":[]}}]}
 }}
@@ -49,7 +49,7 @@ let runsReply = #"""
 
 /// What became of PR_0: merged by someone else.
 let departuresReply = #"""
-{"data":{"nodes":[{"id":"PR_0","state":"MERGED","mergedBy":{"login":"octocat"},"timelineItems":{"nodes":[]}}]}}
+{"data":{"nodes":[{"id":"PR_0","state":"MERGED","mergedBy":{"login":"octocat","avatarUrl":"https://avatars.githubusercontent.com/u/583231?v=4"},"timelineItems":{"nodes":[]}}]}}
 """#
 
 /// Every request a fake GitHub saw.
