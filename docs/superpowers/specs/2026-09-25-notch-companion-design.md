@@ -1192,3 +1192,12 @@ not notarised, so a downloader allows it once in System Settings › Privacy &
 Security; the README's Install section says how. There is no licence: the code
 can be read, not reused. Everything else stays personal: no auto-update, no
 localisation, macOS 27 on Apple silicon only.
+
+## Settings, the look (2026-10-22)
+
+Every option in Settings has an icon and a line on what it does, and four
+panes open with a live strip of the real island, run on a private controller,
+that shows the option the pointer rests on, with the user's own content or a
+labelled sample (user's call). The logic lives in a new `SettingsKit` library.
+New options are a separate, later piece. Design:
+`2026-10-22-rich-settings-design.md`.

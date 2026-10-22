@@ -108,7 +108,7 @@ the menu says so when both are refused.
 ## Settings
 
 The menu bar icon's "Settings…" (or `open ledge://settings`) opens a window in
-System Settings' idiom: a sidebar of sections, grouped forms. General (launch at
+System Settings' idiom: a sidebar of sections, grouped forms. Every option has an icon and a line on what it does, and the General, Island, Media and Calendar panes open with a live preview of the island that shows the option the pointer rests on, with your own song, meeting and battery where there are any. General (launch at
 login, how long the cursor rests before the island opens, the song-change
 caption), Island (which blips show: keys, battery, devices, Focus, Clock timers, Live Activities,
 calendar events, reminders; and whether the island shows on the lock screen, look
