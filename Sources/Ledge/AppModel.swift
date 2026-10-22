@@ -255,7 +255,9 @@ final class AppModel {
         // One check at a time (2026-10-22): a timer firing during a manual
         // check would otherwise announce the same version twice.
         guard checkTask == nil else { return }
-        updateStatus = .checking
+        // An update already found stays in About until the user updates
+        // (2026-10-22), through a check under way or one that fails.
+        if !hasUpdate { updateStatus = .checking }
         let checker = UpdateChecker(currentVersion: version ?? Self.runningVersion)
         let lastAnnounced = version == nil
             ? UserDefaults.standard.string(forKey: Self.lastAnnouncedKey).flatMap(AppVersion.init) : nil
@@ -276,7 +278,7 @@ final class AppModel {
         let now = Date()
         switch finding {
         case nil:
-            updateStatus = .failed(now)
+            if !hasUpdate { updateStatus = .failed(now) }
         case .upToDate?:
             updateStatus = .upToDate(now)
         case .available(let release, let announce)?:
