@@ -767,6 +767,10 @@ public struct NotchRootView: View {
                 scoreSide(score.home, crest: controller.homeCrestImage, crestLeading: true,
                           geometryID: Self.homeCrestGeometryID)
             }
+        } else if let activity = controller.activities.first, activity.id == NotchController.callActivityID {
+            // A call (2026-10-22): the app's own icon, a red crossed-out mic
+            // when muted, a red hang-up when it has ended.
+            callGlyph(activity)
         } else if let activity = controller.activities.first, activity.id == NotchController.githubActivityID {
             // A GitHub blip (2026-10-22): who did it, or what happened.
             // Before the product-render branch, which would draw the
@@ -941,6 +945,33 @@ public struct NotchRootView: View {
         if first.score != nil || first.compactText != nil { return true }
         if let parts = first.parts, !parts.isEmpty { return true }
         return first.id == Self.mediaActivityID && controller.media != nil && controller.state != .expanded
+    }
+
+    /// A call's leading glyph (2026-10-22). Red for muted and ended — the
+    /// system's own red, like a low battery — else the app's icon, decoded
+    /// once by the controller; a green mic if it has none.
+    @ViewBuilder
+    private func callGlyph(_ activity: NotchController.ActivityDisplay) -> some View {
+        let symbol = activity.symbolName ?? "mic.fill"
+        Group {
+            if symbol == "mic.slash.fill" || symbol == "phone.down.fill" {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(tintColor(for: .warning) ?? contentColor)
+            } else if let icon = controller.callIconImage {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 20, height: 20)
+            } else {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(tintColor(for: .positive) ?? contentColor)
+            }
+        }
+        .id(symbol)
+        .transition(.blurReplace)
+        .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: symbol)
     }
 
     /// The charging battery: the cell filled to its level, the rim held
@@ -1164,6 +1195,7 @@ public struct NotchRootView: View {
                 // …and the GitHub running item's clock, amber (2026-10-22).
                 let isTicking = activity.id == NotchController.timerActivityID
                     || activity.id == NotchController.githubRunActivityID
+                    || activity.id == NotchController.callActivityID
                 // …and a GitHub blip's word, in its event's colour (2026-10-22).
                 let isGitHub = activity.id == NotchController.githubActivityID
                 compactValue(compact, bump: !isTicking, color: (isTicking || isGitHub) ? tintColor(for: activity.tint) : nil)
@@ -1279,6 +1311,15 @@ public struct NotchRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .id("github")
+            .transition(panelTransition)
+        } else if controller.state == .expanded, controller.panel == .call, let data = controller.callPanel {
+            // The call card (2026-10-22).
+            CallPanelView(
+                data: data, contentColor: contentColor,
+                reduceMotion: controller.reduceMotion, emit: { controller.emit($0) }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .id("call")
             .transition(panelTransition)
         } else if controller.state == .expanded, let media = controller.media {
             MediaPanelView(
