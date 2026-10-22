@@ -6,8 +6,9 @@ public enum GitHubEvent: Sendable, Equatable {
     case checksFailed(GitHubPR)
     case reviewed(GitHubPR, GitHubReview)
     case commented(GitHubPR, GitHubComment)
-    case merged(GitHubPR)
-    case closed(GitHubPR)
+    /// Who merged or closed it, and their picture, ride along (2026-10-22).
+    case merged(GitHubDeparture)
+    case closed(GitHubDeparture)
     case reviewRequested(GitHubPR)
     case runPassed(GitHubRun)
     case runFailed(GitHubRun)
@@ -21,13 +22,16 @@ public struct GitHubRunning: Sendable, Equatable {
     public let caption: String
     public let url: URL
     public let startedAt: Date?
+    /// The PR's checks, for the ring; none for a run (2026-10-22).
+    public let segments: [CheckSegment]
 
-    public init(key: String, source: Source, caption: String, url: URL, startedAt: Date?) {
+    public init(key: String, source: Source, caption: String, url: URL, startedAt: Date?, segments: [CheckSegment] = []) {
         self.key = key
         self.source = source
         self.caption = caption
         self.url = url
         self.startedAt = startedAt
+        self.segments = segments
     }
 }
 
@@ -69,7 +73,7 @@ public enum GitHubEvents {
         }
 
         for departure in new.departed where departure.by != me {
-            events.append(departure.merged ? .merged(departure.pr) : .closed(departure.pr))
+            events.append(departure.merged ? .merged(departure) : .closed(departure))
         }
 
         let asked = Set(old.requested.map(\.id))
@@ -113,7 +117,8 @@ public enum GitHubEvents {
         let checks = snapshot.mine.compactMap { pr -> GitHubRunning? in
             guard let state = pr.checks, state.state == .pending else { return nil }
             return GitHubRunning(key: "pr:\(pr.id):\(pr.headSHA ?? "")", source: .checks,
-                                 caption: GitHubNotice.prCaption(pr), url: pr.url, startedAt: state.startedAt)
+                                 caption: GitHubNotice.prCaption(pr), url: pr.url, startedAt: state.startedAt,
+                                 segments: state.segments)
         }
         let heads = Set(snapshot.mine.compactMap(\.headSHA))
         let runs = snapshot.runs.filter { $0.status == .running && !heads.contains($0.headSHA) }.map { run in

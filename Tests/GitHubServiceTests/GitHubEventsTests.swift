@@ -6,9 +6,11 @@ private let t0 = date("2026-10-22T03:00:00Z")
 private let link = URL(string: "https://github.com/dede/ledge")!
 
 private func pr(_ id: String = "PR_1", number: Int = 4, sha: String = "aaa", checks: CheckState? = nil, failed: String? = nil,
+                segments: [CheckSegment] = [], started: Date? = nil,
                 reviews: [GitHubReview] = [], comments: [GitHubComment] = []) -> GitHubPR {
     GitHubPR(id: id, number: number, title: "update notice", url: URL(string: "https://github.com/dede/ledge/pull/\(number)")!,
-             repo: "ledge", author: "dede", headSHA: sha, checks: checks.map { GitHubChecks(state: $0, failedName: failed) },
+             repo: "ledge", author: "dede", headSHA: sha,
+             checks: checks.map { GitHubChecks(state: $0, startedAt: started, failedName: failed, segments: segments) },
              reviews: reviews, comments: comments)
 }
 
@@ -78,7 +80,7 @@ private func comment(_ id: String, _ who: String) -> GitHubComment {
     let after = snap(1, departed: [GitHubDeparture(pr: open.mine[0], merged: true, by: "sam"),
                                    GitHubDeparture(pr: open.mine[1], merged: false, by: "sam"),
                                    GitHubDeparture(pr: open.mine[2], merged: true, by: "dede")])
-    #expect(GitHubEvents.between(open, after) == [.merged(open.mine[0]), .closed(open.mine[1])])
+    #expect(GitHubEvents.between(open, after) == [.merged(after.departed[0]), .closed(after.departed[1])])
 }
 
 @Test func aReviewRequestIsNewsOnce() {
@@ -108,6 +110,7 @@ private func comment(_ id: String, _ who: String) -> GitHubComment {
     #expect(items.map(\.key) == ["pr:PR_1:aaa", "run:1"])
     #expect(items.map(\.source) == [.checks, .run])
     #expect(items.map(\.caption) == ["#4 update notice · ledge", "Deploy · web"])
+    #expect(GitHubEvents.running(in: snap(0, mine: [pr(checks: .pending, segments: [.passed, .running])])).first?.segments == [.passed, .running])
 }
 
 @Test func theRunningClockKeepsEachStartAndCounts() {
@@ -125,23 +128,28 @@ private func comment(_ id: String, _ who: String) -> GitHubComment {
 @Test func eachEventHasItsLook() {
     let p = pr(checks: .failed, failed: "test (macos)")
     #expect(GitHubNotice.blip(for: .checksFailed(p)) == GitHubBlip(
-        title: "Checks failed", symbolName: "xmark.circle.fill", word: "Failed", tintName: "red",
-        caption: "#4 update notice · test (macos)", url: p.url))
-    #expect(GitHubNotice.blip(for: .checksPassed(p)).caption == "#4 update notice · ledge")
-    #expect(GitHubNotice.blip(for: .checksPassed(p)).tintName == "green")
-    let approved = GitHubNotice.blip(for: .reviewed(p, review("R1", "coderabbitai", .approved)))
-    #expect(approved.caption == "coderabbitai · #4 ledge" && approved.word == "Approved" && approved.symbolName == "checkmark.seal.fill")
+        title: "Checks failed", symbolName: "xmark", word: "Failed", tintName: "red",
+        caption: "update notice · test (macos) · ledge", url: p.url, avatarURL: nil))
+    #expect(GitHubNotice.blip(for: .checksPassed(p)).caption == "update notice · ledge")
+    #expect(GitHubNotice.blip(for: .checksPassed(p)).symbolName == "checkmark")
+    let face = URL(string: "https://avatars.githubusercontent.com/u/9")!
+    let approved = GitHubNotice.blip(for: .reviewed(p, GitHubReview(id: "R1", author: "coderabbitai", state: .approved,
+                                                                  at: nil, url: nil, avatarURL: face)))
+    #expect(approved.caption == "update notice · coderabbitai · ledge" && approved.word == "Approved")
+    #expect(approved.symbolName == "checkmark" && approved.avatarURL == face)
     let changes = GitHubNotice.blip(for: .reviewed(p, review("R2", "sam", .changesRequested)))
-    #expect(changes.word == "Changes" && changes.tintName == "orange" && changes.symbolName == "exclamationmark.bubble.fill")
+    #expect(changes.word == "Changes" && changes.tintName == "orange" && changes.symbolName == "exclamationmark")
     let said = GitHubNotice.blip(for: .commented(p, comment("C1", "sam")))
     #expect(said.word == "Comment" && said.tintName == nil && said.symbolName == "bubble.left.fill")
-    #expect(GitHubNotice.blip(for: .merged(p)).symbolName == "arrow.triangle.merge")
-    #expect(GitHubNotice.blip(for: .merged(p)).tintName == "purple")
-    #expect(GitHubNotice.blip(for: .closed(p)).tintName == "gray")
+    let merged = GitHubNotice.blip(for: .merged(GitHubDeparture(pr: p, merged: true, by: "sam", byAvatarURL: face)))
+    #expect(merged.symbolName == "arrow.triangle.merge" && merged.tintName == "purple" && merged.avatarURL == face)
+    #expect(merged.caption == "update notice · sam · ledge")
+    #expect(GitHubNotice.blip(for: .closed(GitHubDeparture(pr: p, merged: false, by: nil))).caption == "update notice · ledge")
     let asked = GitHubNotice.blip(for: .reviewRequested(pr("PR_9", number: 12)))
-    #expect(asked.caption == "dede asks for your review · #12 ledge" && asked.word == "Review" && asked.tintName == "blue")
+    #expect(asked.caption == "update notice · dede · ledge" && asked.word == "Review")
+    #expect(asked.tintName == "blue" && asked.symbolName == "eye.fill")
     #expect(GitHubNotice.blip(for: .runFailed(run(1, .failed))).caption == "Deploy · web")
-    #expect(GitHubNotice.blip(for: .runPassed(run(1, .passed))).word == "Passed")
+    #expect(GitHubNotice.blip(for: .runPassed(run(1, .passed))).symbolName == "checkmark")
 }
 
 @Test func aBurstIsOneBlip() {
@@ -149,28 +157,52 @@ private func comment(_ id: String, _ who: String) -> GitHubComment {
     let events: [GitHubEvent] = [.commented(p, comment("C1", "sam")), .checksPassed(p), .reviewed(p, review("R1", "sam", .changesRequested))]
     let blip = GitHubNotice.burst(events)
     #expect(blip?.word == "Changes")
-    #expect(blip?.caption == "sam · #4 ledge · +2 more")
+    #expect(blip?.caption == "update notice · sam · ledge · +2 more")
     #expect(GitHubNotice.burst([]) == nil)
-    #expect(GitHubNotice.burst([.checksPassed(p)])?.caption == "#4 update notice · ledge")
+    #expect(GitHubNotice.burst([.checksPassed(p)])?.caption == "update notice · ledge")
 }
 
 /// Review Focus 1.
 @Test func aLongTitleIsShortenedInTheCaption() {
     let long = GitHubPR(id: "x", number: 9, title: String(repeating: "a", count: 60), url: link, repo: "ledge")
-    #expect(GitHubNotice.blip(for: .merged(long)).caption == "#9 " + String(repeating: "a", count: 39) + "… · ledge")
+    #expect(GitHubNotice.blip(for: .merged(GitHubDeparture(pr: long, merged: true, by: nil))).caption == String(repeating: "a", count: 39) + "… · ledge")
 }
 
-@Test func thePanelListsRunsThenPRsThenRequests() {
-    let s = snap(0, mine: [pr("PR_1", number: 4, checks: .passed), pr("PR_2", number: 5, checks: .failed), pr("PR_3", number: 6, checks: .pending)],
-                 requested: [pr("PR_9", number: 12)], runs: [run(1, .running)])
+/// Review Focus 3.
+@Test func theHeroIsWhatIsMostWorthWatching() {
+    let s = snap(0, mine: [pr("PR_1", number: 4, checks: .passed),
+                           pr("PR_2", number: 5, checks: .failed, failed: "test (macos)"),
+                           pr("PR_3", number: 6, sha: "ccc", checks: .pending, segments: [.passed, .failed, .running, .running],
+                              started: t0.addingTimeInterval(60))],
+                 requested: [pr("PR_9", number: 12)])
     let list = GitHubPanelRows.make(s)
-    #expect(list.rows.map(\.id) == ["run:1", "PR_2", "PR_3"])
-    #expect(list.rows.map(\.mark) == [.running, .failed, .running])
-    #expect(list.more == 2, "PR_1 and the review request did not fit")
-    let few = GitHubPanelRows.make(snap(0, mine: [pr(checks: .passed)], requested: [pr("PR_9", number: 12)]))
-    #expect(few.rows.map(\.mark) == [.passed, .review] && few.more == 0)
-    #expect(few.rows[0].title == "#4 update notice" && few.rows[0].repo == "ledge")
-    #expect(GitHubPanelRows.make(snap(0)).rows.isEmpty)
+    #expect(list.hero?.kind == .running && list.hero?.id == "PR_3" && list.hero?.tag == "Checks running")
+    #expect(list.hero?.detail == "ledge #6 · 2 of 4 checks · 1 failed")
+    #expect(list.hero?.segments == [.passed, .failed, .running, .running])
+    #expect(list.hero?.startedAt == t0.addingTimeInterval(60))
+    #expect(list.rows.map(\.id) == ["PR_2", "PR_1"], "two rows under the hero, failed first")
+    #expect(list.more == 1, "the review request did not fit")
+
+    let failed = GitHubPanelRows.make(snap(0, mine: [pr("PR_1", number: 4, checks: .passed),
+                                                    pr("PR_2", number: 5, checks: .failed, failed: "test (macos)")]))
+    #expect(failed.hero?.kind == .failed && failed.hero?.detail == "ledge #5 · test (macos) failed")
+    #expect(failed.hero?.startedAt == nil, "a finished hero has no clock")
+    #expect(failed.rows.map(\.id) == ["PR_1"] && failed.more == 0)
+
+    let review = GitHubPanelRows.make(snap(0, mine: [pr(checks: .passed)], requested: [pr("PR_9", number: 12)]))
+    #expect(review.hero?.kind == .review && review.hero?.detail == "ledge #12 · dede asks for your review")
+    #expect(review.hero?.id == "asked:PR_9" && review.rows.map(\.id) == ["PR_1"])
+
+    let quiet = GitHubPanelRows.make(snap(0, mine: (1...7).map { pr("PR_\($0)", number: $0, checks: .passed) }))
+    #expect(quiet.hero == nil && quiet.rows.count == 4 && quiet.more == 3, "alone: four rows and the rest counted")
+    #expect(quiet.rows.first?.mark == .passed && quiet.rows.first?.title == "#1 update notice")
+    #expect(GitHubPanelRows.make(snap(0)).hero == nil && GitHubPanelRows.make(snap(0)).rows.isEmpty)
+}
+
+@Test func aRunOfTheUsersCanBeTheHero() {
+    let hero = GitHubPanelRows.make(snap(0, mine: [pr(checks: .passed)], runs: [run(1, .running)])).hero
+    #expect(hero?.kind == .running && hero?.tag == "Run going" && hero?.detail == "web · your run")
+    #expect(hero?.segments == [] && hero?.startedAt == t0.addingTimeInterval(30))
 }
 
 @Test func theProbesStoryTellsEveryMoment() {
@@ -180,6 +212,7 @@ private func comment(_ id: String, _ who: String) -> GitHubComment {
     #expect(told == [[], [], ["checksFailed"], ["commented"], ["reviewed"], ["merged"], ["reviewRequested"]])
     #expect(GitHubEvents.running(in: story[1]).count == 1)
     #expect(!GitHubPanelRows.make(story[6]).rows.isEmpty)
+    #expect(GitHubPanelRows.make(GitHubSample.panelSnapshot(login: "you", now: t0)).hero?.kind == .running)
 }
 
 private func name(_ event: GitHubEvent) -> String {

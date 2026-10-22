@@ -147,7 +147,7 @@ public enum PreviewStage {
             showGitHub(c, .reviewed(content.pullRequest ?? GitHubSample.pr, review))
             return caption(scene, sample: content.pullRequest == nil ? "not connected" : nil)
         case .githubMerges:
-            showGitHub(c, .merged(content.pullRequest ?? GitHubSample.pr))
+            showGitHub(c, .merged(GitHubDeparture(pr: content.pullRequest ?? GitHubSample.pr, merged: true, by: GitHubSample.reviewer)))
             return caption(scene, sample: content.pullRequest == nil ? "not connected" : nil)
         case .githubRequests:
             showGitHub(c, .reviewRequested(GitHubSample.request))
