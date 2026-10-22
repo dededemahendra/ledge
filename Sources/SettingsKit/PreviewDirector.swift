@@ -10,6 +10,8 @@ import Observation
 public final class PreviewDirector {
     public static let cycleInterval: TimeInterval = 2.5
     public static let playDuration: TimeInterval = 3
+    /// How long a row stays pointed at after the pointer leaves it, so crossing the gap to the next row does not flash the cycle (2026-10-22).
+    public static let leaveGrace: TimeInterval = 0.2
 
     /// The pane's scenes, in row order.
     public let scenes: [PreviewScene]
@@ -27,8 +29,13 @@ public final class PreviewDirector {
     /// Bumped when a switch is turned on for the scene already showing, so
     /// the strip plays it again from the start (2026-10-22).
     public private(set) var replays = 0
+    /// `staged`, read without observing it (2026-10-22): a strip reads this
+    /// for its first frame, so the pane that builds the strip is not drawn
+    /// again with every scene change.
+    @ObservationIgnored public private(set) var stagedUntracked: PreviewScene?
 
     @ObservationIgnored private var pointed: PreviewScene?
+    @ObservationIgnored private var leaving: (scene: PreviewScene, at: Date)?
     @ObservationIgnored private var playing: (scene: PreviewScene, until: Date)?
     @ObservationIgnored private var cycleIndex = 0
     @ObservationIgnored private var nextCycle: Date?
@@ -50,6 +57,7 @@ public final class PreviewDirector {
 
     public func point(at scene: PreviewScene, now: Date = Date()) {
         self.now = now
+        leaving = nil
         pointed = scene
         resolve()
     }
@@ -59,9 +67,7 @@ public final class PreviewDirector {
     public func leave(_ scene: PreviewScene, now: Date = Date()) {
         self.now = now
         guard pointed == scene else { return }
-        pointed = nil
-        nextCycle = now + Self.cycleInterval
-        resolve()
+        leaving = (scene, now)
     }
 
     public func switchedOn(_ scene: PreviewScene, now: Date = Date()) {
@@ -80,6 +86,11 @@ public final class PreviewDirector {
 
     public func tick(at now: Date) {
         self.now = now
+        if let leaving, now >= leaving.at + Self.leaveGrace {
+            self.leaving = nil
+            pointed = nil
+            nextCycle = now + Self.cycleInterval
+        }
         if let playing, now >= playing.until {
             self.playing = nil
             nextCycle = now + Self.cycleInterval
@@ -113,5 +124,6 @@ public final class PreviewDirector {
         }
         let nextStaged = (scene == .hoverCard && now < sceneSince + hoverDwell) ? .nowPlaying : scene
         if nextStaged != staged { staged = nextStaged }
+        stagedUntracked = nextStaged
     }
 }
