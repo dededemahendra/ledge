@@ -1338,6 +1338,7 @@ final class AppModel {
         case .selectOutput(let id): device.setDefaultOutput(uid: id)
         case .openSource:           openSourceApp()
         case .toggleFavorite:       favorites.toggle()
+        case .toggleMute, .hideCallApp: break
         case .seek(let fraction):
             // The scrubber only knows its own width, not the track's
             // duration — this is the one place both are in scope.

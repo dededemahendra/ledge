@@ -142,6 +142,12 @@ public enum NotchIntent: Sendable, Equatable {
     case openSource
     /// The card's star: favourite or un-favourite the current track.
     case toggleFavorite
+    /// The call card's mute button (2026-10-22): mute or unmute every
+    /// running mic.
+    case toggleMute
+    /// The call card's "Not a call": hide the pill for the app on the mic
+    /// from then on.
+    case hideCallApp
 }
 
 /// One entry of the panel's output picker. A pure value like
@@ -399,6 +405,15 @@ public final class NotchController {
     /// from bumping every second.
     public static let timerActivityID = "timer"
 
+    /// `AppModel` inserts a call, and its ended moment, with this id
+    /// (2026-10-22). The view draws the app's icon or a red glyph, and keeps
+    /// the clock from bumping every second.
+    public static let callActivityID = "call"
+
+    public var isCallLeading: Bool {
+        activities.first?.id == Self.callActivityID
+    }
+
     public var isCalendarLeading: Bool {
         activities.first?.id == Self.calendarActivityID
     }
@@ -428,6 +443,8 @@ public final class NotchController {
         case liveActivity
         /// What is going on on GitHub (2026-10-22).
         case github
+        /// The call on the mic, with its mute button (2026-10-22).
+        case call
     }
 
     public private(set) var panel: Panel = .media
@@ -457,6 +474,16 @@ public final class NotchController {
         recomputeState()
     }
 
+    /// What the call card shows; `nil` means no call (2026-10-22).
+    public private(set) var callPanel: CallPanelData?
+
+    public func setCallPanel(_ data: CallPanelData?) {
+        guard data != callPanel else { return }
+        callPanel = data
+        if callPanel == nil, panel == .call { panel = .media }
+        recomputeState()
+    }
+
     #if DEBUG
     /// Debug probes only (2026-10-22): pins `panel` open for a screenshot,
     /// the way a click pins the now-playing card.
@@ -471,6 +498,7 @@ public final class NotchController {
     /// The modes there are right now, in swipe order.
     public var availablePanels: [Panel] {
         var panels: [Panel] = []
+        if callPanel != nil { panels.append(.call) }
         if hasCard { panels.append(.liveActivity) }
         if media != nil { panels.append(.media) }
         if calendarMode != nil { panels.append(.calendar) }
@@ -747,6 +775,8 @@ public final class NotchController {
         // So does a GitHub item's, the way a Live Activity's card opens
         // (2026-10-22).
         if hovered, isAnyGitHubLeading, githubPanel != nil, !isPinnedOpen { panel = .github }
+        // And a call's (2026-10-22).
+        if hovered, isCallLeading, callPanel != nil, !isPinnedOpen { panel = .call }
         // Leaving puts the card back on now-playing for next time, unless
         // it is pinned where it is.
         if !hovered, !isPinnedOpen { panel = .media }
@@ -865,6 +895,11 @@ public final class NotchController {
             githubAvatarData = avatar
             githubAvatarImage = avatar.flatMap(NSImage.init(data:))
         }
+        let callIcon = activities.first.flatMap { $0.id == Self.callActivityID ? $0.artwork : nil }
+        if callIcon != callIconData {
+            callIconData = callIcon
+            callIconImage = callIcon.flatMap(NSImage.init(data:))
+        }
         if panel == .liveActivity, !(activities.first?.id == Self.liveActivityID && hasPanelContent) {
             panel = .media
         }
@@ -895,11 +930,17 @@ public final class NotchController {
     public private(set) var githubAvatarImage: NSImage?
     private var githubAvatarData: Data?
 
+    /// The leading call's app icon (2026-10-22), decoded once per change:
+    /// its clock republishes the record every second.
+    public private(set) var callIconImage: NSImage?
+    private var callIconData: Data?
+
     /// Identity of the leading blip, if the leading activity is one.
-    /// Title included so plug → unplug (same id, new title) pulses again.
+    /// Title included so plug → unplug (same id, new title) pulses again,
+    /// and a call's ended moment pulses as it replaces the call (2026-10-22).
     private var leadingBlipKey: String? {
         guard let first = activities.first,
-              [Self.hudActivityID, Self.powerActivityID, Self.deviceActivityID].contains(first.id)
+              [Self.hudActivityID, Self.powerActivityID, Self.deviceActivityID, Self.callActivityID].contains(first.id)
         else { return nil }
         return "\(first.id)|\(first.title)"
     }
@@ -971,6 +1012,8 @@ public final class NotchController {
         } else if isHovered, panel == .liveActivity, hasCard {
             state = .expanded
         } else if isHovered, panel == .github, githubPanel != nil {
+            state = .expanded
+        } else if isHovered, panel == .call, callPanel != nil {
             state = .expanded
         } else if activityCount > 0, !(isHovered && onlyChargingIsShowing && upcoming != nil) {
             state = .activity

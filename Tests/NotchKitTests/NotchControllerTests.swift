@@ -1128,3 +1128,73 @@ private let gitHubPanel = GitHubPanelData(rows: [
             != NotchController.earSlot(forActivity: NotchController.chargingActivityID))
     #expect(NotchController.earSlot(forActivity: nil) != NotchController.earSlot(forActivity: NotchController.powerActivityID))
 }
+
+// MARK: - Calls (2026-10-22)
+
+@MainActor
+private let callPanel = CallPanelData(appName: "zoom.us", icon: nil, since: Date(timeIntervalSince1970: 1_000),
+                                      isMuted: false, canMute: true, micName: "MacBook Air Microphone")
+
+@MainActor
+private func callDisplay(artwork: Data? = nil) -> NotchController.ActivityDisplay {
+    .init(id: NotchController.callActivityID, title: "On a call · zoom.us", compactText: "12:04",
+          symbolName: "mic.fill", artwork: artwork, tint: .positive)
+}
+
+@MainActor
+@Test func hoveringTheCallOpensItsCard() {
+    let c = makeController()
+    c.setActivities([callDisplay()], overflow: 0)
+    c.setCallPanel(callPanel)
+    c.setHovered(true)
+    #expect(c.panel == .call && c.state == .expanded)
+}
+
+@MainActor
+@Test func theCallCardGoesWithItsData() {
+    let c = makeController()
+    c.setActivities([callDisplay()], overflow: 0)
+    c.setCallPanel(callPanel)
+    c.setHovered(true)
+    c.setCallPanel(nil)
+    #expect(c.panel == .media && c.state == .activity)
+}
+
+@MainActor
+@Test func withoutCardDataHoveringTheCallStaysAnItem() {
+    let c = makeController()
+    c.setActivities([callDisplay()], overflow: 0)
+    c.setHovered(true)
+    #expect(c.state == .activity)
+}
+
+@MainActor
+@Test func whileLockedTheCallsButtonsDoNothing() {
+    let c = makeController()
+    var intents: [NotchIntent] = []
+    c.onIntent = { intents.append($0) }
+    c.setActivities([callDisplay()], overflow: 0)
+    c.setCallPanel(callPanel)
+    c.setLocked(true)
+    c.emit(.toggleMute)
+    c.emit(.hideCallApp)
+    #expect(intents.isEmpty)
+    c.setLocked(false)
+    c.emit(.toggleMute)
+    #expect(intents == [.toggleMute])
+}
+
+/// The clock ticks every second; the icon must not be decoded each time.
+@MainActor
+@Test func theCallsIconIsDecodedOnce() {
+    let c = makeController()
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+                               hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    let png = rep.representation(using: .png, properties: [:])!
+    c.setActivities([callDisplay(artwork: png)], overflow: 0)
+    let first = c.callIconImage
+    c.setActivities([callDisplay(artwork: png)], overflow: 0)
+    #expect(first != nil && c.callIconImage === first)
+    c.setActivities([], overflow: 0)
+    #expect(c.callIconImage == nil, "gone with the call")
+}

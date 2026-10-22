@@ -453,6 +453,13 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    /// The call card (2026-10-22); can open or close the card.
+    public func setCallPanel(_ data: CallPanelData?) {
+        guard data != controller.callPanel else { return }
+        controller.setCallPanel(data)
+        syncWindowToVisibility()
+    }
+
     #if DEBUG
     /// Debug probes only (2026-10-22): see `NotchController.debugOpen(_:)`.
     public func debugOpen(_ panel: NotchController.Panel) {
