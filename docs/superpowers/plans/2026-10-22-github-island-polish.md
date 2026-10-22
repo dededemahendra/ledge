@@ -16,7 +16,7 @@
 - Avatars only from `https://*.githubusercontent.com`, with no token and no cookies, only while connected; at most 64 kept in memory, none on disk. A blip waits at most 1 s for its avatar, then shows its disc.
 - Segments: passed (CheckRun COMPLETED with SUCCESS, NEUTRAL, SKIPPED or STALE; StatusContext SUCCESS), failed (CheckRun FAILURE, TIMED_OUT, STARTUP_FAILURE, CANCELLED, ACTION_REQUIRED; StatusContext FAILURE, ERROR), running (anything else); ordered passed, failed, running. Past 12 segments, draw one smooth fill (fraction done; red once any failed).
 - Hero order: running (earliest start, nil last) > failed > review requested > none. Under a hero 2 rows; alone 5 rows, or 4 and "N more on GitHub".
-- Captions: `<title> · <who or what> · <repo>`, missing parts left out, title shortened past 40 characters; the island bolds a caption up to its FIRST " · ".
+- Captions: `<title> · <who or what> · <repo>`, missing parts left out, title shortened past 40 characters; the island bolds a GitHub blip's caption up to its FIRST " · "; every other caption keeps the LAST (the 2026-10-21 reminders rule).
 - Disc glyphs: passed/approved `checkmark`, failed `xmark`, changes `exclamationmark`, comment `bubble.left.fill`, merged `arrow.triangle.merge`, closed `xmark`, review `eye.fill`. Tints as before (green, red, orange, none, purple, gray, blue).
 - Run tests with `make test` / `make test FILTER=<name>`; never bare `swift test`. Only `brightnessTargetsTheBuiltInDisplay` and `bridgeLoadsAndReadsARealBrightnessValue` may fail. `make build` builds without launching; `make build CONF=release` builds release.
 - `@State` cannot be used as a macro: spelled-out `State` as elsewhere.
@@ -1593,7 +1593,7 @@ from mockups: a panel with a hero card (what is running, else failed, else a
 review request, with a segmented bar of its checks and a clock) over two rows;
 a running ring with a segment per check; blips with the person's avatar and a
 badge, or a colour disc for checks and runs, and captions that lead with the
-PR's title (the island now bolds a caption up to its first separator); and an
+PR's title (a GitHub blip's caption is bold up to its first separator); and an
 account card in Settings. Avatars come from GitHub's image server, no token,
 memory only. Design: `2026-10-22-github-island-polish-design.md`.
 ```
