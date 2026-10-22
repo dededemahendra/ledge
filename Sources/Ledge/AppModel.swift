@@ -262,9 +262,12 @@ final class AppModel {
         checkTask = Task { @MainActor [weak self] in
             let finding = await checker.check(lastAnnounced: lastAnnounced)
             guard let self else { return }
+            // Cancelled: whoever cancelled it has already cleared or replaced
+            // `checkTask` (2026-10-22), so leave it alone.
+            guard !Task.isCancelled else { return }
             self.checkTask = nil
-            // Switched off while asking: the answer is dropped (2026-10-22).
-            guard !Task.isCancelled, self.settings.checksForUpdates || version != nil else { return }
+            // Switched off while asking: the answer is dropped.
+            guard self.settings.checksForUpdates || version != nil else { return }
             self.apply(finding, remember: version == nil)
         }
     }
