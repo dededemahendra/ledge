@@ -15,7 +15,7 @@
 - Every request goes to `https://api.github.com` with the user's token: GraphQL `POST /graphql` (`Authorization: bearer <token>`), REST `GET /repos/{owner}/{repo}/actions/runs?actor={login}&per_page=10` (`Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, `If-None-Match` when an ETag is known). `User-Agent: Ledge/<version>`. Ephemeral session, 15 s timeout, 30 s in all.
 - Not connected is the default (`githubConnected` false): no GitHub request at all until the user connects.
 - Rounds: every 60 s, every 20 s while anything runs, at once on start, on wake and on Check now. Failures back off 60, 120, then 300 s. A rate limit waits until GitHub's reset (at least 60 s). A 401 stops until the user tries again.
-- The first round after start is a quiet baseline. A result is announced once per PR head commit. The user's own reviews, comments, merges and closes are never announced; runs they start are.
+- The first round after start is a quiet baseline. A pass is announced once per PR head commit (even across a return to pending); a failure each time the checks end failed. The user's own reviews, comments, merges and closes are never announced; runs they start are.
 - `ActivityKind.github`: priority 38, TTL 8 s. `ActivityKind.githubRun`: priority 18, sticky. Record ids `"github"` and `"github-run"`.
 - Blip looks, burst order and captions exactly as the spec's table: failed, changes requested, review requested, approved, merged, passed, comment, closed; a burst's caption ends ` · +N more`. Running tint `yellow`.
 - Lock screen: no GitHub blip, running item or panel while locked; what was missed shows as one blip after unlock.
