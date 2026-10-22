@@ -453,6 +453,14 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    #if DEBUG
+    /// Debug probes only (2026-10-22): see `NotchController.debugOpen(_:)`.
+    public func debugOpen(_ panel: NotchController.Panel) {
+        controller.debugOpen(panel)
+        syncWindowToVisibility()
+    }
+    #endif
+
     /// A song-change caption (`NotchController.caption`) grows the island,
     /// so it goes through the presenter for the window resync.
     public func setCaption(_ caption: String?) {

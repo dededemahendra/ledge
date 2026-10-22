@@ -649,10 +649,11 @@ public struct NotchRootView: View {
     /// "Title · Artist": the title carries the weight, the artist sits back.
     /// Left-aligned like the reference, under the artwork's ear. One line,
     /// tail-truncated; the caption row is 26pt, the text 11pt. A previewed
-    /// reminder that is overdue has its time in red. Split at the LAST
-    /// separator, so a title with " · " in it stays whole (2026-10-21).
+    /// reminder that is overdue has its time in red. Split at the FIRST
+    /// separator (2026-10-22).
     private func captionRow(_ caption: String) -> some View {
-        let split = caption.range(of: " · ", options: .backwards)
+        // Bold up to the first separator, the rest dim (2026-10-22): "Title · Artist", "Fix the date picker · sam · web".
+        let split = caption.range(of: " · ")
         let title = split.map { String(caption[..<$0.lowerBound]) } ?? caption
         let artist = split.map { String(caption[$0.upperBound...]) } ?? ""
         let overdue = controller.isPreviewingUpcoming && controller.upcoming?.isPastDue == true
@@ -765,6 +766,15 @@ public struct NotchRootView: View {
                 scoreSide(score.home, crest: controller.homeCrestImage, crestLeading: true,
                           geometryID: Self.homeCrestGeometryID)
             }
+        } else if let activity = controller.activities.first, activity.id == NotchController.githubActivityID {
+            // A GitHub blip (2026-10-22): who did it, or what happened.
+            // Before the product-render branch, which would draw the
+            // avatar square and unbadged.
+            GitHubBlipGlyph(avatar: controller.githubAvatarImage, symbol: activity.symbolName ?? "circle.fill",
+                            color: tintColor(for: activity.tint) ?? Color(nsColor: .systemGray))
+                .id(activity.title)
+                .transition(.blurReplace)
+                .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: activity.title)
         } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
@@ -787,8 +797,14 @@ public struct NotchRootView: View {
         } else if let activity = controller.activities.first, activity.id == NotchController.githubRunActivityID {
             // GitHub checks or a run going (2026-10-22): an amber arc
             // turning, the count of what runs on it.
-            GitHubRunRing(color: tintColor(for: activity.tint) ?? contentColor, count: activity.badge,
-                          reduceMotion: controller.reduceMotion)
+            // A segment per check of the leading PR (2026-10-22); a run
+            // outside a PR has none and keeps the turning arc.
+            if let segments = activity.segments, !segments.isEmpty {
+                CheckRing(segments: segments, reduceMotion: controller.reduceMotion)
+            } else {
+                GitHubRunRing(color: tintColor(for: activity.tint) ?? contentColor, count: activity.badge,
+                              reduceMotion: controller.reduceMotion)
+            }
         } else if let activity = controller.activities.first, activity.id == NotchController.timerActivityID,
                   let fill = activity.barFill {
             // A running countdown (2026-09-29): a ring emptying clockwise
@@ -1147,7 +1163,9 @@ public struct NotchRootView: View {
                 // …and the GitHub running item's clock, amber (2026-10-22).
                 let isTicking = activity.id == NotchController.timerActivityID
                     || activity.id == NotchController.githubRunActivityID
-                compactValue(compact, bump: !isTicking, color: isTicking ? tintColor(for: activity.tint) : nil)
+                // …and a GitHub blip's word, in its event's colour (2026-10-22).
+                let isGitHub = activity.id == NotchController.githubActivityID
+                compactValue(compact, bump: !isTicking, color: (isTicking || isGitHub) ? tintColor(for: activity.tint) : nil)
             } else if activity.id == Self.mediaActivityID,
                       let media = controller.media,
                       controller.state != .expanded {

@@ -932,15 +932,15 @@ private func matchScore() -> NotchController.ActivityDisplay.Score {
     #expect(c.parameters.topRadius == 16)
 }
 
-/// The caption is measured as it is drawn (2026-10-21): split at its LAST
-/// " · ", so a title with one in it is measured in the title's weight and
-/// the island is not left a few points short of it.
+/// The caption is measured as it is drawn (2026-10-21): split at its FIRST
+/// " · " (2026-10-22), the title in bold and the rest, separators included,
+/// dim.
 @MainActor
-@Test func captionWidthSplitsAtTheLastSeparatorLikeTheView() {
+@Test func captionWidthSplitsAtTheFirstSeparatorLikeTheView() {
     let c = NotchController(metrics: NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32)))
-    let title = NSAttributedString(string: "Pay rent · Flat 2 and the garage",
+    let title = NSAttributedString(string: "Pay rent",
                                    attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
-    let time = NSAttributedString(string: " · 14:00",
+    let time = NSAttributedString(string: " · Flat 2 and the garage · 14:00",
                                   attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
     #expect(c.captionWidth("Pay rent · Flat 2 and the garage · 14:00") == ceil(title + time) + 2 * 14 + 16)
 }
@@ -1076,4 +1076,42 @@ private let gitHubPanel = GitHubPanelData(rows: [
     #expect(c.parameters.width >= c.metrics.notchRect.width + 2 * c.captionedEarSlot)
     c.setActivities([.init(id: NotchController.calendarActivityID, title: "Design review", compactText: "5m")], overflow: 0)
     #expect(c.captionedEarSlot == NotchMetrics.activityEarWidth, "a short word keeps the 38 pt ends")
+}
+
+/// Review Focus 4: the width maths the caption row draws from.
+@MainActor
+@Test func aCaptionIsBoldUpToItsFirstSeparator() {
+    let c = makeController()
+    let bold = NSAttributedString(string: "Fix the date picker", attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
+    let rest = NSAttributedString(string: " · sam · web", attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
+    #expect(c.captionWidth("Fix the date picker · sam · web") == ceil(bold + rest) + 2 * 14 + 16)
+}
+
+@MainActor
+@Test func aGitHubBlipBringsItsAvatarAndTheRingItsSegments() {
+    let c = makeController()
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+                               hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    let png = rep.representation(using: .png, properties: [:])!
+    c.setActivities([.init(id: NotchController.githubActivityID, title: "Approved", compactText: "Approved",
+                           symbolName: "checkmark", artwork: png)], overflow: 0)
+    #expect(c.githubAvatarImage != nil)
+    c.setActivities([.init(id: NotchController.githubRunActivityID, title: "Checks running", compactText: "0:42",
+                           segments: [.passed, .failed, .running])], overflow: 0)
+    #expect(c.githubAvatarImage == nil, "gone with its blip")
+    #expect(c.activities.first?.segments == [.passed, .failed, .running])
+}
+
+@MainActor
+@Test func thePanelCarriesItsHeroAndADebugProbeCanPinItOpen() {
+    let c = makeController()
+    let hero = GitHubPanelData.Hero(id: "PR_5", kind: .running, tag: "Checks running", title: "GitHub on the island",
+                                    detail: "ledge #5 · 4 of 6 checks · 1 failed", segments: [.passed, .failed, .running],
+                                    since: Date(), avatar: nil, url: URL(string: "https://github.com/dede/ledge/pull/5")!)
+    c.setGitHubPanel(GitHubPanelData(hero: hero, rows: []))
+    #expect(c.githubPanel?.hero?.title == "GitHub on the island")
+    #if DEBUG
+    c.debugOpen(.github)
+    #expect(c.state == .expanded && c.panel == .github)
+    #endif
 }

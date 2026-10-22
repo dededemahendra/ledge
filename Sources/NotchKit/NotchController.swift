@@ -252,6 +252,8 @@ public final class NotchController {
         /// A small count on the leading glyph (2026-10-22): how many GitHub
         /// checks and runs are going. `nil` draws none.
         public let badge: Int?
+        /// The GitHub ring's segments, a check each (2026-10-22).
+        public let segments: [IslandCheck]?
 
         public init(
             id: String,
@@ -266,7 +268,8 @@ public final class NotchController {
             parts: [Part]? = nil,
             score: Score? = nil,
             lines: [String] = [],
-            badge: Int? = nil
+            badge: Int? = nil,
+            segments: [IslandCheck]? = nil
         ) {
             self.id = id
             self.title = title
@@ -281,6 +284,7 @@ public final class NotchController {
             self.score = score
             self.lines = lines
             self.badge = badge
+            self.segments = segments
         }
     }
 
@@ -453,6 +457,17 @@ public final class NotchController {
         recomputeState()
     }
 
+    #if DEBUG
+    /// Debug probes only (2026-10-22): pins `panel` open for a screenshot,
+    /// the way a click pins the now-playing card.
+    public func debugOpen(_ panel: Panel) {
+        guard metrics.notchRect.width > 0 else { return }
+        self.panel = panel
+        isPinnedOpen = true
+        state = .expanded
+    }
+    #endif
+
     /// The modes there are right now, in swipe order.
     public var availablePanels: [Panel] {
         var panels: [Panel] = []
@@ -558,8 +573,8 @@ public final class NotchController {
     /// paddings and room to spare (2026-10-01).
     func captionWidth(_ caption: String?) -> CGFloat {
         guard let caption else { return NotchMetrics.captionedMinimumWidth }
-        // Split where `captionRow` splits it, at the last separator.
-        let split = caption.range(of: " · ", options: .backwards)
+        // Split where `captionRow` splits it, at the first separator (2026-10-22): the title in bold, the rest dim.
+        let split = caption.range(of: " · ")
         let title = NSAttributedString(string: split.map { String(caption[..<$0.lowerBound]) } ?? caption,
                                        attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
         let rest = split.map {
@@ -836,6 +851,11 @@ public final class NotchController {
         if activities.first?.score?.away.crest != self.activities.first?.score?.away.crest {
             awayCrestImage = activities.first?.score?.away.crest.flatMap(NSImage.init(data:))
         }
+        let avatar = activities.first.flatMap { $0.id == Self.githubActivityID ? $0.artwork : nil }
+        if avatar != githubAvatarData {
+            githubAvatarData = avatar
+            githubAvatarImage = avatar.flatMap(NSImage.init(data:))
+        }
         if panel == .liveActivity, !(activities.first?.id == Self.liveActivityID && hasPanelContent) {
             panel = .media
         }
@@ -861,6 +881,10 @@ public final class NotchController {
     /// not decode a PNG on every body pass.
     public private(set) var homeCrestImage: NSImage?
     public private(set) var awayCrestImage: NSImage?
+    /// A GitHub blip's avatar (2026-10-22), decoded once per change like
+    /// the crests; `nil` when no GitHub blip leads or it has none.
+    public private(set) var githubAvatarImage: NSImage?
+    private var githubAvatarData: Data?
 
     /// Identity of the leading blip, if the leading activity is one.
     /// Title included so plug → unplug (same id, new title) pulses again.
