@@ -573,8 +573,8 @@ public final class NotchController {
     /// paddings and room to spare (2026-10-01).
     func captionWidth(_ caption: String?) -> CGFloat {
         guard let caption else { return NotchMetrics.captionedMinimumWidth }
-        // Split where `captionRow` splits it, at the first separator (2026-10-22): the title in bold, the rest dim.
-        let split = caption.range(of: " · ")
+        // Split where `captionRow` splits it: at the last separator, so a title with one in it stays bold (2026-10-21); a GitHub blip's caption at the first, its PR's title bold and the rest dim (2026-10-22).
+        let split = isGitHubLeading ? caption.range(of: " · ") : caption.range(of: " · ", options: .backwards)
         let title = NSAttributedString(string: split.map { String(caption[..<$0.lowerBound]) } ?? caption,
                                        attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
         let rest = split.map {

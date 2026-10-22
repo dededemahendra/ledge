@@ -649,11 +649,12 @@ public struct NotchRootView: View {
     /// "Title · Artist": the title carries the weight, the artist sits back.
     /// Left-aligned like the reference, under the artwork's ear. One line,
     /// tail-truncated; the caption row is 26pt, the text 11pt. A previewed
-    /// reminder that is overdue has its time in red. Split at the FIRST
-    /// separator (2026-10-22).
+    /// reminder that is overdue has its time in red. Split at the LAST
+    /// separator, so a title with " · " in it stays whole (2026-10-21); a
+    /// GitHub blip's caption splits at the FIRST (2026-10-22).
     private func captionRow(_ caption: String) -> some View {
-        // Bold up to the first separator, the rest dim (2026-10-22): "Title · Artist", "Fix the date picker · sam · web".
-        let split = caption.range(of: " · ")
+        // Bold up to the last separator, so a title with one in it stays bold (2026-10-21); a GitHub blip's caption splits at the first, its PR's title bold and the rest dim (2026-10-22).
+        let split = controller.isGitHubLeading ? caption.range(of: " · ") : caption.range(of: " · ", options: .backwards)
         let title = split.map { String(caption[..<$0.lowerBound]) } ?? caption
         let artist = split.map { String(caption[$0.upperBound...]) } ?? ""
         let overdue = controller.isPreviewingUpcoming && controller.upcoming?.isPastDue == true

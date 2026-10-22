@@ -932,15 +932,15 @@ private func matchScore() -> NotchController.ActivityDisplay.Score {
     #expect(c.parameters.topRadius == 16)
 }
 
-/// The caption is measured as it is drawn (2026-10-21): split at its FIRST
-/// " · " (2026-10-22), the title in bold and the rest, separators included,
-/// dim.
+/// The caption is measured as it is drawn (2026-10-21): split at its LAST
+/// " · ", so a title with one in it is measured in the title's weight and
+/// the island is not left a few points short of it.
 @MainActor
-@Test func captionWidthSplitsAtTheFirstSeparatorLikeTheView() {
+@Test func captionWidthSplitsAtTheLastSeparatorLikeTheView() {
     let c = NotchController(metrics: NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32)))
-    let title = NSAttributedString(string: "Pay rent",
+    let title = NSAttributedString(string: "Pay rent · Flat 2 and the garage",
                                    attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
-    let time = NSAttributedString(string: " · Flat 2 and the garage · 14:00",
+    let time = NSAttributedString(string: " · 14:00",
                                   attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
     #expect(c.captionWidth("Pay rent · Flat 2 and the garage · 14:00") == ceil(title + time) + 2 * 14 + 16)
 }
@@ -1078,10 +1078,11 @@ private let gitHubPanel = GitHubPanelData(rows: [
     #expect(c.captionedEarSlot == NotchMetrics.activityEarWidth, "a short word keeps the 38 pt ends")
 }
 
-/// Review Focus 4: the width maths the caption row draws from.
+/// Review Focus 4: a GitHub blip's caption splits at its first separator; every other caption keeps the last.
 @MainActor
-@Test func aCaptionIsBoldUpToItsFirstSeparator() {
+@Test func aGitHubCaptionIsBoldUpToItsFirstSeparator() {
     let c = makeController()
+    c.setActivities([.init(id: NotchController.githubActivityID, title: "Approved", compactText: "Approved")], overflow: 0)
     let bold = NSAttributedString(string: "Fix the date picker", attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width
     let rest = NSAttributedString(string: " · sam · web", attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .regular)]).size().width
     #expect(c.captionWidth("Fix the date picker · sam · web") == ceil(bold + rest) + 2 * 14 + 16)
