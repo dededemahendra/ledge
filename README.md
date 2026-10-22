@@ -20,14 +20,20 @@ Needs macOS 27 on an Apple silicon Mac.
 2. Open it and drag Ledge onto Applications.
 3. Open Ledge from Applications. It is signed with its own certificate, not
    notarised by Apple, so macOS blocks the first launch and says it cannot
-   verify the app. Click Done, open System Settings › Privacy & Security,
-   scroll down to Security, click Open Anyway beside the line about Ledge, and
-   confirm. macOS remembers the choice, and permissions you grant later stay
-   granted when you update.
+   verify the app. Click Done, then within the hour open System Settings ›
+   Privacy & Security, scroll down to Security, click Open Anyway beside the
+   line about Ledge, and confirm with your password or Touch ID. macOS
+   remembers the choice, and permissions you grant later stay granted when you
+   update.
 
-   Or in Terminal, before opening it:
+   If Open Anyway does not appear, run this in Terminal and open Ledge again:
    `xattr -dr com.apple.quarantine /Applications/Ledge.app`
-4. Ledge asks for the permissions below as it needs them.
+4. Ledge has no Dock icon: it lives in the notch and in the menu bar. It asks
+   for Accessibility at launch and for the other permissions below when a
+   feature first needs them.
+
+There is no licence: you may download and use Ledge and read its code, but not
+reuse or redistribute the code.
 
 ## What it shows
 

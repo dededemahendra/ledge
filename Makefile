@@ -86,14 +86,16 @@ install: release
 # `install` signs it, beside an Applications shortcut to drag it onto. Then
 # mounted and checked, so a broken image is never uploaded.
 dmg: release
+	$(if $(VERSION),,$(error could not read the version from Info.plist.in))
 	rm -rf "$(DMGSTAGE)" "$(DMG)"
 	mkdir -p "$(DMGSTAGE)"
 	ditto "$(APPDIR)" "$(DMGSTAGE)/$(APP).app"
 	ln -s /Applications "$(DMGSTAGE)/Applications"
-	hdiutil create -volname "$(APP)" -srcfolder "$(DMGSTAGE)" -ov -format UDZO "$(DMG)"
+	hdiutil create -volname "$(APP)" -srcfolder "$(DMGSTAGE)" -format UDZO "$(DMG)"
 	@m=$$(mktemp -d); hdiutil attach -nobrowse -readonly -mountpoint "$$m" "$(DMG)" >/dev/null && \
-	  codesign --verify --strict "$$m/$(APP).app" && test -L "$$m/Applications"; s=$$?; \
-	  hdiutil detach "$$m" >/dev/null; rmdir "$$m"; \
+	  codesign --verify --strict "$$m/$(APP).app" && \
+	  codesign -dvv "$$m/$(APP).app" 2>&1 | grep -q "Authority=$(IDENTITY)" && test -L "$$m/Applications"; s=$$?; \
+	  hdiutil detach "$$m" >/dev/null 2>&1 || hdiutil detach -force "$$m" >/dev/null 2>&1; rmdir "$$m"; \
 	  if [ $$s -ne 0 ]; then echo "the image did not check out"; exit $$s; fi
 	@shasum -a 256 "$(DMG)"
 
