@@ -731,6 +731,8 @@ public final class NotchController {
     /// always there and this changes nothing.
     public var earsShowAboveCard: Bool {
         guard state == .expanded else { return false }
+        // The call card carries the app and the clock itself (2026-10-22).
+        if panel == .call { return false }
         // A match's crests fly into its own card (2026-10-21): with that card
         // open both ears are empty, the "+N" pip included, since the crest's
         // ear never gives way to it.
@@ -761,6 +763,7 @@ public final class NotchController {
                 ? metrics.captioned(fitting: max(captionWidth(caption), metrics.notchRect.width + 2 * leadingEarWidth))
                 : metrics.oneActivity(earWidth: leadingEarWidth)
         case .expanded:
+            if panel == .call, callPanel != nil { return metrics.callCard }
             return metrics.expanded(
                 outputRows: panel == .media && isOutputPickerOpen ? outputs.count : 0,
                 earsShowing: earsShowAboveCard

@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// The call card (2026-10-22): the app and its mic, the call's clock and
-/// the mute button on one row; "Not a call" at the foot. Two rows, so it
-/// sits in the open island's fixed budget like the other cards.
+/// The call card (2026-10-22): the app and its state, the call's clock and
+/// the mute button on one row; the mic and "Not a call" under a hairline.
+/// Two rows, in a card only as tall as they are.
 struct CallPanelView: View {
     let data: CallPanelData
     let contentColor: Color
@@ -35,19 +35,19 @@ struct CallPanelView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 reveal(app, order: 0)
                 Spacer(minLength: 8)
                 reveal(clock, order: 1)
                 reveal(muteButton, order: 2)
             }
-            HStack {
-                if !data.canMute {
-                    Text("This mic can't be muted from here")
-                        .font(.system(size: 11))
-                        .foregroundStyle(contentColor.opacity(0.5))
-                }
+            .frame(height: 44)
+            Rectangle()
+                .fill(contentColor.opacity(0.1))
+                .frame(height: 1)
+            HStack(spacing: 4) {
+                reveal(micLine, order: 3)
                 Spacer(minLength: 8)
                 reveal(Button { emit(.hideCallApp) } label: {
                     Text("Not a call")
@@ -55,47 +55,71 @@ struct CallPanelView: View {
                         .foregroundStyle(contentColor.opacity(0.55))
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain), order: 3)
+                .buttonStyle(.plain), order: 4)
             }
+            .frame(height: 14)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
         .onAppear { revealed = true }
     }
 
-    /// The app's icon and name, a click bringing it forward, over the mic.
+    /// The app's icon and name, a click bringing it forward, over the
+    /// call's state in a word: the card may speak where the ears don't.
     private var app: some View {
         Button {
             if let url = URL(string: "ledge://call") { emit(.open(url)) }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 9) {
                 if let icon = data.icon.flatMap(NSImage.init(data:)) {
                     Image(nsImage: icon)
                         .resizable()
                         .interpolation(.high)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 30, height: 30)
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(data.appName)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(contentColor)
                         .lineLimit(1)
-                    if let mic = data.micName {
-                        Text(mic)
-                            .font(.system(size: 11))
-                            .foregroundStyle(contentColor.opacity(0.55))
-                            .lineLimit(1)
-                    }
+                    Text(data.isMuted ? "Muted" : "On a call")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(data.isMuted ? Color(nsColor: .systemRed) : contentColor.opacity(0.55))
+                        .contentTransition(.opacity)
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .animation(reduceMotion ? nil : .snappy, value: data.isMuted)
     }
 
+    /// The mic in use, or why the button can't mute it.
+    @ViewBuilder
+    private var micLine: some View {
+        if !data.canMute {
+            Text("This mic can't be muted from here")
+                .font(.system(size: 11))
+                .foregroundStyle(contentColor.opacity(0.55))
+                .lineLimit(1)
+        } else if let mic = data.micName {
+            HStack(spacing: 4) {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 9, weight: .medium))
+                Text(mic)
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(contentColor.opacity(0.55))
+        }
+    }
+
+    /// Ticks on the call's own whole seconds, so it turns over when the
+    /// call does rather than when the card opened.
     private var clock: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        TimelineView(.periodic(from: data.since, by: 1)) { context in
             Text(GitHubPanelView.clock(context.date.timeIntervalSince(data.since)))
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: 26, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(Color(nsColor: .systemGreen))
                 .contentTransition(.numericText())

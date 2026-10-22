@@ -769,8 +769,13 @@ public struct NotchRootView: View {
             }
         } else if let activity = controller.activities.first, activity.id == NotchController.callActivityID {
             // A call (2026-10-22): the app's own icon, a red crossed-out mic
-            // when muted, a red hang-up when it has ended.
-            callGlyph(activity)
+            // when muted, a red hang-up when it has ended. Its card carries
+            // both itself, so the ear gives way while it is open.
+            if controller.state == .expanded, controller.panel == .call {
+                Color.clear
+            } else {
+                callGlyph(activity)
+            }
         } else if let activity = controller.activities.first, activity.id == NotchController.githubActivityID {
             // A GitHub blip (2026-10-22): who did it, or what happened.
             // Before the product-render branch, which would draw the
@@ -1186,6 +1191,10 @@ public struct NotchRootView: View {
                 }
             } else if let parts = activity.parts, !parts.isEmpty {
                 readings(parts)
+            } else if activity.id == NotchController.callActivityID, controller.state == .expanded,
+                      controller.panel == .call {
+                // The call card's own clock is the one that shows (2026-10-22).
+                Color.clear
             } else if let compact = activity.compactText {
                 // A ticking clock must not bump every second; its digits
                 // still roll.
@@ -1318,7 +1327,7 @@ public struct NotchRootView: View {
                 data: data, contentColor: contentColor,
                 reduceMotion: controller.reduceMotion, emit: { controller.emit($0) }
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .id("call")
             .transition(panelTransition)
         } else if controller.state == .expanded, let media = controller.media {

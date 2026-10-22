@@ -182,6 +182,25 @@ public struct NotchMetrics: Sendable, Equatable {
     public static let cardContentHeight: CGFloat = 136
     /// The open card's width, on a notch or a pill.
     public static let expandedWidth: CGFloat = 356
+    /// Room for the call card's content below its top (2026-10-22): two
+    /// rows, the app and its controls over the mic and "Not a call".
+    public static let callCardContentHeight: CGFloat = 96
+
+    /// The call card (2026-10-22, polish): as wide as the other cards, only
+    /// as tall as its two rows. Its ears give way to it, so a pill keeps
+    /// the short top band.
+    public var callCard: NotchShapeParameters {
+        if isVirtual {
+            return pill(width: Self.expandedWidth, height: Self.callCardContentHeight + cardTopBand(earsShowing: false),
+                        radius: 26)
+        }
+        return NotchShapeParameters(
+            width: Self.expandedWidth,
+            height: atLeastNotchHeight(notchRect.height + Self.callCardContentHeight),
+            bottomRadius: 26,
+            outerFillet: 13
+        )
+    }
 
     /// A pill's parameters: every corner `radius`, no fillets, floating at
     /// `pillTopInset`.

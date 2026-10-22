@@ -1198,3 +1198,18 @@ private func callDisplay(artwork: Data? = nil) -> NotchController.ActivityDispla
     c.setActivities([], overflow: 0)
     #expect(c.callIconImage == nil, "gone with the call")
 }
+
+/// The call card (2026-10-22, polish): shorter than the other cards — two
+/// rows — and the ears give way to it, since it carries the app and the
+/// clock itself.
+@MainActor
+@Test func theCallCardIsShorterAndTheEarsGiveWay() {
+    let c = makeController()
+    c.setActivities([callDisplay()], overflow: 0)
+    c.setCallPanel(callPanel)
+    c.setHovered(true)
+    #expect(c.parameters.height == c.metrics.callCard.height)
+    #expect(c.metrics.callCard.height < c.metrics.expanded.height)
+    #expect(c.metrics.callCard.width == c.metrics.expanded.width)
+    #expect(!c.earsShowAboveCard)
+}
