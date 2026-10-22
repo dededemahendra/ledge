@@ -2,7 +2,7 @@
 
 A notch companion for the MacBook, in the Dynamic Island style: now-playing
 with controls, volume and brightness in place of the stock overlay, battery
-and audio-output blips. Personal build for one machine; not distributed.
+and audio-output blips. Free to download: see Install.
 
 Built and measured against a MacBook Air 13" (M5) on macOS 27.0 with a
 179 × 32 pt notch. Nothing about the notch is hardcoded. A Mac without one (a
@@ -11,13 +11,31 @@ iPhone's Dynamic Island: 4 pt below the top edge at the centre of the main
 display, nothing there at rest, growing out of a point when something happens.
 See `docs/superpowers/specs/2026-10-21-pill-island-design.md`.
 
+## Install
+
+Needs macOS 27 on an Apple silicon Mac.
+
+1. Download `Ledge-<version>.dmg` from the
+   [latest release](https://github.com/dededemahendra/ledge/releases/latest).
+2. Open it and drag Ledge onto Applications.
+3. Open Ledge from Applications. It is signed with its own certificate, not
+   notarised by Apple, so macOS blocks the first launch and says it cannot
+   verify the app. Click Done, open System Settings › Privacy & Security,
+   scroll down to Security, click Open Anyway beside the line about Ledge, and
+   confirm. macOS remembers the choice, and permissions you grant later stay
+   granted when you update.
+
+   Or in Terminal, before opening it:
+   `xattr -dr com.apple.quarantine /Applications/Ledge.app`
+4. Ledge asks for the permissions below as it needs them.
+
 ## What it shows
 
 | Trigger | Island |
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
-| Nothing playing, cursor resting on the island | the next event or timed reminder: calendar or checklist glyph left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00 to 22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
+| Nothing playing, cursor resting on the island | the next event or timed reminder: calendar glyph, or a reminder's ring in its list's colour, left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00 to 22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
 | An iPhone Live Activity (paired iPhone, macOS 26+) | a match shows its crest and score in each ear, around the notch, keeping up by the second; hover and the pair drops into a card with names, period and a clock that counts; click for the system's own. Needs Screen Recording |
 | A Focus turns on or off | with Full Disk Access granted: the Focus's own symbol in its own colour left and its name right (the island stretches to fit), "Off" with the symbol uncoloured, 3 s; without it: the moon and On/Off |
@@ -62,6 +80,9 @@ nothing to read) is listed under Needs attention in Settings › Permissions,
 with a count on that pane in the sidebar. It registers itself as a
 login item on first launch — macOS says so once, and the switch lives in
 System Settings › General › Login Items.
+
+`make dmg` builds `dist/Ledge-<version>.dmg` for a release (the version comes
+from `Info.plist.in`) and checks it before printing its SHA-256.
 
 ## Permissions
 

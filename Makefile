@@ -5,6 +5,9 @@ CONF     ?= debug
 BUILDDIR := .build/$(CONF)
 DIST     := dist
 APPDIR   := $(DIST)/$(APP).app
+VERSION  := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist.in)
+DMG      := $(DIST)/$(APP)-$(VERSION).dmg
+DMGSTAGE := .build/dmg
 
 # swift-testing's macro plugin ships in a `plugins/testing/` SUBdirectory that is
 # not on the compiler's default plugin search path, so `swift test` fails
@@ -15,7 +18,7 @@ APPDIR   := $(DIST)/$(APP).app
 TESTING_PLUGIN := $(shell d="$$(dirname "$$(dirname "$$(xcrun -f swift)")")/lib/swift/host/plugins/testing"; [ -d "$$d" ] && echo "$$d")
 TESTFLAGS := $(if $(TESTING_PLUGIN),-Xswiftc -plugin-path -Xswiftc $(TESTING_PLUGIN),)
 
-.PHONY: all dev release test build bundle sign install run stop cert cert-allow clean
+.PHONY: all dev release test build bundle sign install dmg run stop cert cert-allow clean
 
 all: release
 
@@ -78,6 +81,21 @@ release:
 install: release
 	rm -rf "/Applications/$(APP).app"
 	cp -R "$(APPDIR)" /Applications/
+
+# A disk image for a GitHub release (2026-10-22): the release app, signed as
+# `install` signs it, beside an Applications shortcut to drag it onto. Then
+# mounted and checked, so a broken image is never uploaded.
+dmg: release
+	rm -rf "$(DMGSTAGE)" "$(DMG)"
+	mkdir -p "$(DMGSTAGE)"
+	ditto "$(APPDIR)" "$(DMGSTAGE)/$(APP).app"
+	ln -s /Applications "$(DMGSTAGE)/Applications"
+	hdiutil create -volname "$(APP)" -srcfolder "$(DMGSTAGE)" -ov -format UDZO "$(DMG)"
+	@m=$$(mktemp -d); hdiutil attach -nobrowse -readonly -mountpoint "$$m" "$(DMG)" >/dev/null && \
+	  codesign --verify --strict "$$m/$(APP).app" && test -L "$$m/Applications"; s=$$?; \
+	  hdiutil detach "$$m" >/dev/null; rmdir "$$m"; \
+	  if [ $$s -ne 0 ]; then echo "the image did not check out"; exit $$s; fi
+	@shasum -a 256 "$(DMG)"
 
 clean:
 	rm -rf .build "$(DIST)"
