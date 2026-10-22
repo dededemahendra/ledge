@@ -151,7 +151,7 @@ struct SettingsView: View {
                     } icon: {
                         SettingsTile(symbol: section.symbol, color: section.tile)
                     }
-                    .badge(section == .permissions ? issueCount : 0)
+                    .badge(section == .permissions ? issueCount : (section == .about && model.hasUpdate ? 1 : 0))
                     .tag(section)
                 }
                 .listStyle(.sidebar)
@@ -165,7 +165,7 @@ struct SettingsView: View {
                 case .media:       MediaSettings(settings: settings, model: model)
                 case .calendar:    CalendarSettings(settings: settings, model: model)
                 case .permissions: PermissionsSettings(model: model)
-                case .about:       AboutSettings()
+                case .about:       AboutSettings(model: model)
                 }
             }
             .formStyle(.grouped)

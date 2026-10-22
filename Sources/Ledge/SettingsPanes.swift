@@ -16,7 +16,7 @@ struct GeneralSettings: View {
     init(settings: AppSettings, model: AppModel) {
         self.settings = settings
         self.model = model
-        let director = PreviewDirector(scenes: [.hoverCard, .songCaption], isOn: { $0.isOn(in: settings) })
+        let director = PreviewDirector(scenes: [.hoverCard, .songCaption, .update], isOn: { $0.isOn(in: settings) })
         director.hoverDwell = settings.hoverDwell
         _director = State(initialValue: director)
     }
@@ -62,6 +62,13 @@ struct GeneralSettings: View {
                 }
             } footer: {
                 Text("A short pause keeps a pointer passing through the notch from opening the island.")
+            }
+            Section {
+                SettingsRow("Check for updates", detail: "Once a day, Ledge asks GitHub whether a newer version is out.",
+                            symbol: "arrow.down.circle.fill", color: Color(nsColor: .systemGreen), scene: .update, director: director) {
+                    Toggle("Check for updates", isOn: playing(\.checksForUpdates, .update, settings: settings, director: director))
+                        .labelsHidden()
+                }
             }
         }
     }
@@ -425,8 +432,11 @@ struct PermissionsSettings: View {
 }
 
 /// About (2026-10-22): a header, and the way to the releases and the
-/// source. No update checker: the spec rules out auto-update.
+/// source. The Updates section was added 2026-10-22; it only checks and
+/// announces, never installs.
 struct AboutSettings: View {
+    let model: AppModel
+
     var body: some View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         return Form {
@@ -444,6 +454,13 @@ struct AboutSettings: View {
                 .padding(.vertical, 14)
             }
             Section {
+                TimelineView(.periodic(from: .now, by: 2)) { _ in
+                    UpdateRow(model: model)
+                }
+            } header: {
+                Text("Updates")
+            }
+            Section {
                 SettingsRow("Latest release", detail: "The downloads page on GitHub.",
                             symbol: "arrow.down.circle.fill", color: Color(nsColor: .systemGreen)) {
                     Button("Open") { open("https://github.com/dededemahendra/ledge/releases/latest") }
@@ -458,6 +475,50 @@ struct AboutSettings: View {
 
     private func open(_ address: String) {
         if let url = URL(string: address) { NSWorkspace.shared.open(url) }
+    }
+}
+
+/// Settings › About › Updates (2026-10-22): what the last check found,
+/// when, and a way to act on it.
+struct UpdateRow: View {
+    let model: AppModel
+
+    var body: some View {
+        let status = model.updateStatus
+        SettingsRow(Self.title(status), detail: Self.detail(status),
+                    symbol: "arrow.down.circle.fill", color: Color(nsColor: .systemGreen)) {
+            switch status {
+            case .available(let release, _):
+                Button("Download") { NSWorkspace.shared.open(release.pageURL) }
+            case .off, .checking:
+                EmptyView()
+            default:
+                Button("Check now") { model.checkForUpdates() }
+            }
+        }
+    }
+
+    static func title(_ status: AppModel.UpdateStatus) -> String {
+        switch status {
+        case .notChecked:             return "Not checked yet"
+        case .off:                    return "Checking is off"
+        case .checking:               return "Checking…"
+        case .upToDate:               return "Ledge is up to date"
+        case .available(let r, _):    return "Version \(r.version) is available"
+        case .failed:                 return "Could not check just now"
+        }
+    }
+
+    static func detail(_ status: AppModel.UpdateStatus) -> String? {
+        switch status {
+        case .off:
+            return "Turn it on in General."
+        case .upToDate(let at), .available(_, let at), .failed(let at):
+            let day: Date.FormatStyle.DateStyle = Calendar.current.isDateInToday(at) ? .omitted : .abbreviated
+            return "Last checked at \(at.formatted(date: day, time: .shortened))."
+        case .notChecked, .checking:
+            return nil
+        }
     }
 }
 
