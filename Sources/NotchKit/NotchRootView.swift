@@ -685,7 +685,7 @@ public struct NotchRootView: View {
     private var earContentKey: String {
         let first = controller.activities.first
         let hint = controller.skipHint.map { $0 == .next ? "n" : "p" } ?? "-"
-        return "\(first?.id ?? "-")|\(controller.media == nil ? 0 : 1)|\(hint)|\(controller.isPreviewingUpcoming ? "u" : "-")"
+        return "\(NotchController.earSlot(forActivity: first?.id))|\(controller.media == nil ? 0 : 1)|\(hint)|\(controller.isPreviewingUpcoming ? "u" : "-")"
     }
 
     /// Spec §6/§10: content must stay inside the island's own rect and clear

@@ -454,10 +454,14 @@ builders `compactLeading`, `compactTrailing`, `detailRow`, `expanded`.
 ### PowerService — no permission, public API
 
 **Presentation (2026-09-28):** a power blip is the plain one-activity island,
-alone or over music — glyph (bolt charging, plug held on AC, battery-fill
-otherwise) on the left, the percentage on the right, no words (a labelled
-"Charging …… 95%" row was tried and dropped at the user's request).
-`activityTitle` keeps the long form for the detail row.
+alone or over music — glyph (bolt charging, battery-fill otherwise) on the
+left, the percentage on the right, no words (a labelled "Charging …… 95%" row
+was tried and dropped at the user's request). `activityTitle` keeps the long
+form for the detail row. A plug-in is one blip (2026-10-22): the bolt battery
+filled to the charge even while macOS still reports AC held, no event when
+charging starts or holds with the charger still in, and the blip hands over to
+the steady charging state in the same ear slot, without the ears popping in
+again.
 
 `IOPSNotificationCreateRunLoopSource` plus `IOPSCopyPowerSourcesInfo`. Emits
 plug/unplug, percentage threshold crossings (20 / 10 / 5%), fully-charged,

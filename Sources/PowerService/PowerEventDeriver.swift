@@ -45,32 +45,47 @@ public enum PowerEvent: Sendable, Equatable {
     }
 
     /// Colour meaning for the glyph, matching the system's own battery
-    /// indicator: green while charging or charged, red when low, none
-    /// otherwise (2026-09-29).
+    /// indicator: green on the charger or charged, red when low, none
+    /// otherwise (2026-09-29). The charger going in is green even while
+    /// macOS still says "not charging" (2026-10-22): it hands over to the
+    /// steady charging state, which is green either way.
     public enum Tint: Sendable, Equatable {
         case positive, warning
     }
 
     public var tint: Tint? {
         switch self {
-        case .pluggedIn(_, true, _), .fullyCharged: return .positive
-        case .lowBattery:                           return .warning
-        case .pluggedIn(_, false, _), .unplugged:   return nil
+        case .pluggedIn, .fullyCharged: return .positive
+        case .lowBattery:               return .warning
+        case .unplugged:                return nil
         }
     }
 
-    /// Glyph for the leading ear. The battery with a bolt while charging —
-    /// the menu bar's own charging glyph (user's call, 2026-09-29: the bare
-    /// bolt read as "power", not "battery") — a plug while held on AC, the
+    /// Glyph for the leading ear. The battery with a bolt when the charger
+    /// goes in — the menu bar's own charging glyph (user's call,
+    /// 2026-09-29: the bare bolt read as "power", not "battery") — the
     /// full battery when charged, a battery whose fill tracks the level
-    /// otherwise.
+    /// otherwise. No plug while held on AC (2026-10-22, user's call):
+    /// macOS reports most plug-ins as held for a few seconds before
+    /// charging starts, and the plug then the battery read as two blips.
     public var symbolName: String {
         switch self {
-        case .pluggedIn(_, true, _):   return "battery.100percent.bolt"
-        case .pluggedIn(_, false, _):  return "powerplug.fill"
+        case .pluggedIn:               return "battery.100percent.bolt"
         case .fullyCharged:            return "battery.100percent"
         case .unplugged(let percent), .lowBattery(let percent):
             return Self.batterySymbol(percent: percent)
+        }
+    }
+
+    /// How full the battery glyph draws (2026-10-22): the charge, so the
+    /// blip fills its cell to the level as the steady charging state does
+    /// rather than tinting the symbol end to end.
+    public var barFill: Double {
+        switch self {
+        case .pluggedIn(let percent, _, _), .unplugged(let percent), .lowBattery(let percent):
+            return Double(percent) / 100
+        case .fullyCharged:
+            return 1
         }
     }
 
@@ -118,20 +133,12 @@ public struct PowerEventDeriver: Sendable {
             } else {
                 events.append(.unplugged(percent: snapshot.percent))
             }
-        } else if snapshot.isPluggedIn, snapshot.isCharging != previous.isCharging {
-            // Optional fix-wave addition: without this, nothing fires when the
-            // state flips between charging and held (optimised-charging hold,
-            // thermal hold) WITHOUT an intervening unplug/replug, so the island
-            // would keep showing whatever label it last had. Re-fires the same
-            // `.pluggedIn` event with the fresh `isCharging` value/estimate;
-            // `ActivityQueue` coalesces it into the existing `.power` activity
-            // by kind and restarts its TTL, same as any other update.
-            events.append(.pluggedIn(
-                percent: snapshot.percent,
-                isCharging: snapshot.isCharging,
-                timeToFullMinutes: snapshot.timeToFullMinutes
-            ))
         }
+        // Charging starting or holding with the charger still in is no
+        // moment of its own (2026-10-22, user's call): macOS reports most
+        // plug-ins as held and then charging a few seconds later, and
+        // re-firing on that flip made one plug-in two blips. The steady
+        // charging state reads the snapshot itself.
 
         if snapshot.isCharged, !firedFullyCharged {
             events.append(.fullyCharged)

@@ -1116,3 +1116,15 @@ private let gitHubPanel = GitHubPanelData(rows: [
     #expect(c.state == .expanded && c.panel == .github)
     #endif
 }
+
+/// The plug-in blip hands over to the steady charging state without the
+/// ears popping in again (2026-10-22): both draw the same battery, so they
+/// share one ear slot. Other activities keep their own.
+@MainActor
+@Test func powerAndChargingShareOneEarSlot() {
+    #expect(NotchController.earSlot(forActivity: NotchController.powerActivityID)
+            == NotchController.earSlot(forActivity: NotchController.chargingActivityID))
+    #expect(NotchController.earSlot(forActivity: NotchController.hudActivityID)
+            != NotchController.earSlot(forActivity: NotchController.chargingActivityID))
+    #expect(NotchController.earSlot(forActivity: nil) != NotchController.earSlot(forActivity: NotchController.powerActivityID))
+}

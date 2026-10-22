@@ -1730,3 +1730,21 @@ Pending until the user reports them:
 8. The panel's hero card: checks running with the segmented bar and a ticking clock; checks failed; a review request with the asker's picture. A debug build's `ledge://probe/github-panel` pins it open on a sample.
 9. A blip from a person (a review, a comment) shows their picture with a badge; checks and runs show a colour disc.
 10. Settings › GitHub: the account card with your picture and the line of counts; before connecting, the welcome card.
+
+## One battery blip per plug-in (2026-10-22)
+
+The user's screenshot at 76 % showed the plug-in blip as the flat symbol
+tinted green end to end: power events carried no fill, so only the steady
+charging state that follows got the filled cell. Their screen recording then
+showed one plug-in as three moments: a plug glyph for 3 s (macOS reports the
+charger as "on AC, not charging" first), the green battery with a second pulse
+when charging started (the deriver re-fired on that flip), and the same battery
+popping in again 3 s later when the blip handed over to the charging state (a
+new ear slot). Now a power event carries its charge, the charger going in is
+the green bolt battery whatever macOS reports first, the charging/held flip is
+no event, and the blip and the charging state share one ear slot. Low, full
+and unplugged blips draw the same filled cell. Headless renders checked at 76 %
+charging (green to three quarters, white bolt) and 9 % low (a red sliver).
+Judge live: plug in below 100 % — one blip, the filled battery from the first
+frame, and nothing moves when it settles into the charging state; unplug — the
+cell turns white in place with the island's pulse.

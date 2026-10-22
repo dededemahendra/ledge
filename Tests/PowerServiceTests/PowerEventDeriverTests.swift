@@ -44,23 +44,18 @@ private func snapshot(
     #expect(events.first?.activityTitle == "On AC · 95%")
 }
 
-/// Optional fix-wave addition: nothing used to fire when the state flips
-/// between charging and held (optimised-charging hold, thermal hold)
-/// WITHOUT an intervening unplug/replug — the island would keep showing
-/// whatever label it last had, indefinitely. `PowerEventDeriver` now
-/// re-fires `.pluggedIn` with the fresh `isCharging` value whenever it
-/// changes while still plugged in.
-@Test func chargingAndHeldToggleWhileAlreadyPluggedInIsReported() {
+/// Charging starting or holding while the charger stays in is no blip
+/// (2026-10-22, user's call). macOS reports a plug-in as "on AC, not
+/// charging" and then "charging" a few seconds later, so re-firing on the
+/// flip made one plug-in two blips. The steady charging state follows the
+/// readings by itself.
+@Test func chargingAndHeldToggleWhilePluggedInIsNoBlip() {
     var d = PowerEventDeriver()
-    _ = d.events(for: snapshot(95, plugged: true, charging: true, toFull: 24))
-
-    let held = d.events(for: snapshot(95, plugged: true, charging: false))
-    #expect(held == [.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil)])
-    #expect(held.first?.activityTitle == "On AC · 95%")
-
-    let resumed = d.events(for: snapshot(95, plugged: true, charging: true, toFull: 20))
-    #expect(resumed == [.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20)])
-    #expect(resumed.first?.activityTitle == "Charging · 95% · 20 min to full")
+    _ = d.events(for: snapshot(80, plugged: false))
+    #expect(d.events(for: snapshot(80, plugged: true, charging: false))
+            == [.pluggedIn(percent: 80, isCharging: false, timeToFullMinutes: nil)])
+    #expect(d.events(for: snapshot(80, plugged: true, charging: true, toFull: 40)).isEmpty, "charging starts")
+    #expect(d.events(for: snapshot(80, plugged: true, charging: false)).isEmpty, "a hold")
 }
 
 /// The steady-state case right next to the addition above: repeated
@@ -169,7 +164,8 @@ private func snapshot(
 @Test func glyphsFollowTheState() {
     #expect(PowerEvent.pluggedIn(percent: 95, isCharging: true, timeToFullMinutes: 20).symbolName == "battery.100percent.bolt",
             "the menu bar's own charging glyph")
-    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).symbolName == "powerplug.fill")
+    #expect(PowerEvent.pluggedIn(percent: 95, isCharging: false, timeToFullMinutes: nil).symbolName == "battery.100percent.bolt",
+            "the charger going in is the battery whatever macOS says first (2026-10-22)")
     #expect(PowerEvent.fullyCharged.symbolName == "battery.100percent")
     #expect(PowerEvent.unplugged(percent: 87).symbolName == "battery.75percent")
     #expect(PowerEvent.unplugged(percent: 95).symbolName == "battery.100percent")
@@ -178,12 +174,24 @@ private func snapshot(
     #expect(PowerEvent.batterySymbol(percent: 50).hasPrefix("battery.50"))
 }
 
+/// A battery blip carries its charge (2026-10-22): without it the ear
+/// drew the plug-in blip as the flat symbol tinted green end to end, not
+/// the cell filled to the level the steady charging state draws.
+@Test func batteryGlyphsCarryTheirCharge() {
+    #expect(PowerEvent.pluggedIn(percent: 66, isCharging: true, timeToFullMinutes: 40).barFill == 0.66)
+    #expect(PowerEvent.fullyCharged.barFill == 1)
+    #expect(PowerEvent.unplugged(percent: 87).barFill == 0.87)
+    #expect(PowerEvent.lowBattery(percent: 9).barFill == 0.09)
+    #expect(PowerEvent.pluggedIn(percent: 66, isCharging: false, timeToFullMinutes: nil).barFill == 0.66)
+}
+
 @Test func tintFollowsTheSystemsOwnBatteryColours() {
     #expect(PowerEvent.pluggedIn(percent: 40, isCharging: true, timeToFullMinutes: 30).tint == .positive, "green while charging")
     #expect(PowerEvent.fullyCharged.tint == .positive)
     #expect(PowerEvent.lowBattery(percent: 9).tint == .warning, "red when low")
     #expect(PowerEvent.unplugged(percent: 80).tint == nil, "plain on battery")
-    #expect(PowerEvent.pluggedIn(percent: 80, isCharging: false, timeToFullMinutes: nil).tint == nil, "held on AC is not charging")
+    #expect(PowerEvent.pluggedIn(percent: 80, isCharging: false, timeToFullMinutes: nil).tint == .positive,
+            "green as the charging state it hands over to")
 }
 
 /// Every glyph the power blip can show must exist in SF Symbols on this

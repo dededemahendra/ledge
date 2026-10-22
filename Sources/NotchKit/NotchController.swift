@@ -653,8 +653,17 @@ public final class NotchController {
     /// `AppModel` inserts every power record with this id.
     public static let powerActivityID = "power"
 
+    /// Which ear slot an activity draws in: the ears pop in again whenever
+    /// it changes. The plug-in blip and the steady charging state share one
+    /// (2026-10-22, user's call): they draw the same battery, and the blip
+    /// running out redrew it, a third motion for one plug-in.
+    public static func earSlot(forActivity id: String?) -> String {
+        guard let id else { return "-" }
+        return id == powerActivityID || id == chargingActivityID ? "battery" : id
+    }
+
     /// A charging/battery blip leads: the plain one-activity island, glyph
-    /// left (bolt, plug, battery fill), percentage right, no words — the
+    /// left (bolt or battery fill), percentage right, no words — the
     /// user's call (2026-09-28) after a labelled "Charging …… 95%" row was
     /// tried. Whatever is queued behind it waits; it used to fall into the
     /// two-slot layout over music with a grey dot for a glyph.

@@ -877,6 +877,7 @@ final class AppModel {
                 title: event.activityTitle,
                 compactText: event.compactText,
                 symbolName: event.symbolName,
+                barFill: event.barFill,
                 tint: event.tint.map { $0 == .positive ? ActivityTint.positive : .warning }
             )
         )
