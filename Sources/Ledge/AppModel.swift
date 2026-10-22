@@ -10,6 +10,7 @@ import CalendarService
 import TimerService
 import FocusService
 import LiveActivityService
+import SettingsKit
 import LedgeSettings
 import OSLog
 
@@ -207,6 +208,34 @@ final class AppModel {
         device.stop()
     }
 
+    // MARK: - Settings previews (2026-10-22)
+
+    /// What only arrives as events, kept for the Settings previews: the
+    /// last volume level, the last Focus that came on, and the last
+    /// headphones that reported a charge.
+    private var lastVolume: Double?
+    private var lastFocus: PreviewContent.Focus?
+    private var lastHeadphones: PreviewContent.Headphones?
+
+    /// The user's own content for the Settings previews: what the island
+    /// already shows or has seen. A nil field becomes a labelled sample.
+    func previewContent() -> PreviewContent {
+        let controller = presenter.controller
+        let items = (controller.upcoming.map { [$0] } ?? []) + (controller.calendarMode?.items ?? [])
+        let output = controller.outputs.first(where: \.isCurrent)?.name
+        return PreviewContent(
+            media: controller.media,
+            mediaSource: controller.media == nil ? nil : mediaPayload.bundleIdentifier,
+            nextEvent: items.first { $0.kind == .event },
+            nextReminder: items.first { $0.kind == .reminder },
+            batteryPercent: power.availability.isAvailable ? power.latest?.percent : nil,
+            headphones: lastHeadphones.flatMap { $0.name == output ? $0 : nil },
+            focus: lastFocus,
+            volume: lastVolume,
+            timer: controller.activities.first { $0.id == NotchController.timerActivityID }
+        )
+    }
+
     /// Devices ride the same `ActivityRecord` shape as power: a title for
     /// the detail row, a glyph for the leading ear, an optional battery
     /// percentage for the trailing ear. Same id for every device event, so
@@ -296,6 +325,10 @@ final class AppModel {
     /// case readings side by side; one figure for everything else that
     /// reports a battery.
     private func handle(_ event: DeviceEvent) {
+        if case .outputChanged(let name, _, let levels?) = event, !levels.isEmpty {
+            lastHeadphones = PreviewContent.Headphones(name: name, main: levels.main, left: levels.left,
+                                                       right: levels.right, case: levels.`case`)
+        }
         guard settings.showsDevices else { return }
         queue.insert(
             ActivityRecord(
@@ -338,6 +371,7 @@ final class AppModel {
     /// presentational, and a side-table would need hand-maintained
     /// synchronisation with `insert`/coalesce/`prune` that no test covers.
     private func handle(_ event: HUDEvent) {
+        if case .volume(let level, _) = event { lastVolume = level }
         if case .capsLock = event {
             guard settings.showsCapsLock else { return }
         } else {
@@ -437,6 +471,9 @@ final class AppModel {
     /// Without the Focus database (Full Disk Access) it is the moon and
     /// On/Off. A symbol this macOS lacks falls back to the moon.
     private func handle(_ event: FocusEvent) {
+        if event.isOn, let mode = event.mode {
+            lastFocus = PreviewContent.Focus(name: mode.name, symbolName: mode.symbolName, tintName: mode.tintColorName)
+        }
         guard settings.showsFocus else { return }
         let symbol = NSImage(systemSymbolName: event.symbolName, accessibilityDescription: nil) == nil
             ? (event.isOn ? "moon.fill" : "moon") : event.symbolName
