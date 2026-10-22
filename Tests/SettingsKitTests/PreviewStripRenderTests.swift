@@ -70,3 +70,17 @@ private func islandBox(_ strip: PreviewStrip, width: CGFloat) -> CGRect {
     renderer.scale = 1
     #expect(renderer.cgImage?.width == 300)
 }
+
+/// The strip's menu bar is the screen's own (2026-10-22): on a MacBook it is
+/// as tall as the notch, so the notch island sits inside it; elsewhere it is
+/// the screen's menu bar, 24 pt when that cannot be read (an auto-hiding one).
+@Test func theMenuBarBandIsAsTallAsTheScreensMenuBar() {
+    let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32))
+    let scaled = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 208, height: 37))
+    let pill = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 44, height: 32), isVirtual: true)
+    #expect(PreviewStrip.menuBarHeight(for: notch, screenMenuBar: 24) == 32, "a MacBook's menu bar is the notch's height")
+    #expect(PreviewStrip.menuBarHeight(for: scaled, screenMenuBar: nil) == 37)
+    #expect(PreviewStrip.menuBarHeight(for: pill, screenMenuBar: 24) == 24)
+    #expect(PreviewStrip.menuBarHeight(for: pill, screenMenuBar: 0) == 24, "an auto-hiding menu bar reads as 0")
+    #expect(PreviewStrip.menuBarHeight(for: pill, screenMenuBar: nil) == 24)
+}

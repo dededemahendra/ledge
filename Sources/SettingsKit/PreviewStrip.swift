@@ -17,6 +17,8 @@ public struct PreviewStrip: View {
     let options: PreviewStage.Options
     let wallpaper: NSImage?
     let content: () -> PreviewContent
+    /// The menu bar band's height, the screen's own: see `menuBarHeight`.
+    let menuBar: CGFloat
 
     // Spelled-out State: no macro plugin on this toolchain.
     private var _controller: State<NotchController>
@@ -35,7 +37,9 @@ public struct PreviewStrip: View {
         self.options = options
         self.wallpaper = wallpaper
         self.content = content
-        let controller = Self.makeController(metrics: metrics ?? Self.hostMetrics())
+        let resolved = metrics ?? Self.hostMetrics()
+        menuBar = Self.menuBarHeight(for: resolved, screenMenuBar: metrics == nil ? Self.hostMenuBar() : nil)
+        let controller = Self.makeController(metrics: resolved)
         // The first scene goes on now, so the strip is right on its first
         // frame (and in a headless render, which runs no `onChange`).
         let first = director.stagedUntracked.map { PreviewStage.apply($0, content: content(), to: controller, options: options) }
@@ -48,7 +52,7 @@ public struct PreviewStrip: View {
             backdrop
             Rectangle()
                 .fill(Color.black.opacity(0.3))
-                .frame(height: 18)
+                .frame(height: menuBar)
             if director.staged == .lockScreen {
                 TimelineView(.everyMinute) { context in
                     Text(context.date, format: .dateTime.hour().minute())
@@ -116,6 +120,22 @@ public struct PreviewStrip: View {
         let placement = NSScreen.islandHost?.placement
         let size = placement?.notchRect.size ?? CGSize(width: 179, height: 32)
         return NotchMetrics(notchRect: CGRect(origin: .zero, size: size), isVirtual: placement?.isVirtual ?? false)
+    }
+
+    /// The menu bar band's height (2026-10-22): on a MacBook the menu bar
+    /// is as tall as the notch, so the notch island sits inside it as it does
+    /// on screen; elsewhere it is the screen's own menu bar, or 24 pt when
+    /// that reads as nothing (a menu bar that hides itself).
+    nonisolated static func menuBarHeight(for metrics: NotchMetrics, screenMenuBar: CGFloat?) -> CGFloat {
+        if !metrics.isVirtual { return metrics.notchRect.height }
+        guard let screenMenuBar, screenMenuBar > 0 else { return 24 }
+        return screenMenuBar
+    }
+
+    /// The island's screen's menu bar: the strip above its visible frame.
+    static func hostMenuBar() -> CGFloat? {
+        guard let screen = NSScreen.islandHost?.screen ?? NSScreen.main else { return nil }
+        return screen.frame.maxY - screen.visibleFrame.maxY
     }
 
     static func makeController(metrics: NotchMetrics) -> NotchController {
