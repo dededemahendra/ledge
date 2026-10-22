@@ -1748,3 +1748,32 @@ charging (green to three quarters, white bolt) and 9 % low (a red sliver).
 Judge live: plug in below 100 % — one blip, the filled battery from the first
 frame, and nothing moves when it settles into the charging state; unplug — the
 cell turns white in place with the island's pulse.
+
+## Calls on the island (2026-10-22)
+
+Confirmed by the user, live, with Meet in the Dia browser:
+
+- The call shows as Dia (a browser resolves to itself), with the green clock.
+- Muting from the card turns the island's glyph and the button red.
+
+Closing the tab left the clock running, and the mic muted, in that first
+build. A process's own "running input" flag never notifies; only the process
+list and each mic's "running somewhere" flag do, and a browser's audio
+process outlives its tab. Fixed by listening to the mics and reading again
+while anything holds the mic. Relaunching afterwards undid the leftover mute
+from the saved record, so the crash path works too. The card was then made
+shorter, with the ears giving way to it.
+
+Pending until the user reports them:
+
+1. Closing the Meet tab ends the call: a red hang-up and the length for
+   3 s, and the mic unmuted if Ledge muted it.
+2. A Zoom or FaceTime call.
+3. Meet in Safari (resolved through its responsible process) and in Chrome.
+4. Muting from System Settings shows on the island.
+5. AirPods connecting mid-call: the call and clock carry on, and they are
+   muted too if the call was.
+6. Locking during a call: the pill shows, and the card's buttons do nothing.
+7. Switching Calls off mid-call: the pill goes, with no ended moment.
+8. "Not a call" on Voice Memos, then bringing it back from Settings ›
+   Island › Not calls.

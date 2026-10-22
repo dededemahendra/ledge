@@ -436,6 +436,7 @@ priority  kind           ttl        notes
     60    power          3 s        plug, unplug, 20/10/5% thresholds, full
     50    device         3 s        AirPods/Bluetooth connect, output change
     40    notification   5 s        mirrored system notifications
+    30    call           sticky     the mic held by an app (a call); 3 s ended moment
     10    media          sticky     never expires; the resting state
 ```
 
