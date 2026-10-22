@@ -5,7 +5,7 @@ let package = Package(
     name: "Ledge",
     platforms: [.macOS("27.0")],
     targets: [
-        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService", "FocusService", "LiveActivityService", "LedgeSettings", "SettingsKit"], path: "Sources/Ledge"),
+        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService", "FocusService", "LiveActivityService", "LedgeSettings", "SettingsKit", "UpdateService"], path: "Sources/Ledge"),
         .target(name: "NotchKit"),
         .target(name: "ActivityKit"),
         .target(name: "PowerService", dependencies: ["ActivityKit"]),
@@ -17,7 +17,8 @@ let package = Package(
         .target(name: "FocusService", dependencies: ["ActivityKit"]),
         .target(name: "LiveActivityService", dependencies: ["ActivityKit"]),
         .target(name: "LedgeSettings"),
-        .target(name: "SettingsKit", dependencies: ["NotchKit", "LedgeSettings", "HUDService", "PowerService", "DeviceService", "FocusService"]),
+        .target(name: "UpdateService"),
+        .target(name: "SettingsKit", dependencies: ["NotchKit", "LedgeSettings", "HUDService", "PowerService", "DeviceService", "FocusService", "UpdateService"]),
         .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
         .testTarget(name: "NotchWindowTests", dependencies: ["NotchKit"]),
         .testTarget(name: "NotchRenderTests", dependencies: ["NotchKit"]),
@@ -31,6 +32,7 @@ let package = Package(
         .testTarget(name: "LiveActivityServiceTests", dependencies: ["LiveActivityService"]),
         .testTarget(name: "LedgeSettingsTests", dependencies: ["LedgeSettings"]),
         .testTarget(name: "SettingsKitTests", dependencies: ["SettingsKit", "NotchKit", "LedgeSettings", "HUDService"]),
+        .testTarget(name: "UpdateServiceTests", dependencies: ["UpdateService"]),
         .testTarget(
             name: "MediaServiceTests",
             dependencies: ["MediaService"],
