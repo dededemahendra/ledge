@@ -127,3 +127,20 @@ private final class Flag: @unchecked Sendable { var value = false }
     #expect(d.stagedUntracked == .battery)
     #expect(!changed.value)
 }
+
+/// Two rows with the same scene (music apps, calendars): the next row's enter
+/// before the last row's leave keeps the pointer (2026-10-22).
+@MainActor
+@Test func twoRowsOfTheSameSceneHandOverWithoutLettingGo() {
+    let d = PreviewDirector(scenes: [.meeting, .reminder], isOn: { _ in true }, now: t0)
+    d.point(at: .meeting, now: t0)        // row A
+    d.point(at: .meeting, now: t0 + 1)    // row B's enter
+    d.leave(.meeting, now: t0 + 1)        // row A's leave, after it
+    d.tick(at: t0 + 2)
+    d.tick(at: t0 + 10)
+    #expect(d.scene == .meeting, "still on row B")
+    d.leave(.meeting, now: t0 + 11)       // row B's leave
+    d.tick(at: t0 + 11 + PreviewDirector.leaveGrace)
+    d.tick(at: t0 + 11 + PreviewDirector.leaveGrace + PreviewDirector.cycleInterval)
+    #expect(d.scene == .reminder, "let go, and the cycle moves on")
+}

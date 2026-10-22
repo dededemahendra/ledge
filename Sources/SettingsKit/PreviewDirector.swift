@@ -35,6 +35,7 @@ public final class PreviewDirector {
     @ObservationIgnored public private(set) var stagedUntracked: PreviewScene?
 
     @ObservationIgnored private var pointed: PreviewScene?
+    @ObservationIgnored private var pointers: [PreviewScene: Int] = [:]
     @ObservationIgnored private var leaving: (scene: PreviewScene, at: Date)?
     @ObservationIgnored private var playing: (scene: PreviewScene, until: Date)?
     @ObservationIgnored private var cycleIndex = 0
@@ -57,16 +58,22 @@ public final class PreviewDirector {
 
     public func point(at scene: PreviewScene, now: Date = Date()) {
         self.now = now
+        pointers[scene, default: 0] += 1
         leaving = nil
         pointed = scene
         resolve()
     }
 
-    /// The pointer left `scene`'s row. A leave that arrives after the next
-    /// row's enter changes nothing.
+    /// The pointer left one of `scene`'s rows. A leave counts against the
+    /// scene's rows: one that arrives after the next row's enter, of the same
+    /// scene or another, changes nothing.
     public func leave(_ scene: PreviewScene, now: Date = Date()) {
         self.now = now
-        guard pointed == scene else { return }
+        let left = max(0, (pointers[scene] ?? 0) - 1)
+        pointers[scene] = left == 0 ? nil : left
+        // Another row of the same scene still has the pointer (its enter
+        // came before this row's leave): keep it.
+        guard pointed == scene, left == 0 else { return }
         leaving = (scene, now)
     }
 

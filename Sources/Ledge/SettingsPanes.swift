@@ -265,15 +265,17 @@ struct CalendarSettings: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            // One card per kind with the accounts as labels inside it —
-            // not a section per account: sections made in a loop render
-            // unreliably in a grouped Form on macOS (merged cards, rows
-            // drawn twice), and a fixed structure does not.
+            // One card per kind with the accounts as label rows inside it, in
+            // one flat loop — not a section per account, and not a label
+            // followed by a nested loop: both render unreliably in a grouped
+            // Form on macOS (merged cards, the last row drawn under its card).
             if !events.isEmpty {
                 Section {
-                    ForEach(events, id: \.source) { group in
-                        AccountLabel(group.source)
-                        ForEach(group.calendars) { calendar in
+                    ForEach(CalendarRow.rows(events)) { row in
+                        switch row {
+                        case .account(let title):
+                            AccountLabel(title)
+                        case .calendar(let calendar):
                             CalendarToggle(calendar: calendar, settings: settings, scene: .meeting, director: director)
                         }
                     }
@@ -285,9 +287,11 @@ struct CalendarSettings: View {
             }
             if !lists.isEmpty {
                 Section {
-                    ForEach(lists, id: \.source) { group in
-                        AccountLabel(group.source)
-                        ForEach(group.calendars) { list in
+                    ForEach(CalendarRow.rows(lists)) { row in
+                        switch row {
+                        case .account(let title):
+                            AccountLabel(title)
+                        case .calendar(let list):
                             CalendarToggle(calendar: list, settings: settings, scene: .reminder, director: director)
                         }
                     }
@@ -312,6 +316,25 @@ struct AccountLabel: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
             .padding(.top, 2)
+    }
+}
+
+/// One row of a calendars card (2026-10-22): an account's label or one
+/// calendar, so the card is one flat loop. A label followed by a nested loop
+/// put the last calendar under its card, drawn as footer text.
+private enum CalendarRow: Identifiable {
+    case account(String)
+    case calendar(CalendarInfo)
+
+    var id: String {
+        switch self {
+        case .account(let title): return "account:\(title)"
+        case .calendar(let calendar): return "calendar:\(calendar.id)"
+        }
+    }
+
+    static func rows(_ groups: [(source: String, calendars: [CalendarInfo])]) -> [CalendarRow] {
+        groups.flatMap { [CalendarRow.account($0.source)] + $0.calendars.map { CalendarRow.calendar($0) } }
     }
 }
 
@@ -437,7 +460,6 @@ struct AboutSettings: View {
         if let url = URL(string: address) { NSWorkspace.shared.open(url) }
     }
 }
-
 
 /// A switch that plays its scene in the strip when it is turned on.
 @MainActor

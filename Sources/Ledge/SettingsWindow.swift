@@ -27,6 +27,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.model = model
     }
 
+    /// Closing drops the window (2026-10-22): an ordered-out window keeps its
+    /// SwiftUI views, and with them each preview strip's clock, four times a
+    /// second. The next `show` builds it again on the same pane, which
+    /// `selection` keeps.
+    func windowWillClose(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in self?.window = nil }
+    }
+
     #if DEBUG
     /// Development only: renders every pane of the live window to
     /// `directory/settings-<section>.png` through the view's own display
