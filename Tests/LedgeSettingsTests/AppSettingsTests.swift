@@ -114,3 +114,12 @@ private func fresh() -> (AppSettings, UserDefaults) {
     #expect(again.agentsEnabled)
     #expect(!again.agentWaiting && !again.agentFinished && !again.agentWorking && !again.agentFailed)
 }
+
+/// Long commands edit ~/.zshrc, so they wait for the user (2026-10-23).
+@MainActor
+@Test func longCommandsAreOffByDefault() {
+    let (s, defaults) = fresh()
+    #expect(!s.showsLongCommands)
+    s.showsLongCommands = true
+    #expect(AppSettings(defaults: defaults).showsLongCommands)
+}

@@ -112,6 +112,13 @@ public enum PreviewSample {
         icon.size = NSSize(width: 64, height: 64)
         return icon.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
     }
+    /// A finished command (2026-10-23): a green check, its time, and the
+    /// caption the island shows with it.
+    @MainActor public static let longCommand = NotchController.ActivityDisplay(
+        id: NotchController.commandActivityID, title: "make test", compactText: "1:20",
+        symbolName: "checkmark.circle.fill", tint: .positive
+    )
+    public static let longCommandCaption = "make test · 1m 20s"
     @MainActor public static let liveActivity = NotchController.ActivityDisplay(
         id: NotchController.liveActivityID, title: "Live Activity",
         score: .init(home: .init(name: "HOME", value: "2", crest: nil),

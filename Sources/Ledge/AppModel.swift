@@ -333,6 +333,15 @@ final class AppModel {
         publish()
     }
 
+    // MARK: - Long commands (2026-10-23)
+
+    private let commands = CommandMonitor()
+    /// Why long commands can't be heard, for their Settings row.
+    var longCommandsProblem: String? {
+        if case .problem(let text) = commands.status { return text }
+        return nil
+    }
+
     // MARK: - Agents (2026-10-23)
 
     private let agents = AgentMonitor()

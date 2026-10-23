@@ -180,6 +180,10 @@ public enum PreviewStage {
             showAgent(c, AgentNotice.blip(for: .failed(agentSample(.failed(reason: "rate_limit")))),
                       id: NotchController.agentActivityID)
             return caption(scene, sample: "no session")
+        case .longCommand:
+            c.setActivities([PreviewSample.longCommand], overflow: 0)
+            c.setCaption(PreviewSample.longCommandCaption)
+            return caption(scene, sample: "no long command yet")
         }
     }
 

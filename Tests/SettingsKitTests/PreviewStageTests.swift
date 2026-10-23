@@ -92,7 +92,8 @@ private func island() -> NotchController {
     let defaults = UserDefaults(suiteName: suite)!
     defaults.removePersistentDomain(forName: suite)
     let s = AppSettings(defaults: defaults)
-    #expect(PreviewScene.allCases.allSatisfy { $0.isOn(in: s) }, "everything is on by default")
+    #expect(PreviewScene.allCases.filter { $0 != .longCommand }.allSatisfy { $0.isOn(in: s) }, "everything is on by default")
+    #expect(!PreviewScene.longCommand.isOn(in: s), "it edits ~/.zshrc, so it waits for the user")
     s.showsBattery = false
     s.showsVolumeBrightness = false
     #expect(!PreviewScene.battery.isOn(in: s))
@@ -172,4 +173,14 @@ private func island() -> NotchController {
     settings.agentWaiting = false
     #expect(!PreviewScene.agentWaiting.isOn(in: settings))
     #expect(PreviewScene.agentFinished.title == "Finished its turn")
+}
+
+/// The long-command scene: a pass, its time and its caption, as a sample.
+@MainActor
+@Test func theLongCommandSceneShowsAPassAndItsTime() {
+    let c = island()
+    let sample = PreviewStage.apply(.longCommand, content: PreviewContent(), to: c)
+    #expect(sample.text == "Long commands · Sample: no long command yet")
+    #expect(c.activities.first?.compactText == "1:20")
+    #expect(c.captionText == "make test · 1m 20s")
 }

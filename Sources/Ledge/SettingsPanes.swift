@@ -84,7 +84,7 @@ struct IslandSettings: View {
         self.settings = settings
         self.model = model
         _director = State(initialValue: PreviewDirector(
-            scenes: [.volume, .brightness, .capsLock, .battery, .headphones, .focus, .timer, .call,
+            scenes: [.volume, .brightness, .capsLock, .battery, .headphones, .focus, .timer, .call, .longCommand,
                      .liveActivity, .meeting, .reminder, .lockScreen],
             isOn: { $0.isOn(in: settings) }
         ))
@@ -118,8 +118,12 @@ struct IslandSettings: View {
                     "timer", .systemOrange, \.showsClockTimers, .timer)
                 row("Calls", "The app and how long, while the mic is on",
                     "phone.fill", .systemGreen, \.showsCalls, .call)
+                row("Long commands", model.longCommandsProblem ?? "zsh commands that ran 10 seconds or more",
+                    "terminal", .systemGray, \.showsLongCommands, .longCommand)
             } header: {
                 Text("What happens on the Mac")
+            } footer: {
+                Text("Long commands adds a marked block to ~/.zshrc and keeps a backup. New terminal windows pick it up; run exec zsh in open ones.")
             }
             if !settings.hiddenCallApps.isEmpty {
                 Section {

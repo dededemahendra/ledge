@@ -37,6 +37,7 @@ public final class AppSettings {
         public static let agentFinished = "agentFinished"
         public static let agentWorking = "agentWorking"
         public static let agentFailed = "agentFailed"
+        public static let showsLongCommands = "showsLongCommands"
         public static let mediaSources = "mediaSources"
         public static let calendarLeadMinutes = "calendarLeadMinutes"
         public static let disabledCalendarIDs = "disabledCalendarIDs"
@@ -104,6 +105,9 @@ public final class AppSettings {
     public var agentFinished: Bool { didSet { save(agentFinished, Key.agentFinished) } }
     public var agentWorking: Bool { didSet { save(agentWorking, Key.agentWorking) } }
     public var agentFailed: Bool { didSet { save(agentFailed, Key.agentFailed) } }
+    /// Long terminal commands on the island (2026-10-23): off until the user
+    /// switches it on, which puts Ledge's block into `~/.zshrc`.
+    public var showsLongCommands: Bool { didSet { save(showsLongCommands, Key.showsLongCommands) } }
     /// Enabled music apps' bundle identifiers.
     public var mediaSources: Set<String> { didSet { save(Array(mediaSources).sorted(), Key.mediaSources) } }
     public var calendarLeadMinutes: Int { didSet { save(calendarLeadMinutes, Key.calendarLeadMinutes) } }
@@ -141,6 +145,7 @@ public final class AppSettings {
         agentFinished = defaults.object(forKey: Key.agentFinished) as? Bool ?? true
         agentWorking = defaults.object(forKey: Key.agentWorking) as? Bool ?? true
         agentFailed = defaults.object(forKey: Key.agentFailed) as? Bool ?? true
+        showsLongCommands = defaults.object(forKey: Key.showsLongCommands) as? Bool ?? false
         mediaSources = (defaults.object(forKey: Key.mediaSources) as? [String]).map(Set.init)
             ?? Set(Self.knownMediaSources.map(\.id))
         calendarLeadMinutes = defaults.object(forKey: Key.calendarLeadMinutes) as? Int ?? 5
