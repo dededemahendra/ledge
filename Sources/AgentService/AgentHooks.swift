@@ -33,30 +33,36 @@ public enum AgentHooks {
         return c.contains(marker)
     }
 
-    /// Takes Ledge's hooks out of every group of every event. Groups emptied by that go too;
-    /// events emptied by that go when `pruneEvents` is set (`events` keeps its place otherwise).
-    private static func strip(_ settings: OrderedJSON, keepingEvents keep: Set<String>) -> OrderedJSON {
+    /// Takes Ledge's hooks out of a list of groups; groups emptied by that go too.
+    private static func strip(groups: [OrderedJSON]) -> (groups: [OrderedJSON], touched: Bool) {
+        var out: [OrderedJSON] = []
+        var touched = false
+        for group in groups {
+            guard case .object(var members) = group,
+                  let gi = members.lastIndex(where: { $0.key == "hooks" }),
+                  case .array(let hooks) = members[gi].value else { out.append(group); continue }
+            let kept = hooks.filter { !isLedge($0) }
+            if kept.count == hooks.count { out.append(group); continue }
+            touched = true
+            if kept.isEmpty { continue }
+            members[gi].value = .array(kept)
+            out.append(.object(members))
+        }
+        return (out, touched)
+    }
+
+    /// Takes Ledge's hooks out of every group of every event, then the groups, events and
+    /// `hooks` that became empty because of it.
+    public static func removing(from settings: OrderedJSON) -> OrderedJSON {
         guard case .object(var top) = settings,
               let hi = top.lastIndex(where: { $0.key == "hooks" }),
               case .object(let events) = top[hi].value else { return settings }
         var newEvents: [(key: String, value: OrderedJSON)] = []
         for event in events {
             guard case .array(let groups) = event.value else { newEvents.append(event); continue }
-            var newGroups: [OrderedJSON] = []
-            var touched = false
-            for group in groups {
-                guard case .object(var members) = group,
-                      let gi = members.lastIndex(where: { $0.key == "hooks" }),
-                      case .array(let hooks) = members[gi].value else { newGroups.append(group); continue }
-                let kept = hooks.filter { !isLedge($0) }
-                if kept.count == hooks.count { newGroups.append(group); continue }
-                touched = true
-                if kept.isEmpty { continue }
-                members[gi].value = .array(kept)
-                newGroups.append(.object(members))
-            }
-            if touched && newGroups.isEmpty && !keep.contains(event.key) { continue }
-            newEvents.append((key: event.key, value: touched ? .array(newGroups) : event.value))
+            let (kept, touched) = strip(groups: groups)
+            if touched && kept.isEmpty { continue }
+            newEvents.append((key: event.key, value: touched ? .array(kept) : event.value))
         }
         if newEvents.isEmpty && !events.isEmpty {
             top.remove(at: hi)
@@ -66,26 +72,51 @@ public enum AgentHooks {
         return .object(top)
     }
 
-    public static func removing(from settings: OrderedJSON) -> OrderedJSON {
-        strip(settings, keepingEvents: [])
+    private static func holdsLedge(_ group: OrderedJSON) -> Bool {
+        guard case .array(let hooks)? = group["hooks"] else { return false }
+        return hooks.contains(where: isLedge)
     }
 
+    private static func holdsOnlyLedge(_ group: OrderedJSON) -> Bool {
+        guard case .array(let hooks)? = group["hooks"] else { return false }
+        return !hooks.isEmpty && hooks.allSatisfy(isLedge)
+    }
+
+    /// Ledge's group keeps its place when it is alone in its group; otherwise it goes last.
     public static func installing(into settings: OrderedJSON, helper: String) -> OrderedJSON {
-        guard case .object(var top) = strip(settings, keepingEvents: Set(events)) else { return settings }
+        guard case .object(var top) = settings else { return settings }
         var hooksIndex = top.lastIndex { $0.key == "hooks" }
         if hooksIndex == nil {
             top.append((key: "hooks", value: .object([])))
             hooksIndex = top.count - 1
         }
         guard let hi = hooksIndex, case .object(var evs) = top[hi].value else { return .object(top) }
+
+        // Events outside the ten: take Ledge out, dropping what it empties.
+        var rebuilt: [(key: String, value: OrderedJSON)] = []
+        for ev in evs {
+            guard !events.contains(ev.key), case .array(let groups) = ev.value else { rebuilt.append(ev); continue }
+            let (kept, touched) = strip(groups: groups)
+            if touched && kept.isEmpty { continue }
+            rebuilt.append(touched ? (key: ev.key, value: .array(kept)) : ev)
+        }
+        evs = rebuilt
+
         for event in events {
             let group = ledgeGroup(event: event, helper: helper)
-            if let ei = evs.lastIndex(where: { $0.key == event }), case .array(var groups) = evs[ei].value {
-                groups.append(group)
-                evs[ei].value = .array(groups)
-            } else {
+            guard let ei = evs.lastIndex(where: { $0.key == event }), case .array(var groups) = evs[ei].value else {
+                evs.removeAll { $0.key == event }
                 evs.append((key: event, value: .array([group])))
+                continue
             }
+            let mine = groups.indices.filter { holdsLedge(groups[$0]) }
+            if mine.count == 1, holdsOnlyLedge(groups[mine[0]]) {
+                groups[mine[0]] = group
+            } else {
+                groups = strip(groups: groups).groups
+                groups.append(group)
+            }
+            evs[ei].value = .array(groups)
         }
         top[hi].value = .object(evs)
         return .object(top)
@@ -115,13 +146,16 @@ public struct AgentSettingsFile: Sendable {
 
     public init(url: URL) { self.url = url }
 
-    private var backupURL: URL { url.appendingPathExtension("ledge-backup") }
+    /// The file itself: a symlinked settings.json stays a link and its target gets the change.
+    private var target: URL { url.resolvingSymlinksInPath() }
+
+    private var backupURL: URL { target.appendingPathExtension("ledge-backup") }
 
     /// Missing file: nil. Otherwise the original bytes and what they parse to.
     private func read() throws(Problem) -> (data: Data, json: OrderedJSON)? {
-        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        guard FileManager.default.fileExists(atPath: target.path) else { return nil }
         let data: Data
-        do { data = try Data(contentsOf: url) } catch { throw .unreadable(error.localizedDescription) }
+        do { data = try Data(contentsOf: target) } catch { throw .unreadable(error.localizedDescription) }
         let json: OrderedJSON
         do { json = try OrderedJSON.parse(data) } catch { throw .unreadable("\(error)") }
         guard case .object = json else { throw .notAnObject }
@@ -151,11 +185,11 @@ public struct AgentSettingsFile: Sendable {
     private func write(_ json: OrderedJSON, original: Data?) throws(Problem) {
         let fm = FileManager.default
         do {
-            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             if let original, !fm.fileExists(atPath: backupURL.path) {
                 try original.write(to: backupURL, options: .atomic)
             }
-            try json.written().write(to: url, options: .atomic)
+            try json.written().write(to: target, options: .atomic)
         } catch {
             throw .unreadable(error.localizedDescription)
         }

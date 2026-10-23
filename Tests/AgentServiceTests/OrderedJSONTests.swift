@@ -74,7 +74,15 @@ private func bytes(_ s: String) -> Data { Data(s.utf8) }
 }
 
 @Test func badJSONThrows() {
-    for bad in ["{", "{'a':1}", "{} x", "", "[1,]", "01"] {
+    for bad in ["{", "{'a':1}", "{} x", "", "[1,]", "01", "\"abc", "\"\\u12", "\"\\x\"", "\"a\nb\"", "\"\\ud800x\""] {
         #expect(throws: (any Error).self) { try OrderedJSON.parse(bytes(bad)) }
     }
+}
+
+@Test func deepNestingThrowsInsteadOfCrashing() throws {
+    #expect(throws: (any Error).self) { try OrderedJSON.parse(bytes(String(repeating: "[", count: 100_000))) }
+    let ok = String(repeating: "[", count: 512) + String(repeating: "]", count: 512)
+    #expect(try OrderedJSON.parse(bytes(ok)).written().count > 0)
+    let tooDeep = String(repeating: "[", count: 513) + String(repeating: "]", count: 513)
+    #expect(throws: (any Error).self) { try OrderedJSON.parse(bytes(tooDeep)) }
 }

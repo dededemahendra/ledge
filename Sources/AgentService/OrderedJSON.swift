@@ -46,8 +46,10 @@ public indirect enum OrderedJSON: Sendable, Equatable {
     }
 
     private struct Parser {
+        static let maxDepth = 512
         let bytes: [UInt8]
         var i = 0
+        var depth = 0
 
         init(bytes: [UInt8]) { self.bytes = bytes }
 
@@ -77,6 +79,9 @@ public indirect enum OrderedJSON: Sendable, Equatable {
         }
 
         mutating func object() throws -> OrderedJSON {
+            depth += 1
+            defer { depth -= 1 }
+            guard depth <= Parser.maxDepth else { throw fail("nested too deeply") }
             i += 1
             var members: [(key: String, value: OrderedJSON)] = []
             skipSpace()
@@ -99,6 +104,9 @@ public indirect enum OrderedJSON: Sendable, Equatable {
         }
 
         mutating func array() throws -> OrderedJSON {
+            depth += 1
+            defer { depth -= 1 }
+            guard depth <= Parser.maxDepth else { throw fail("nested too deeply") }
             i += 1
             var items: [OrderedJSON] = []
             skipSpace()
@@ -227,29 +235,40 @@ public indirect enum OrderedJSON: Sendable, Equatable {
         case .bool(let b): out += b ? "true" : "false"
         case .number(let n): out += n
         case .string(let s): Self.escape(s, into: &out)
-        case .array(let items):
-            if items.isEmpty { out += "[]"; return }
-            let inner = String(repeating: "  ", count: depth + 1)
-            out += "[\n"
-            for (n, item) in items.enumerated() {
-                out += inner
-                item.write(into: &out, depth: depth + 1)
-                out += n < items.count - 1 ? ",\n" : "\n"
-            }
-            out += String(repeating: "  ", count: depth) + "]"
-        case .object(let members):
-            if members.isEmpty { out += "{}"; return }
-            let inner = String(repeating: "  ", count: depth + 1)
-            out += "{\n"
-            for (n, member) in members.enumerated() {
-                out += inner
-                Self.escape(member.key, into: &out)
-                out += ": "
-                member.value.write(into: &out, depth: depth + 1)
-                out += n < members.count - 1 ? ",\n" : "\n"
-            }
-            out += String(repeating: "  ", count: depth) + "}"
+        case .array(let items): Self.writeArray(items, into: &out, depth: depth)
+        case .object(let members): Self.writeObject(members, into: &out, depth: depth)
         }
+    }
+
+    // Kept apart from `write` so each level of nesting uses a small stack frame.
+    private static func writeArray(_ items: [OrderedJSON], into out: inout String, depth: Int) {
+        if items.isEmpty { out += "[]"; return }
+        out += "[\n"
+        for (n, item) in items.enumerated() {
+            indent(&out, depth + 1)
+            item.write(into: &out, depth: depth + 1)
+            out += n < items.count - 1 ? ",\n" : "\n"
+        }
+        indent(&out, depth)
+        out += "]"
+    }
+
+    private static func writeObject(_ members: [(key: String, value: OrderedJSON)], into out: inout String, depth: Int) {
+        if members.isEmpty { out += "{}"; return }
+        out += "{\n"
+        for (n, member) in members.enumerated() {
+            indent(&out, depth + 1)
+            escape(member.key, into: &out)
+            out += ": "
+            member.value.write(into: &out, depth: depth + 1)
+            out += n < members.count - 1 ? ",\n" : "\n"
+        }
+        indent(&out, depth)
+        out += "}"
+    }
+
+    private static func indent(_ out: inout String, _ depth: Int) {
+        for _ in 0..<depth { out += "  " }
     }
 
     private static func escape(_ s: String, into out: inout String) {
