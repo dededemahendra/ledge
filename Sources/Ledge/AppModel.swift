@@ -497,7 +497,7 @@ final class AppModel {
         switch mark {
         case .waiting(let text, let since): .waiting(text, since: since)
         case .working(let text, let since): .working(text, since: since)
-        case .done(let took, let at):       .done("Done in \(AgentNotice.duration(took))", at: at)
+        case .done(let took, let at):       .done(took.map { "Done in \(AgentNotice.duration($0))" } ?? "Done", at: at)
         case .failed(let text, let at):     .failed(text, at: at)
         case .idle:                         .idle
         }

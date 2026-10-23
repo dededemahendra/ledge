@@ -36,7 +36,7 @@ public struct AgentPanelData: Sendable, Equatable {
         public enum Mark: Sendable, Equatable {
             case waiting(String, since: Date)
             case working(String, since: Date)
-            /// The text is already "Done in 3m 20s".
+            /// The text is already "Done in 3m 20s", or "Done" when the length is unknown.
             case done(String, at: Date)
             /// The text is already "Rate limited".
             case failed(String, at: Date)

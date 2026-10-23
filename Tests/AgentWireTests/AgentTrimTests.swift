@@ -111,3 +111,20 @@ private func hook(_ json: String, env: [String: String] = [:]) -> AgentMessage? 
     #expect(line.last == 0x0A)
     #expect(try JSONDecoder().decode(AgentMessage.self, from: line.dropLast()) == m)
 }
+
+@Test func theAgentIdComesAcrossAndIsNeverDropped() throws {
+    let m = hook(#"{"session_id":"s","hook_event_name":"PreToolUse","agent_id":"agent-7","tool_name":"Read"}"#)
+    #expect(m?.agent == "agent-7")
+    #expect(hook(#"{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Read"}"#)?.agent == nil)
+    #expect(hook(#"{"session_id":"s","hook_event_name":"PreToolUse","agent_id":" "}"#)?.agent == nil)
+    let long = hook(#"{"session_id":"s","hook_event_name":"Stop","agent_id":"\#(String(repeating: "a", count: 500))"}"#)
+    #expect(long?.agent?.count == AgentTrim.maxField)
+
+    let big = String(repeating: "x", count: 3000)
+    var n = AgentMessage(event: "PreToolUse", session: "s", stamp: 1, title: big, message: big, agent: "agent-7")
+    n.summary = big
+    let line = try #require(AgentTrim.line(n))
+    let back = try JSONDecoder().decode(AgentMessage.self, from: line)
+    #expect(back.message == nil && back.summary == nil && back.title == big)
+    #expect(back.agent == "agent-7")
+}

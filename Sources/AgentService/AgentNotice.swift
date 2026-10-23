@@ -33,7 +33,8 @@ public enum AgentNotice {
             return AgentBlip(sessionID: s.id, title: "Waiting · \(s.name)", word: word, tintName: waitingTintName,
                              caption: "\(s.name) · \(detail(waiting))", ttl: 8)
         case .finished(let s):
-            guard case .finished(let took) = s.state else { return plain(s, "Done", "Done", "green", 3) }
+            // No length when the turn's start was never seen: just the name.
+            guard case .finished(let took?) = s.state else { return plain(s, "Done", "Done", "green", 3) }
             return AgentBlip(sessionID: s.id, title: "Done · \(s.name)", word: "Done", tintName: "green",
                              caption: "\(s.name) · \(duration(took))", ttl: 3)
         case .failed(let s):

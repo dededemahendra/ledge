@@ -17,6 +17,8 @@ public struct AgentMessage: Codable, Sendable, Equatable {
     public var error: String?
     public var source: String?
     public var reason: String?
+    /// The subagent that sent the event (`agent_id`); nil for the main thread.
+    public var agent: String?
     /// The helper process's start, from the kernel, in microseconds since 1970.
     public var stamp: Int64
     /// The helper's parents, nearest first.
@@ -25,7 +27,7 @@ public struct AgentMessage: Codable, Sendable, Equatable {
     public init(event: String, session: String, stamp: Int64, pids: [Int32] = [], cwd: String? = nil,
                 project: String? = nil, transcript: String? = nil, title: String? = nil, tool: String? = nil,
                 summary: String? = nil, notification: String? = nil, message: String? = nil,
-                error: String? = nil, source: String? = nil, reason: String? = nil) {
+                error: String? = nil, source: String? = nil, reason: String? = nil, agent: String? = nil) {
         self.v = 1
         self.event = event
         self.session = session
@@ -42,5 +44,6 @@ public struct AgentMessage: Codable, Sendable, Equatable {
         self.error = error
         self.source = source
         self.reason = reason
+        self.agent = agent
     }
 }

@@ -22,13 +22,17 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
         case input(String?)
     }
     public enum State: Sendable, Equatable {
-        case idle, working, waiting(Waiting), finished(took: TimeInterval), failed(reason: String)
+        /// `took` is nil when no turn start is known: a session first heard at its Stop, or one already idle.
+        case idle, working, waiting(Waiting), finished(took: TimeInterval?), failed(reason: String)
     }
     public let id: String
     public var name: String
     /// The name before any " 2" suffix, so a clash can be re-resolved.
     var baseName: String
+    /// The project's folder name, for names and window titles.
     public var project: String
+    /// The project's full path, for opening it (2026-10-23).
+    public var projectPath: String
     public var transcript: String?
     public var host: CallAppInfo?
     public var claudePID: Int32?
@@ -41,15 +45,18 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
     public var action: String?
     /// True when `action` is a shell command, which is drawn monospaced.
     public var actionIsCommand: Bool
+    /// The subagent whose ask the session waits on; nil is the main thread.
+    var waitingAgent: String?
 
     /// A session as a preview or a test sample (2026-10-23).
-    public init(id: String, name: String, project: String, state: AgentSession.State,
+    public init(id: String, name: String, project: String, projectPath: String = "", state: AgentSession.State,
                 stateSince: Date = Date(), turnStart: Date? = nil) {
         let shown = AgentNames.display(name)
         self.id = id
         self.name = shown
         self.baseName = shown
         self.project = project
+        self.projectPath = projectPath
         self.transcript = nil
         self.host = nil
         self.claudePID = nil
@@ -60,15 +67,17 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
         self.lastEvent = stateSince
         self.action = nil
         self.actionIsCommand = false
+        self.waitingAgent = nil
     }
 
-    init(id: String, name: String, baseName: String, project: String, transcript: String?, host: CallAppInfo?,
+    init(id: String, name: String, baseName: String, project: String, projectPath: String = "", transcript: String?, host: CallAppInfo?,
          claudePID: Int32?, state: State, stateSince: Date, turnStart: Date?, lastStamp: Int64, lastEvent: Date,
          action: String? = nil, actionIsCommand: Bool = false) {
         self.id = id
         self.name = name
         self.baseName = baseName
         self.project = project
+        self.projectPath = projectPath
         self.transcript = transcript
         self.host = host
         self.claudePID = claudePID
@@ -79,6 +88,7 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
         self.lastEvent = lastEvent
         self.action = action
         self.actionIsCommand = actionIsCommand
+        self.waitingAgent = nil
     }
 }
 
@@ -118,7 +128,8 @@ public struct AgentSessions: Sendable, Equatable {
         } else {
             let base = Self.baseName(message)
             session = AgentSession(id: message.session, name: base, baseName: base,
-                                   project: Self.projectName(message), transcript: message.transcript,
+                                   project: Self.projectName(message), projectPath: Self.projectPath(message) ?? "",
+                                   transcript: message.transcript,
                                    host: nil, claudePID: nil, state: .idle, stateSince: now,
                                    turnStart: nil, lastStamp: message.stamp, lastEvent: now)
         }
@@ -126,6 +137,10 @@ public struct AgentSessions: Sendable, Equatable {
         session.lastStamp = message.stamp
         session.lastEvent = now
         if let transcript = message.transcript { session.transcript = transcript }
+        if let path = Self.projectPath(message) {
+            session.projectPath = path
+            session.project = Self.projectName(message)
+        }
         if let host = facts.host { session.host = host }
         if let pid = facts.claudePID { session.claudePID = pid }
         if let title = message.title.map(AgentNames.display), title != session.baseName {
@@ -142,6 +157,8 @@ public struct AgentSessions: Sendable, Equatable {
         return moment.map { $0(session) }
     }
 
+    /// Esc (2026-10-23). The stamp moves to now, so a hook the cancelled tool
+    /// started before it (its PostToolUseFailure) comes too late to count.
     public mutating func interrupt(session id: String, now: Date) {
         guard let i = sessions.firstIndex(where: { $0.id == id }) else { return }
         sessions[i].state = .idle
@@ -149,6 +166,8 @@ public struct AgentSessions: Sendable, Equatable {
         sessions[i].turnStart = nil
         sessions[i].action = nil
         sessions[i].actionIsCommand = false
+        sessions[i].waitingAgent = nil
+        sessions[i].lastStamp = max(sessions[i].lastStamp, Int64(now.timeIntervalSince1970 * 1_000_000))
     }
 
     public mutating func processExited(_ pid: Int32) {
@@ -184,6 +203,8 @@ public struct AgentSessions: Sendable, Equatable {
     private func transition(_ s: inout AgentSession, _ m: AgentMessage, now: Date) -> ((AgentSession) -> AgentMoment)? {
         switch m.event {
         case "SessionStart":
+            // Auto-compaction restarts the session mid-turn: nothing changes (2026-10-23).
+            if m.source == "compact" { return nil }
             set(&s, .idle, now: now)
             s.turnStart = nil
             clearAction(&s)
@@ -194,25 +215,33 @@ public struct AgentSessions: Sendable, Equatable {
             s.actionIsCommand = false
         case "PreToolUse":
             if m.tool == "AskUserQuestion" || m.tool == "ExitPlanMode" { return wait(&s, m, now: now) }
-            work(&s, now: now)
             s.action = AgentNotice.action(tool: m.tool, summary: m.summary)
             s.actionIsCommand = m.tool == "Bash"
-        case "PostToolUse", "PostToolUseFailure":
+            // Another agent's tool keeps a wait; only the agent that asked ends it.
+            if case .waiting = s.state, m.agent != s.waitingAgent { return nil }
             work(&s, now: now)
+        case "PostToolUse", "PostToolUseFailure":
+            // A tool ending only ends a wait (by the agent that asked) or keeps a
+            // turn going; it never starts one (2026-10-23).
+            switch s.state {
+            case .working: work(&s, now: now)
+            case .waiting where m.agent == s.waitingAgent: work(&s, now: now)
+            case .waiting, .idle, .finished, .failed: break
+            }
         case "PermissionRequest":
             return wait(&s, m, now: now)
         case "Notification":
             guard let kind = m.notification, Self.waitingNotifications.contains(kind) else { return nil }
             // Already waiting: keep the existing detail, which (e.g. "Bash: make test") is more specific than the notification's text.
             if case .waiting = s.state { return nil }
-            enter(&s, .waiting(.input(m.message)), now: now)
+            enter(&s, .waiting(.input(m.message)), agent: m.agent, now: now)
             return { .waiting($0) }
         case "Stop":
             switch s.state {
             case .finished, .failed: return nil
             default: break
             }
-            let took = now.timeIntervalSince(s.turnStart ?? s.stateSince)
+            let took = s.turnStart.map { now.timeIntervalSince($0) }
             set(&s, .finished(took: took), now: now)
             s.turnStart = nil
             clearAction(&s)
@@ -241,15 +270,17 @@ public struct AgentSessions: Sendable, Equatable {
             let tool = m.tool ?? "Claude"
             kind = .permission(m.summary.map { tool + ": " + $0 } ?? tool)
         }
-        return enter(&s, .waiting(kind), now: now)
+        return enter(&s, .waiting(kind), agent: m.agent, now: now)
     }
 
-    /// Enter waiting; a moment only when coming from a state that was not waiting.
+    /// Enter waiting on `agent`'s ask; a moment only when coming from a state that was not waiting.
     @discardableResult
-    private func enter(_ s: inout AgentSession, _ state: AgentSession.State, now: Date) -> ((AgentSession) -> AgentMoment)? {
+    private func enter(_ s: inout AgentSession, _ state: AgentSession.State, agent: String?,
+                       now: Date) -> ((AgentSession) -> AgentMoment)? {
         var wasWaiting = false
         if case .waiting = s.state { wasWaiting = true }
         if s.turnStart == nil { s.turnStart = now }
+        s.waitingAgent = agent
         if wasWaiting {
             s.state = state
             return nil
@@ -271,13 +302,20 @@ public struct AgentSessions: Sendable, Equatable {
     private func set(_ s: inout AgentSession, _ state: AgentSession.State, now: Date) {
         if s.state != state { s.stateSince = now }
         s.state = state
+        if case .waiting = state {} else { s.waitingAgent = nil }
     }
 
     // MARK: - Names and order
 
+    /// The full path a message names, if any.
+    private static func projectPath(_ m: AgentMessage) -> String? {
+        m.project ?? m.cwd
+    }
+
+    /// The folder's name; "" for none, and for "/" (2026-10-23), whose last component is "/" itself.
     private static func projectName(_ m: AgentMessage) -> String {
-        let path = m.project ?? m.cwd ?? ""
-        return (path as NSString).lastPathComponent
+        let name = ((projectPath(m) ?? "") as NSString).lastPathComponent
+        return name == "/" ? "" : name
     }
 
     private static func baseName(_ m: AgentMessage) -> String {

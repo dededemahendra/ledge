@@ -20,7 +20,8 @@ public struct AgentRow: Sendable, Equatable, Identifiable {
     public enum Mark: Sendable, Equatable {
         case waiting(detail: String, since: Date)
         case working(action: String, since: Date)
-        case done(took: TimeInterval, at: Date)
+        /// `took` nil: the turn's length is unknown.
+        case done(took: TimeInterval?, at: Date)
         case failed(reason: String, at: Date)
         case idle
     }

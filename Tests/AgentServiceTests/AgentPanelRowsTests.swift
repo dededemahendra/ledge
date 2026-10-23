@@ -146,3 +146,8 @@ private func session(_ state: AgentSession.State, id: String, since: Date = t0, 
     ], now: at(10))
     #expect(card.rows.first?.mark == .working(action: "Thinking", since: at(2)))
 }
+
+@Test func aDoneRowWithoutALengthCarriesNone() {
+    let card = AgentPanelRows.card([session(.finished(took: nil), id: "d", since: at(60))], now: at(100))
+    #expect(card.rows.map(\.mark) == [.done(took: nil, at: at(60))])
+}
