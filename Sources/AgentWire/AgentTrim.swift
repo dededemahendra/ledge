@@ -10,13 +10,18 @@ public enum AgentTrim {
         guard let object = (try? JSONSerialization.jsonObject(with: hookJSON)) as? [String: Any],
               let session = object["session_id"] as? String,
               let event = object["hook_event_name"] as? String else { return nil }
-        func text(_ key: String) -> String? { (object[key] as? String).map(cut) }
-        func path(_ key: String) -> String? { object[key] as? String }
+        func present(_ key: String) -> String? {
+            guard let value = object[key] as? String,
+                  !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return value
+        }
+        func text(_ key: String) -> String? { present(key).map(cut) }
+        func path(_ key: String) -> String? { present(key) }
         let cwd = path("cwd")
         var message = AgentMessage(
             event: cut(event), session: cut(session), stamp: stamp, pids: pids,
             cwd: cwd, project: environment["CLAUDE_PROJECT_DIR"] ?? cwd, transcript: path("transcript_path"),
-            title: text("title") ?? text("session_title"), tool: text("tool_name"),
+            title: text("session_title"), tool: text("tool_name"),
             notification: text("notification_type"), message: text("message"),
             error: text("error"), source: text("source"), reason: text("reason"))
         if let tool = object["tool_name"] as? String, let input = object["tool_input"] as? [String: Any] {
@@ -59,20 +64,18 @@ public enum AgentTrim {
             }
         }
         guard let result else { return nil }
-        let cut = cut(result)
-        return cut.isEmpty ? nil : cut
+        let short = cut(result)
+        return short.isEmpty ? nil : short
     }
 
     /// The JSON line with its "\n", within `maxLine`, or nil when even the trimmed line is too long.
-    /// Drops the long, least useful fields first; the folder is never dropped.
+    /// Over the limit it drops `message`, then `summary`, then `title`; nothing else is ever dropped.
     public static func line(_ message: AgentMessage) -> Data? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         var message = message
         let drops: [(inout AgentMessage) -> Void] = [
-            { $0.message = nil }, { $0.error = nil }, { $0.notification = nil }, { $0.reason = nil },
-            { $0.source = nil }, { $0.summary = nil }, { $0.title = nil }, { $0.tool = nil },
-            { $0.transcript = nil }, { $0.project = nil },
+            { $0.message = nil }, { $0.summary = nil }, { $0.title = nil },
         ]
         var step = 0
         while true {

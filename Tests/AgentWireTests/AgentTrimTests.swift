@@ -59,12 +59,17 @@ private func hook(_ json: String, env: [String: String] = [:]) -> AgentMessage? 
     let n = hook(#"{"session_id":"s","hook_event_name":"Notification","notification_type":"permission_prompt","message":"Needs you","title":"Claude"}"#)
     #expect(n?.notification == "permission_prompt")
     #expect(n?.message == "Needs you")
-    #expect(n?.title == "Claude")
+    #expect(n?.title == nil)
     #expect(hook(#"{"session_id":"s","hook_event_name":"StopFailure","error":"rate_limit"}"#)?.error == "rate_limit")
     let start = hook(#"{"session_id":"s","hook_event_name":"SessionStart","source":"resume","session_title":"Fix it"}"#)
     #expect(start?.source == "resume")
     #expect(start?.title == "Fix it")
     #expect(hook(#"{"session_id":"s","hook_event_name":"SessionEnd","reason":"clear"}"#)?.reason == "clear")
+}
+
+@Test func aBlankOrForeignTitleIsNil() {
+    #expect(hook(#"{"session_id":"s","hook_event_name":"Notification","title":"Claude Code"}"#)?.title == nil)
+    #expect(hook(#"{"session_id":"s","hook_event_name":"SessionStart","session_title":"  "}"#)?.title == nil)
 }
 
 @Test func longTextIsCutTo200() {
@@ -84,14 +89,19 @@ private func hook(_ json: String, env: [String: String] = [:]) -> AgentMessage? 
     let da = try JSONDecoder().decode(AgentMessage.self, from: a)
     #expect(da.message == nil && da.summary == big)
 
-    let path = String(repeating: "p", count: 1500)
-    var n = AgentMessage(event: "Notification", session: "s", stamp: 1, cwd: path, project: path, transcript: path, title: "t")
+    let path = String(repeating: "p", count: 1200)
+    var n = AgentMessage(event: "Notification", session: "s", stamp: 1, cwd: path, project: path, transcript: path,
+                         title: "t", tool: "Bash", notification: "idle", message: big, error: "e")
     n.summary = "sum"
     let b = try #require(AgentTrim.line(n))
     #expect(b.count <= AgentTrim.maxLine)
     let db = try JSONDecoder().decode(AgentMessage.self, from: b)
-    #expect(db.summary == nil && db.title == nil)
+    #expect(db.message == nil && db.summary == nil && db.title == nil)
+    #expect(db.tool == "Bash" && db.transcript == path && db.project == path && db.cwd == path)
+    #expect(db.notification == "idle" && db.error == "e")
 
+    let wide = String(repeating: "w", count: 1400)
+    #expect(AgentTrim.line(AgentMessage(event: "Stop", session: "s", stamp: 1, cwd: wide, project: wide, transcript: wide)) == nil)
     #expect(AgentTrim.line(AgentMessage(event: "Stop", session: "s", stamp: 1, cwd: String(repeating: "c", count: 5000))) == nil)
 }
 
