@@ -47,6 +47,7 @@ public final class AgentMonitor {
         onExit: { [weak self] pid in self?.processExited(pid) },
         onLine: { [weak self] session, line in self?.transcriptLine(session: session, line: line) })
     private var lastHeard: Date?
+    private var isEnabled = false
 
     public init(paths: AgentPaths = .live, host: AgentHostLookup = .live, listens: Bool = true) {
         self.paths = paths
@@ -87,6 +88,7 @@ public final class AgentMonitor {
                 return
             }
         }
+        isEnabled = true
         status = .ready(lastHeard: lastHeard)
         Self.log.info("agents enabled")
         onChange?()
@@ -94,7 +96,9 @@ public final class AgentMonitor {
 
     /// Stop listening and remove Ledge's hooks.
     public func disable() {
+        isEnabled = false
         stopListening()
+        lastHeard = nil
         do {
             try AgentSettingsFile(url: paths.settingsFile).uninstall()
         } catch {
@@ -108,7 +112,9 @@ public final class AgentMonitor {
 
     /// Stop listening, keep the hooks (Ledge quitting).
     public func suspend() {
+        isEnabled = false
         stopListening()
+        sessions = AgentSessions()
     }
 
     /// One line from the socket (also the tests' and the probe's way in).
@@ -125,7 +131,7 @@ public final class AgentMonitor {
         let moment = sessions.apply(message, facts: facts, now: now)
         syncWatchers()
         lastHeard = now
-        if case .problem = status {} else { status = .ready(lastHeard: now) }
+        if isEnabled, case .ready = status { status = .ready(lastHeard: now) }
         Self.log.debug("received an event, \(self.sessions.sessions.count) sessions")
         if let moment { onMoment?(moment) }
         onChange?()
@@ -151,9 +157,11 @@ public final class AgentMonitor {
     // MARK: - Internals
 
     private func startListening() throws(AgentListener.Failure) {
-        if listener?.isListening == true { return }
+        if listener?.isListening == true, FileManager.default.fileExists(atPath: paths.socket.path) { return }
+        listener?.stop()
         let listener = AgentListener(url: paths.socket) { [weak self] line in
-            self?.receive(line)
+            guard let self, self.isEnabled else { return }
+            self.receive(line)
         }
         try listener.start()
         self.listener = listener
@@ -185,6 +193,7 @@ public final class AgentMonitor {
     }
 
     private func fail(_ text: String) {
+        isEnabled = false
         stopListening()
         status = .problem(text)
         Self.log.error("agents problem")
