@@ -37,6 +37,39 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
     public var turnStart: Date?
     public var lastStamp: Int64
     public var lastEvent: Date
+
+    /// A session as a preview or a test sample (2026-10-23).
+    public init(id: String, name: String, project: String, state: AgentSession.State,
+                stateSince: Date = Date(), turnStart: Date? = nil) {
+        self.id = id
+        self.name = name
+        self.baseName = name
+        self.project = project
+        self.transcript = nil
+        self.host = nil
+        self.claudePID = nil
+        self.state = state
+        self.stateSince = stateSince
+        self.turnStart = turnStart
+        self.lastStamp = 0
+        self.lastEvent = stateSince
+    }
+
+    init(id: String, name: String, baseName: String, project: String, transcript: String?, host: CallAppInfo?,
+         claudePID: Int32?, state: State, stateSince: Date, turnStart: Date?, lastStamp: Int64, lastEvent: Date) {
+        self.id = id
+        self.name = name
+        self.baseName = baseName
+        self.project = project
+        self.transcript = transcript
+        self.host = host
+        self.claudePID = claudePID
+        self.state = state
+        self.stateSince = stateSince
+        self.turnStart = turnStart
+        self.lastStamp = lastStamp
+        self.lastEvent = lastEvent
+    }
 }
 
 public enum AgentMoment: Sendable, Equatable {

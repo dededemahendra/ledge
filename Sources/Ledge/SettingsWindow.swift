@@ -87,7 +87,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
 /// The sections, as the sidebar lists them.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, island, media, calendar, github, permissions, about
+    case general, island, media, calendar, github, agents, permissions, about
 
     var id: String { rawValue }
 
@@ -98,6 +98,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .media:       return "Media"
         case .calendar:    return "Calendar"
         case .github:      return "GitHub"
+        case .agents:      return "Agents"
         case .permissions: return "Permissions"
         case .about:       return "About"
         }
@@ -110,6 +111,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .media:       return "music.note"
         case .calendar:    return "calendar"
         case .github:      return "arrow.triangle.branch"
+        case .agents:      return "asterisk"
         case .permissions: return "hand.raised.fill"
         case .about:       return "info.circle.fill"
         }
@@ -122,6 +124,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .media:       return Color(nsColor: .systemPink)
         case .calendar:    return Color(nsColor: .systemRed)
         case .github:      return Color(white: 0.2)
+        case .agents:      return Color(red: 0.851, green: 0.467, blue: 0.341)
         case .permissions: return Color(nsColor: .systemGreen)
         case .about:       return Color(nsColor: .systemGray)
         }
@@ -168,6 +171,7 @@ struct SettingsView: View {
                 case .media:       MediaSettings(settings: settings, model: model)
                 case .calendar:    CalendarSettings(settings: settings, model: model)
                 case .github:      GitHubSettings(settings: settings, model: model)
+                case .agents:      AgentSettings(settings: settings, model: model)
                 case .permissions: PermissionsSettings(model: model)
                 case .about:       AboutSettings(model: model)
                 }

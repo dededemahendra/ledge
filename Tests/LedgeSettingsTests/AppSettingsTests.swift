@@ -94,3 +94,23 @@ private func fresh() -> (AppSettings, UserDefaults) {
     again.unhideCallApp("us.zoom.xos")
     #expect(again.hiddenCallApps == [])
 }
+
+@MainActor
+@Test func agentsAreOffButEveryMomentIsOnByDefault() {
+    let (s, _) = fresh()
+    #expect(!s.agentsEnabled)
+    #expect(s.agentWaiting && s.agentFinished && s.agentWorking && s.agentFailed)
+}
+
+@MainActor
+@Test func agentSettingsAreSaved() {
+    let (s, defaults) = fresh()
+    s.agentsEnabled = true
+    s.agentWaiting = false
+    s.agentFinished = false
+    s.agentWorking = false
+    s.agentFailed = false
+    let again = AppSettings(defaults: defaults)
+    #expect(again.agentsEnabled)
+    #expect(!again.agentWaiting && !again.agentFinished && !again.agentWorking && !again.agentFailed)
+}
