@@ -27,6 +27,19 @@ public struct ActivityQueue: Sendable, Equatable {
         max(0, count - Self.visibleSlots)
     }
 
+    /// The record beside the island (2026-10-23): the highest-priority one
+    /// other than the lead whose kind can sit in a tab. None means no tab.
+    public var tab: ActivityRecord? {
+        ordered.dropFirst().first { $0.kind.canSitInTab }
+    }
+
+    /// Records the island and its tab do not show, not counting charging:
+    /// what the "+N" pip stands for.
+    public var overflowBeyondTab: Int {
+        let tabID = tab?.id
+        return ordered.dropFirst().filter { $0.id != tabID && $0.kind != .charging }.count
+    }
+
     /// Coalesces by kind, restarting that kind's TTL window.
     public mutating func insert(_ record: ActivityRecord) {
         records[record.kind] = record
