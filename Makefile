@@ -43,6 +43,7 @@ bundle: build
 	rm -rf "$(APPDIR)"
 	mkdir -p "$(APPDIR)/Contents/MacOS" "$(APPDIR)/Contents/Resources"
 	cp "$(BUILDDIR)/$(APP)" "$(APPDIR)/Contents/MacOS/$(APP)"
+	cp "$(BUILDDIR)/LedgeAgentHook" "$(APPDIR)/Contents/MacOS/ledge-agent-hook"
 	cp -R Resources/mediaremote-adapter "$(APPDIR)/Contents/Resources/"
 	cp Resources/Ledge.icns "$(APPDIR)/Contents/Resources/Ledge.icns"
 	chmod +x "$(APPDIR)/Contents/Resources/mediaremote-adapter/MediaRemoteAdapterTestClient"
@@ -62,6 +63,7 @@ icon:
 	iconutil -c icns .build/icon/Ledge.iconset -o Resources/Ledge.icns
 
 sign: bundle
+	codesign --force --sign "$(IDENTITY)" "$(APPDIR)/Contents/MacOS/ledge-agent-hook"
 	codesign --force --sign "$(IDENTITY)" "$(APPDIR)"
 	@codesign -dv --verbose=2 "$(APPDIR)" 2>&1 | grep -E 'Identifier|Authority' || true
 
