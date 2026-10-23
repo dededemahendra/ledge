@@ -1502,3 +1502,12 @@ private func tabGitHubPanel() -> GitHubPanelData {
     #expect(c.panel == .liveActivity && c.state == .expanded)
     #expect(c.score == nil)
 }
+
+@MainActor
+@Test func aTabWithNoActivityBesideItNeverHoldsActivitySize() {
+    let c = makeController()
+    c.setActivities([], overflow: 0,
+                    tab: .init(id: NotchController.timerActivityID, title: "Timer", compactText: "1:00"))
+    c.setHovered(true, part: .tab)
+    #expect(c.state == .peek)
+}
