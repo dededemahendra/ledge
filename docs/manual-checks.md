@@ -1800,3 +1800,42 @@ Pending until the user reports them:
 5. A Zoom meeting in Zoom's app shows Zoom's icon and the title.
 6. Joining 15 minutes early: "On a call" until 10 minutes before, then the
    title.
+
+## Coding agents on the island (2026-10-23)
+
+Headless renders checked:
+
+- The "Allow?" blip, the waiting item with a count of 2, the working item at
+  4:12 with a count of 3, "Done", "Failed", and the Agents card with one row
+  in each state.
+
+The real `~/.claude/settings.json` (50,073 bytes) parsed and was written back
+byte for byte. Install then remove gave the same bytes, and installing twice
+changed nothing. After the switch went on, the file held Ledge's 10 hooks and
+everything else matched `settings.json.ledge-backup`.
+
+Confirmed live on 2026-10-23 with the probe (`ledge://probe/agents`, sent to
+the dev build with `open -a dist/Ledge.app …`, since the installed copy in
+/Applications answers `ledge://` otherwise):
+
+- "Allow?" in amber with "alpha · Bash: make test".
+- "Done" in green with "alpha · 12s".
+- "Failed" in red with "beta · Rate limited".
+- The working item stayed under music.
+
+Confirmed by the user with a real VS Code session: the waiting item showed the
+asterisk and "ledge" in amber while that window was in front (the blip skipped,
+as designed); the Agents card listed the sessions; a click brought that VS Code
+window forward. Sessions already running picked up the hooks without a restart.
+
+Pending until the user reports them:
+
+1. A Ghostty session: the "Allow?" blip on a Bash prompt, back to working on
+   Allow.
+2. Esc mid-turn and at a prompt: idle, no blip.
+3. A finished turn: "Done" and its length when the window isn't in front.
+4. A click raises the right Ghostty window.
+5. `/exit` or closing the window takes the session off.
+6. AskUserQuestion's "Question" and plan mode's "Plan" blips when the window
+   isn't in front.
+7. Switching Agents off leaves `~/.claude/settings.json` as before.
