@@ -8,6 +8,7 @@ public enum PreviewScene: String, CaseIterable, Sendable {
     case volume, brightness, capsLock, battery, headphones, focus, timer, call, liveActivity
     case meeting, reminder, nowPlaying, songCaption, hoverCard, lockScreen, update
     case githubRunning, githubChecks, githubReviews, githubMerges, githubRequests, githubRuns
+    case agentWaiting, agentWorking, agentFinished, agentFailed
 
     /// The caption under the island: the option's own name.
     public var title: String {
@@ -33,6 +34,10 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .githubMerges:        return "Merges and closes"
         case .githubRequests:      return "Review requests"
         case .githubRuns:          return "Your runs outside PRs"
+        case .agentWaiting:        return "Waiting for you"
+        case .agentWorking:        return "Working"
+        case .agentFinished:       return "Finished its turn"
+        case .agentFailed:         return "Failed"
         }
     }
 
@@ -60,6 +65,10 @@ public enum PreviewScene: String, CaseIterable, Sendable {
         case .githubMerges:           return settings.githubMerges
         case .githubRequests:         return settings.githubReviewRequests
         case .githubRuns:             return settings.githubMyRuns
+        case .agentWaiting:           return settings.agentWaiting
+        case .agentWorking:           return settings.agentWorking
+        case .agentFinished:          return settings.agentFinished
+        case .agentFailed:            return settings.agentFailed
         case .nowPlaying, .hoverCard: return true
         }
     }

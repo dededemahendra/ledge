@@ -6,6 +6,7 @@ import DeviceService
 import FocusService
 import UpdateService
 import GitHubService
+import AgentService
 
 /// What a strip says under the island (2026-10-22): the option's name,
 /// and why a sample stands in where the user has nothing of their own.
@@ -159,6 +160,26 @@ public enum PreviewStage {
         case .githubRuns:
             showGitHub(c, .runPassed(GitHubSample.run))
             return caption(scene, sample: "no run of yours")
+        case .agentWaiting:
+            let blip = AgentNotice.blip(for: .waiting(agentSample(.waiting(.permission("Bash: make test")))))
+            showAgent(c, blip, id: NotchController.agentActivityID)
+            return caption(scene, sample: "no session")
+        case .agentWorking:
+            c.setActivities([NotchController.ActivityDisplay(
+                id: NotchController.agentRunActivityID, title: "Working · ledge", compactText: "4:12",
+                symbolName: "asterisk",
+                tint: .color(red: AgentNotice.orange.red, green: AgentNotice.orange.green, blue: AgentNotice.orange.blue),
+                badge: nil
+            )], overflow: 0)
+            return caption(scene, sample: "no session")
+        case .agentFinished:
+            showAgent(c, AgentNotice.blip(for: .finished(agentSample(.finished(took: 200)))),
+                      id: NotchController.agentActivityID)
+            return caption(scene, sample: "no session")
+        case .agentFailed:
+            showAgent(c, AgentNotice.blip(for: .failed(agentSample(.failed(reason: "rate_limit")))),
+                      id: NotchController.agentActivityID)
+            return caption(scene, sample: "no session")
         }
     }
 
@@ -175,6 +196,19 @@ public enum PreviewStage {
         c.setActivities([NotchController.ActivityDisplay(
             id: NotchController.githubActivityID, title: blip.title, compactText: blip.word,
             symbolName: blip.symbolName, tint: blip.tintName.map { .system($0) }
+        )], overflow: 0)
+        c.setCaption(blip.caption)
+    }
+
+    private static func agentSample(_ state: AgentSession.State) -> AgentSession {
+        AgentSession(id: "sample", name: "ledge", project: "ledge", state: state)
+    }
+
+    /// An agent blip as the app shows it, caption and all (2026-10-23).
+    private static func showAgent(_ c: NotchController, _ blip: AgentBlip, id: String) {
+        c.setActivities([NotchController.ActivityDisplay(
+            id: id, title: blip.title, compactText: blip.word,
+            tint: .system(blip.tintName)
         )], overflow: 0)
         c.setCaption(blip.caption)
     }

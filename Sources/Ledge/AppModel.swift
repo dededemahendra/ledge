@@ -13,6 +13,7 @@ import LiveActivityService
 import SettingsKit
 import UpdateService
 import GitHubService
+import AgentService
 import CallService
 import LedgeSettings
 import OSLog
@@ -322,6 +323,12 @@ final class AppModel {
         showCaption(UpdateNotice.caption(version), for: ActivityKind.update.defaultTTL ?? NotchController.captionDuration)
         publish()
     }
+
+    // MARK: - Agents (2026-10-23)
+
+    private let agents = AgentMonitor()
+    var agentsStatus: AgentMonitor.Status { agents.status }
+    func repairAgents() { agents.enable() }
 
     // MARK: - GitHub (2026-10-22)
 
