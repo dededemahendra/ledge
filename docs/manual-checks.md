@@ -1824,9 +1824,13 @@ the dev build with `open -a dist/Ledge.app …`, since the installed copy in
 - The working item stayed under music.
 
 Confirmed by the user with a real VS Code session: the waiting item showed the
-asterisk and "ledge" in amber while that window was in front (the blip skipped,
-as designed); the Agents card listed the sessions; a click brought that VS Code
-window forward. Sessions already running picked up the hooks without a restart.
+asterisk and "ledge" in amber; the Agents card listed the sessions. Sessions
+already running picked up the hooks without a restart.
+
+Withdrawn from that check: "the blip skipped while the window was in front" and
+"a click brought that VS Code window forward". The host lookup returned nothing
+then, so neither could have worked; VS Code was most likely already in front.
+Both are pending again below.
 
 Pending until the user reports them:
 
@@ -1839,3 +1843,7 @@ Pending until the user reports them:
 6. AskUserQuestion's "Question" and plan mode's "Plan" blips when the window
    isn't in front.
 7. Switching Agents off leaves `~/.claude/settings.json` as before.
+8. The blip skips while the session's VS Code window is in front (the host
+   lookup was fixed after the first check).
+9. A click brings that VS Code window forward (the host lookup was fixed after
+   the first check).

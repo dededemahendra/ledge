@@ -36,7 +36,7 @@ Once a day Ledge asks GitHub whether a newer version is out, and says so once, o
 
 Connecting GitHub in Settings › GitHub adds one more kind of request: while connected, Ledge asks api.github.com about your own PRs and runs every minute, or every 20 seconds while something runs, and fetches the pictures of the people in them from GitHub's image server. Until you connect, it asks GitHub nothing about your work.
 
-Switching on Settings › Agents adds Ledge's hooks to `~/.claude/settings.json` (a copy of the original is kept as `settings.json.ledge-backup`); switching it off takes them out.
+Switching on Settings › Agents adds Ledge's hooks to `~/.claude/settings.json` (a copy of the original is kept as `settings.json.ledge-backup`); switching it off takes them out. Removing Ledge without switching Agents off leaves its hooks in `~/.claude/settings.json`, where they do nothing: each checks that the helper exists before running it.
 
 There is no licence: you may download and use Ledge and read its code, but not
 reuse or redistribute the code.
