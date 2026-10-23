@@ -10,7 +10,8 @@ private let vscode = CallAppInfo(bundleID: "com.microsoft.VSCode", name: "Code",
 private let livePID = ProcessInfo.processInfo.processIdentifier
 
 @MainActor private func lookup(arguments: [String] = ["claude"]) -> AgentHostLookup {
-    AgentHostLookup(name: { $0 == 42 || $0 == livePID ? "claude" : "other" }, arguments: { _ in arguments },
+    AgentHostLookup(name: { $0 == 42 || $0 == livePID ? "claude" : "other" },
+                    arguments: { $0 == 42 || $0 == livePID ? arguments : ["other"] },
                     app: { $0 == 42 || $0 == livePID ? vscode : nil })
 }
 
