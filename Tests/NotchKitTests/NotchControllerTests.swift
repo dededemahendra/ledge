@@ -1523,3 +1523,21 @@ private func tabGitHubPanel() -> GitHubPanelData {
     c.setHovered(true, part: .tab)
     #expect(c.state == .peek)
 }
+
+/// The bubble asks for a look once when its agent starts waiting for the
+/// user (2026-10-23): a pulse, not for every refresh of the same state.
+@MainActor
+@Test func theTabCallsForAttentionWhenItsAgentStartsWaiting() {
+    let c = makeController()
+    let lead = NotchController.ActivityDisplay(id: NotchController.callActivityID, title: "On a call", compactText: "1:00")
+    let working = NotchController.ActivityDisplay(id: NotchController.agentRunActivityID, title: "1 working", compactText: "1")
+    let waiting = NotchController.ActivityDisplay(id: NotchController.agentWaitingActivityID, title: "Needs you", compactText: "1")
+    c.setActivities([lead], overflow: 0, tab: working)
+    let before = c.tabAttention
+    c.setActivities([lead], overflow: 0, tab: waiting)
+    #expect(c.tabAttention == before + 1)
+    c.setActivities([lead], overflow: 0, tab: waiting)
+    #expect(c.tabAttention == before + 1, "the same waiting state again")
+    c.setActivities([lead], overflow: 0, tab: working)
+    #expect(c.tabAttention == before + 1, "back to working")
+}

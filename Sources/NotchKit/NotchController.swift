@@ -1017,6 +1017,9 @@ public final class NotchController {
             callIconImage = callIcon.flatMap(NSImage.init(data:))
         }
         self.activities = activities
+        if tab?.id == Self.agentWaitingActivityID, self.tab?.id != Self.agentWaitingActivityID {
+            tabAttention += 1
+        }
         self.tab = tab
         if panel == .liveActivity, !hasPanelContent {
             panel = .media
@@ -1054,6 +1057,9 @@ public final class NotchController {
 
     /// The second live item, in the tab beside the island (2026-10-23).
     public private(set) var tab: ActivityDisplay?
+    /// Counts the times the tab's agent started waiting for the user
+    /// (2026-10-23): the view pulses the bubble once for each.
+    public private(set) var tabAttention = 0
 
     /// The tab's artwork and crest, decoded once per change like the call's icon.
     public private(set) var tabArtworkImage: NSImage?

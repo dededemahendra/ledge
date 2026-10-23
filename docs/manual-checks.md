@@ -1905,3 +1905,14 @@ open:
    once while an island blip leaves the tab still.
 7. With Reduce Motion, the tab fades in and out in place.
 8. Clicking the island still pins the music card and opens a blip's link.
+
+## The round tab (2026-10-23)
+
+The tab is now a round bubble, as tall as the notch, 8 pt right of the
+island. With an agent in it:
+
+- **Working:** an orange arc turns around its edge.
+- **Waiting for you:** a solid yellow ring, with one pulse as it starts.
+
+Headless renders checked both. Pending: watch an agent go from working to
+waiting, and check the pulse plays once.

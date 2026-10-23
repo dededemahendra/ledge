@@ -632,6 +632,14 @@ public struct NotchRootView: View {
                 .frame(width: max(tab.width, 1), height: tab.height)
                 .position(x: centerX, y: centerY)
                 .clipShape(tabShape)
+                // The agents' state around the bubble's edge (2026-10-23).
+                if let mode = AgentTabRing.mode(for: display.id), controller.isTabShowing {
+                    AgentTabRing(mode: mode, reduceMotion: reduceMotion)
+                        .frame(width: max(tab.width, 1), height: tab.height)
+                        .position(x: centerX, y: centerY)
+                        .transition(.opacity)
+                        .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: mode)
+                }
             }
             tabShape.stroke(Color.white.opacity(showEffects ? 0.09 : 0), lineWidth: 1)
         }
@@ -647,6 +655,13 @@ public struct NotchRootView: View {
         } keyframes: { _ in
             SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
             SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+        }
+        // Once when its agent starts waiting for the user (2026-10-23).
+        .keyframeAnimator(initialValue: 1.0, trigger: controller.tabAttention) { view, scale in
+            view.scaleEffect(reduceMotion ? 1 : scale, anchor: pulseAnchor)
+        } keyframes: { _ in
+            SpringKeyframe(1.12, duration: 0.16, spring: .snappy)
+            SpringKeyframe(1.0, duration: 0.45, spring: .bouncy)
         }
         // The island's blip pulse swells its right edge into the gap: the
         // tab, unscaled, steps aside by as much, so the 6 pt gap holds.

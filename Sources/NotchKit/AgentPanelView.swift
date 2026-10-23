@@ -16,6 +16,8 @@ struct AgentGlyph: View {
     let turning: Bool
     let count: Int?
     let reduceMotion: Bool
+    /// 13 pt in the ears; the round tab draws it a touch larger (2026-10-23).
+    var size: CGFloat = 13
 
     var body: some View {
         ZStack {
@@ -29,7 +31,7 @@ struct AgentGlyph: View {
                 asterisk
             }
         }
-        .frame(width: 14, height: 14)
+        .frame(width: size + 1, height: size + 1)
         .overlay(alignment: .bottomTrailing) {
             if let count, count > 1 {
                 Text("\(count)")
@@ -43,7 +45,7 @@ struct AgentGlyph: View {
 
     private var asterisk: some View {
         Image(systemName: "asterisk")
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: size, weight: .semibold))
             .foregroundStyle(color)
     }
 }

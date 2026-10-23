@@ -7,12 +7,12 @@ private let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
 private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32))
 
 /// A round bubble beside the island, as the iPhone's second island is
-/// (2026-10-23, user's call): as tall as the notch, 6 pt to its right, its
+/// (2026-10-23, user's call): as tall as the notch, 8 pt to its right, its
 /// top against the screen's edge like the island's.
 @Test func onANotchTheTabIsACircleBesideTheIsland() {
     let island = notch.oneActivity
     let tab = notch.tab
-    #expect(tab.gap == 6)
+    #expect(tab.gap == 8)
     #expect(tab.width == 32)
     #expect(tab.height == 32)
     #expect(tab.bottomRadius == 16)
@@ -21,7 +21,7 @@ private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, heigh
     #expect(tab.topInset == 0)
 
     let bounds = NotchTabShape(island: island, tab: tab).path(in: canvas).boundingRect
-    let left = canvas.midX + island.width / 2 + 6
+    let left = canvas.midX + island.width / 2 + 8
     #expect(abs(bounds.minX - left) < 0.001)
     #expect(abs(bounds.width - 32) < 0.001)
     #expect(abs(bounds.minY) < 0.001)
@@ -38,10 +38,10 @@ private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, heigh
     #expect(tab.topRadius == island.height / 2)
     #expect(tab.bottomRadius == island.height / 2)
     #expect(tab.outerFillet == 0)
-    #expect(tab.gap == 6)
+    #expect(tab.gap == 8)
 
     let bounds = NotchTabShape(island: island, tab: tab).path(in: canvas).boundingRect
-    #expect(abs(bounds.minX - (canvas.midX + island.width / 2 + 6)) < 0.001)
+    #expect(abs(bounds.minX - (canvas.midX + island.width / 2 + 8)) < 0.001)
     #expect(abs(bounds.width - island.height) < 0.001)
     #expect(abs(bounds.height - island.height) < 0.001)
     #expect(abs(bounds.minY - NotchMetrics.pillTopInset) < 0.001)
@@ -55,7 +55,7 @@ private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, heigh
     let after = NotchTabShape(island: wide, tab: tab).path(in: canvas).boundingRect
     #expect(abs((after.minX - before.minX) - (400 - narrow.width) / 2) < 0.001)
     // The body never starts before the island's right edge plus the gap.
-    #expect(after.minX + tab.outerFillet >= canvas.midX + wide.width / 2 + 6 - 0.001)
+    #expect(after.minX + tab.outerFillet >= canvas.midX + wide.width / 2 + 8 - 0.001)
 }
 
 @Test func aTuckedTabHasNoWidthAtTheIslandsEdge() {
@@ -78,7 +78,7 @@ private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, heigh
     #expect(tab.height == pill.oneActivity.height)
     let pb = NotchTabShape(island: big, tab: tab).path(in: canvas).boundingRect
     #expect(abs(pb.height - pill.oneActivity.height) < 0.001)
-    #expect(abs(pb.minX - (canvas.midX + big.width / 2 + 6)) < 0.001)
+    #expect(abs(pb.minX - (canvas.midX + big.width / 2 + 8)) < 0.001)
 }
 
 /// Budding out, the round tab stays within its width: no flares beside it.

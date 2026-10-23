@@ -9,7 +9,7 @@ import SwiftUI
 /// `width + 2 * outerFillet` wide. `gap` is measured to the body, not to the
 /// fillet.
 public struct NotchTabParameters: Sendable, Equatable, Animatable {
-    /// 6 shown, 0 tucked.
+    /// 8 shown, 0 tucked.
     public var gap: CGFloat
     /// 40 shown (a pill: the pill's height), 0 tucked.
     public var width: CGFloat
@@ -52,7 +52,9 @@ public struct NotchTabParameters: Sendable, Equatable, Animatable {
 
 extension NotchMetrics {
     public static let tabWidth: CGFloat = 40
-    public static let tabGap: CGFloat = 6
+    /// 8 pt (2026-10-23, user's call): wide enough that the round tab reads
+    /// as its own bubble, as the iPhone's does.
+    public static let tabGap: CGFloat = 8
 
     /// The tab, shown, beside whichever island it is drawn with (`NotchTabShape`
     /// takes the island's width): a round bubble, as the iPhone's second
