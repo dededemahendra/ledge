@@ -5,7 +5,7 @@ let package = Package(
     name: "Ledge",
     platforms: [.macOS("27.0")],
     targets: [
-        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService", "FocusService", "LiveActivityService", "LedgeSettings", "SettingsKit", "UpdateService", "GitHubService", "CallService", "AgentService"], path: "Sources/Ledge"),
+        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService", "FocusService", "LiveActivityService", "LedgeSettings", "SettingsKit", "UpdateService", "GitHubService", "CallService", "AgentService", "AgentWire"], path: "Sources/Ledge"),
         .target(name: "NotchKit"),
         .target(name: "ActivityKit"),
         .target(name: "PowerService", dependencies: ["ActivityKit"]),
