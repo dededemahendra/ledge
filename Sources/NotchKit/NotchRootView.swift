@@ -474,6 +474,7 @@ public struct NotchRootView: View {
                         lineWidth: 1
                     )
                 }
+            tabLayer(island: parameters, showEffects: showEffects)
         }
         // The blip pulse (`NotchController.blipPulse`): the whole island
         // swells ~5% from its top edge — the notch stays welded — and
@@ -517,6 +518,11 @@ public struct NotchRootView: View {
             NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
             value: parameters
         )
+        // The tab buds and merges on the island's own springs.
+        .animation(
+            NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
+            value: controller.tabParameters
+        )
         // Animated on the way OUT only (see `NotchAnimation.hideAnimation`):
         // this sits after the shape's `.animation(value: parameters)`, so
         // without its own it snapped to 0 on the first frame of a collapse.
@@ -532,6 +538,49 @@ public struct NotchRootView: View {
             // transition comes next.
             previousHeight = newValue.height
             previousWidth = newValue.width
+        }
+    }
+
+    /// The tab beside the island (2026-10-23): a second shape in the same
+    /// material, its item's short form centred in it. Its tap is its own
+    /// (`NotchController.tapTab`) and never reaches the island's.
+    @ViewBuilder
+    private func tabLayer(island: NotchShapeParameters, showEffects: Bool) -> some View {
+        let reduceMotion = controller.reduceMotion
+        // Reduce Motion: no bud. The shape stays at full size and fades in place.
+        let tab = reduceMotion && controller.tab != nil
+            ? controller.metrics.tab(beside: island)
+            : controller.tabParameters
+        let tabShape = NotchTabShape(island: island, tab: tab)
+        let centerX = NotchMetrics.canvasSize.width / 2 + island.width / 2 + tab.gap + tab.width / 2
+        let centerY = tab.topInset + tab.height / 2
+        let pulseAnchor = UnitPoint(
+            x: centerX / NotchMetrics.canvasSize.width, y: tab.topInset / NotchMetrics.canvasSize.height
+        )
+        ZStack(alignment: .top) {
+            tabShape.fill(.black)
+            if let display = controller.tab {
+                TabGlyph(
+                    display: display, controller: controller, contentColor: contentColor,
+                    tintColor: { tintColor(for: $0) }
+                )
+                .id(display.id)
+                .transition(.blurReplace)
+                .frame(width: max(tab.width, 1), height: tab.height)
+                .position(x: centerX, y: centerY)
+                .clipShape(tabShape)
+            }
+            tabShape.stroke(Color.white.opacity(showEffects ? 0.09 : 0), lineWidth: 1)
+        }
+        .opacity(reduceMotion && !controller.isTabShowing ? 0 : 1)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : nil, value: controller.isTabShowing)
+        .contentShape(tabShape)
+        .onTapGesture { controller.tapTab() }
+        .keyframeAnimator(initialValue: 1.0, trigger: controller.tab?.id) { view, scale in
+            view.scaleEffect(reduceMotion ? 1 : scale, anchor: pulseAnchor)
+        } keyframes: { _ in
+            SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
+            SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
         }
     }
 
@@ -836,18 +885,8 @@ public struct NotchRootView: View {
             // from the top, the Dynamic Island's own timer glyph. Paused
             // and stopwatch records carry no `barFill` and fall through to
             // their symbols below.
-            ZStack {
-                Circle()
-                    .stroke((tintColor(for: activity.tint) ?? contentColor).opacity(0.25), lineWidth: 2)
-                Circle()
-                    .trim(from: 0, to: fill)
-                    .stroke(tintColor(for: activity.tint) ?? contentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    // Ticks arrive every quarter second; ease between them
-                    // so the ring drains, not steps.
-                    .animation(controller.reduceMotion ? nil : .linear(duration: 0.25), value: fill)
-            }
-            .frame(width: 14, height: 14)
+            TimerRing(fill: fill, color: tintColor(for: activity.tint) ?? contentColor,
+                      reduceMotion: controller.reduceMotion)
         } else if let activity = controller.activities.first, let symbol = activity.symbolName,
                   symbol.hasPrefix("battery."), let level = activity.barFill {
             // A battery the way the phone draws one (2026-10-06, user's
