@@ -255,3 +255,12 @@ private func queue(_ kinds: ActivityKind...) -> ActivityQueue {
     #expect(q.tab?.kind == .timer)
     #expect(q.overflowBeyondTab == 2)
 }
+
+@Test func aCallEndedRecordNeverTakesTheTab() {
+    // "Call ended" is a `.call` record with a 3 s TTL: a blip, not a live call.
+    var q = ActivityQueue()
+    q.insert(record(.hud))
+    q.insert(record(.call, ttl: 3, title: "Call ended"))
+    #expect(q.ordered.first?.kind == .hud)
+    #expect(q.tab == nil)
+}
