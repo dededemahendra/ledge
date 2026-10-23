@@ -38,6 +38,15 @@ private func session(_ state: AgentSession.State, id: String = "s1", since: Date
     #expect(blip.title == "Done · Ledge")
 }
 
+@Test func doneWithoutALengthIsJustTheName() {
+    let blip = AgentNotice.blip(for: .finished(session(.finished(took: nil))))
+    #expect(blip.word == "Done")
+    #expect(blip.tintName == "green")
+    #expect(blip.caption == "Ledge")
+    #expect(blip.ttl == 3)
+    #expect(blip.title == "Done · Ledge")
+}
+
 @Test func failedSaysWhy() {
     func caption(_ r: String) -> String { AgentNotice.blip(for: .failed(session(.failed(reason: r)))).caption }
     let blip = AgentNotice.blip(for: .failed(session(.failed(reason: "rate_limit"))))

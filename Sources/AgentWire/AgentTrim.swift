@@ -23,7 +23,7 @@ public enum AgentTrim {
             cwd: cwd, project: environment["CLAUDE_PROJECT_DIR"] ?? cwd, transcript: path("transcript_path"),
             title: text("session_title"), tool: text("tool_name"),
             notification: text("notification_type"), message: text("message"),
-            error: text("error"), source: text("source"), reason: text("reason"))
+            error: text("error"), source: text("source"), reason: text("reason"), agent: text("agent_id"))
         if let tool = object["tool_name"] as? String, let input = object["tool_input"] as? [String: Any] {
             message.summary = summary(tool: tool, input: input)
         }
@@ -69,7 +69,7 @@ public enum AgentTrim {
     }
 
     /// The JSON line with its "\n", within `maxLine`, or nil when even the trimmed line is too long.
-    /// Over the limit it drops `message`, then `summary`, then `title`; nothing else is ever dropped.
+    /// Over the limit it drops `message`, then `summary`, then `title`; nothing else (`agent` included) is ever dropped.
     public static func line(_ message: AgentMessage) -> Data? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
