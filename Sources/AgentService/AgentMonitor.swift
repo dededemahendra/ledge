@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import OSLog
 import AgentWire
 import CallService
@@ -35,11 +36,15 @@ public final class AgentMonitor {
     private static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "agents")
 
     public private(set) var status: Status = .off
+    /// Switched off, but taking the hooks out failed: `status` says why (2026-10-23).
+    public private(set) var hooksLeftBehind = false
     public private(set) var sessions = AgentSessions()
     public var onMoment: ((AgentMoment) -> Void)?
     public var onChange: (() -> Void)?
 
     private let paths: AgentPaths
+    /// The settings file Ledge edits; tests swap in one that plays another writer.
+    var settingsFile: AgentSettingsFile
     private let host: AgentHostLookup
     private let listens: Bool
     private var listener: AgentListener?
@@ -51,38 +56,46 @@ public final class AgentMonitor {
 
     public init(paths: AgentPaths = .live, host: AgentHostLookup = .live, listens: Bool = true) {
         self.paths = paths
+        self.settingsFile = AgentSettingsFile(url: paths.settingsFile)
         self.host = host
         self.listens = listens
     }
 
     /// Copy the helper, install the hooks, listen. Idempotent; also the Repair button.
     public func enable() {
+        hooksLeftBehind = false
         guard let source = paths.helperSource else {
             fail("The helper is missing from Ledge.app")
             return
         }
-        let fm = FileManager.default
+        // A socket Ledge can't listen on installs nothing (2026-10-23).
+        guard AgentListener.fits(paths.socket) else {
+            fail("Your home folder's path is too long for Ledge's socket")
+            return
+        }
         do {
-            try fm.createDirectory(at: paths.helper.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? fm.removeItem(at: paths.helper)
-            try fm.copyItem(at: source, to: paths.helper)
-            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: paths.helper.path)
+            try Self.installHelper(from: source, to: paths.helper)
         } catch {
             fail("Can't copy the helper: \(error.localizedDescription)")
             return
         }
         do {
-            try AgentSettingsFile(url: paths.settingsFile).install(helper: paths.helper.path)
+            try settingsFile.install(helper: paths.helper.path)
         } catch {
-            switch error {
-            case .notAnObject: fail("Can't read settings.json: it isn't a JSON object")
-            case .unreadable(let reason): fail("Can't read settings.json: \(reason)")
-            }
+            fail(Self.describe(error))
+            return
+        }
+        // Another program may have written the file over Ledge's change.
+        guard settingsFile.isInstalled(helper: paths.helper.path) else {
+            fail("Can't install Ledge's hooks: settings.json didn't keep them")
             return
         }
         if listens {
             do {
                 try startListening()
+            } catch .inUse {
+                fail("Another Ledge is listening for sessions")
+                return
             } catch {
                 fail("Can't listen for sessions: \(describe(error))")
                 return
@@ -94,19 +107,23 @@ public final class AgentMonitor {
         onChange?()
     }
 
-    /// Stop listening and remove Ledge's hooks.
+    /// Stop listening and remove Ledge's hooks. Hooks that can't be removed
+    /// leave a problem, and Repair (this again) tries once more (2026-10-23).
     public func disable() {
         isEnabled = false
         stopListening()
         lastHeard = nil
+        sessions = AgentSessions()
         do {
-            try AgentSettingsFile(url: paths.settingsFile).uninstall()
+            try settingsFile.uninstall()
+            hooksLeftBehind = false
+            status = .off
+            Self.log.info("agents disabled")
         } catch {
+            hooksLeftBehind = true
+            status = .problem("Can't remove Ledge's hooks: \(Self.reason(error))")
             Self.log.error("could not remove hooks")
         }
-        sessions = AgentSessions()
-        status = .off
-        Self.log.info("agents disabled")
         onChange?()
     }
 
@@ -156,6 +173,47 @@ public final class AgentMonitor {
 
     // MARK: - Internals
 
+    /// Copies the helper beside its final place, strips the quarantine flag a
+    /// downloaded Ledge passes on, and renames it over the old one, so a hook
+    /// never finds the helper missing (2026-10-23).
+    static func installHelper(from source: URL, to destination: URL) throws {
+        let fm = FileManager.default
+        let folder = destination.deletingLastPathComponent()
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let temporary = folder.appending(path: ".\(destination.lastPathComponent)-\(UUID().uuidString)")
+        func check(_ result: Int32) throws {
+            if result != 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        }
+        do {
+            try fm.copyItem(at: source, to: temporary)
+            if removexattr(temporary.path, "com.apple.quarantine", 0) != 0, errno != ENOATTR {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+            try check(chmod(temporary.path, 0o755))
+            try check(rename(temporary.path, destination.path))
+        } catch {
+            try? fm.removeItem(at: temporary)
+            throw error
+        }
+    }
+
+    /// A settings problem while installing, as the status line says it.
+    private static func describe(_ problem: AgentSettingsFile.Problem) -> String {
+        switch problem {
+        case .notAnObject: "Can't read settings.json: it isn't a JSON object"
+        case .unreadable(let reason), .unexpectedShape(let reason): "Can't read settings.json: \(reason)"
+        case .unwritable(let reason): "Can't write settings.json: \(reason)"
+        }
+    }
+
+    /// A settings problem while removing, after "Can't remove Ledge's hooks: ".
+    private static func reason(_ problem: AgentSettingsFile.Problem) -> String {
+        switch problem {
+        case .notAnObject: "settings.json isn't a JSON object"
+        case .unreadable(let reason), .unexpectedShape(let reason), .unwritable(let reason): reason
+        }
+    }
+
     private func startListening() throws(AgentListener.Failure) {
         if listener?.isListening == true, FileManager.default.fileExists(atPath: paths.socket.path) { return }
         listener?.stop()
@@ -203,6 +261,7 @@ public final class AgentMonitor {
     private func describe(_ error: AgentListener.Failure) -> String {
         switch error {
         case .pathTooLong: "the socket path is too long"
+        case .inUse: "another Ledge is listening"
         case .system(let reason): reason
         }
     }

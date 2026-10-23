@@ -6,7 +6,7 @@ import Foundation
 //
 // The chain seen on this Mac: this helper's parent is `claude` itself (comm
 // "claude"; headless runs show args like `claude -p …`). Ledge's real hook
-// command is `[ -x "<helper>" ] && "<helper>" || true`, so in practice one
+// command is `[ -x '<helper>' ] && '<helper>' || true`, so in practice one
 // shell sits between: helper -> sh -> claude. `pids` carries the whole chain.
 let input = FileHandle.standardInput.readDataToEndOfFile()
 let me = getpid()

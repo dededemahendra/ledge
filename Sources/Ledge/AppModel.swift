@@ -80,7 +80,9 @@ final class AppModel {
         note("Calendar", calendar.availability)
         note("Focus", focus.availability)
         if settings.showsCalls { note("Calls", call.availability) }
-        if settings.agentsEnabled, case .problem(let text) = agents.status { note("Agents", .unavailable(reason: text)) }
+        if settings.agentsEnabled || agents.hooksLeftBehind, case .problem(let text) = agents.status {
+            note("Agents", .unavailable(reason: text))
+        }
         if let login = LoginItem.issue {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
@@ -335,7 +337,11 @@ final class AppModel {
 
     private let agents = AgentMonitor()
     var agentsStatus: AgentMonitor.Status { agents.status }
-    func repairAgents() { agents.enable() }
+    var agentsHooksLeftBehind: Bool { agents.hooksLeftBehind }
+    /// On, set everything up again; off, try again to take the hooks out.
+    func repairAgents() {
+        if settings.agentsEnabled { agents.enable() } else { agents.disable() }
+    }
 
     /// What the sticky items and the card last drew, so they are republished
     /// only on change (the `githubRunShown` pattern).
@@ -1078,10 +1084,11 @@ final class AppModel {
         publishGitHubPanel()
         // Agents (2026-10-23): on, listen; off, undo Ledge's hooks and take
         // everything it put on the island away. A `.problem` is not retried
-        // here: Repair does that.
+        // here: Repair does that. After hooks that would not come out,
+        // switching on again sets everything up as usual (2026-10-23).
         if settings.agentsEnabled {
-            if agents.status == .off { agents.enable() }
-        } else if agents.status != .off {
+            if agents.status == .off || agents.hooksLeftBehind { agents.enable() }
+        } else if agents.status != .off, !agents.hooksLeftBehind {
             agents.disable()
             agentRunShown = nil
             agentWaitingShown = nil

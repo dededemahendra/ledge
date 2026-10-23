@@ -8,6 +8,8 @@ import AgentWire
 public final class AgentListener {
     public enum Failure: Error, Equatable {
         case pathTooLong
+        /// Another process (another Ledge) answers on the path (2026-10-23).
+        case inUse
         case system(String)
     }
 
@@ -37,6 +39,8 @@ public final class AgentListener {
     private let url: URL
     private let onLine: (Data) -> Void
     private var listenFD: Int32 = -1
+    /// The socket file this listener bound, so stopping never removes another's.
+    private var bound: (device: dev_t, inode: ino_t)?
     private var acceptSource: DispatchSourceRead?
     private var connections: [Int32: Connection] = [:]
 
@@ -47,35 +51,44 @@ public final class AgentListener {
 
     public var isListening: Bool { listenFD >= 0 }
 
+    /// Whether `url`'s path fits a socket address (`sun_path`, NUL included).
+    public nonisolated static func fits(_ url: URL) -> Bool {
+        Array(url.path.utf8CString).count <= MemoryLayout.size(ofValue: sockaddr_un().sun_path)
+    }
+
     public func start() throws(Failure) {
         stop()
         let path = Array(url.path.utf8CString)
         var addr = sockaddr_un()
-        guard path.count <= MemoryLayout.size(ofValue: addr.sun_path) else { throw .pathTooLong }
+        guard Self.fits(url) else { throw .pathTooLong }
         addr.sun_family = sa_family_t(AF_UNIX)
         withUnsafeMutableBytes(of: &addr.sun_path) { raw in
             raw.copyBytes(from: path.map { UInt8(bitPattern: $0) })
         }
+        let size = socklen_t(MemoryLayout<sockaddr_un>.size)
 
+        // Someone answering on the path is another Ledge: leave its socket be.
+        if Self.answers(addr) { throw .inUse }
         unlink(url.path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw .system(String(cString: strerror(errno))) }
         var on: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
-        let size = socklen_t(MemoryLayout<sockaddr_un>.size)
-        let bound = withUnsafePointer(to: &addr) {
+        let didBind = withUnsafePointer(to: &addr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, size) }
         }
-        guard bound == 0 else {
+        guard didBind == 0 else {
             let reason = String(cString: strerror(errno))
             close(fd)
             throw .system(reason)
         }
+        var info = stat()
+        if lstat(url.path, &info) == 0 { bound = (info.st_dev, info.st_ino) }
         chmod(url.path, 0o600)
-        guard listen(fd, 16) == 0, makeNonBlocking(fd) else {
+        guard listen(fd, SOMAXCONN) == 0, makeNonBlocking(fd) else {
             let reason = String(cString: strerror(errno))
             close(fd)
-            unlink(url.path)
+            unlinkIfOurs()
             throw .system(reason)
         }
 
@@ -96,8 +109,33 @@ public final class AgentListener {
         connections.removeAll()
         if listenFD >= 0 {
             listenFD = -1
-            unlink(url.path)
+            unlinkIfOurs()
         }
+    }
+
+    /// Removes the socket file only while it is still the one this listener bound (2026-10-23).
+    private func unlinkIfOurs() {
+        defer { bound = nil }
+        guard let bound else { return }
+        var info = stat()
+        guard lstat(url.path, &info) == 0, info.st_dev == bound.device, info.st_ino == bound.inode else { return }
+        unlink(url.path)
+    }
+
+    /// Whether a connection to `addr` is taken, or would be but for a full backlog.
+    private static func answers(_ addr: sockaddr_un) -> Bool {
+        var addr = addr
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var on: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+        let flags = fcntl(fd, F_GETFL)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) >= 0 else { return false }
+        let rc = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+        }
+        return rc == 0 || errno == EAGAIN || errno == EINPROGRESS
     }
 
     private func makeNonBlocking(_ fd: Int32) -> Bool {

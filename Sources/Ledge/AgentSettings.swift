@@ -40,7 +40,8 @@ struct AgentSettings: View {
                     ))
                     .labelsHidden()
                 }
-                if settings.agentsEnabled {
+                // Switched off, hooks that would not come out stay a problem (2026-10-23).
+                if settings.agentsEnabled || model.agentsHooksLeftBehind {
                     // Inside a timeline: the model is not observable.
                     TimelineView(.periodic(from: .now, by: 2)) { context in
                         status(model.agentsStatus, now: context.date)
