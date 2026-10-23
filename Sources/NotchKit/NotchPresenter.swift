@@ -21,6 +21,8 @@ public final class NotchPresenter {
     /// deliberate stop still feels immediate.
     public static let hoverDwell: TimeInterval = 0.2
     private var hover = HoverIntentTracker(dwell: NotchPresenter.hoverDwell)
+    /// The part last reported to the controller while hovered.
+    private var reportedPart: NotchController.HoverPart?
 
     /// Settings (2026-09-30): a new dwell starts a fresh tracker; a hover
     /// in progress simply begins again.
@@ -327,6 +329,7 @@ public final class NotchPresenter {
             // reappearing once the window comes back (still within its TTL)
             // is correct, not stale, and recomputeState still allows that.
             hover.reset()
+            reportedPart = nil
             dwellTimer?.invalidate()
             dwellTimer = nil
             controller.setHovered(false)
@@ -522,7 +525,15 @@ public final class NotchPresenter {
             window.interactivePath = nil     // Review Focus 4
             return
         }
-        window.setInteractiveShape(NotchShape(forgivingParameters()), in: Self.canvas)
+        window.setInteractiveShape(
+            IslandRegionShape(island: forgivingParameters(), tab: currentTabParameters()), in: Self.canvas
+        )
+    }
+
+    /// The tab's live parameters while it shows, else nil: a tucked or absent
+    /// tab claims nothing.
+    private func currentTabParameters() -> NotchTabParameters? {
+        controller.isTabShowing ? controller.tabParameters : nil
     }
 
     /// Claim/detect a little more than is actually drawn when collapsed or
@@ -605,13 +616,28 @@ public final class NotchPresenter {
     private func reevaluateHover() -> Bool {
         guard let screen = NSScreen.islandHost?.screen else { return false }
         let point = Self.localPoint(NSEvent.mouseLocation, on: screen.frame)
-        let inside = Self.islandPath(for: forgivingParameters()).contains(point)
-        let change = hover.pointer(inside: inside, at: Date())
+        let part = Self.hoverPart(
+            at: point, island: forgivingParameters(), tab: currentTabParameters(), metrics: controller.metrics
+        )
+        let change = hover.pointer(inside: part != nil, at: Date())
         armDwellTimer()
         switch change {
-        case .none:      return false
-        case .hovered:   controller.setHovered(true);  return true
-        case .unhovered: controller.setHovered(false); return true
+        case .none:
+            // Already hovered and the pointer crossed from one part to the
+            // other: report the new part, without restarting the dwell.
+            guard hover.isHovering, let part, part != reportedPart else { return false }
+            reportedPart = part
+            controller.setHovered(true, part: part)
+            return true
+        case .hovered:
+            reportedPart = part ?? .island
+            controller.setHovered(true, part: reportedPart ?? .island)
+            return true
+        case .unhovered:
+            let left = reportedPart ?? .island
+            reportedPart = nil
+            controller.setHovered(false, part: left)
+            return true
         }
     }
 
@@ -658,6 +684,33 @@ extension NotchPresenter {
         NotchShape(parameters).path(in: canvas)
     }
 
+    /// The tab's claimed zone: on a pill it reaches up over its inset to the
+    /// top edge, as the island's does (`hoverParameters`).
+    nonisolated static func tabHoverParameters(_ tab: NotchTabParameters) -> NotchTabParameters {
+        var tab = tab
+        tab.height += tab.topInset
+        tab.topInset = 0
+        return tab
+    }
+
+    /// Which shape of the island ∪ tab the canvas-local `point` is on, nil
+    /// for neither (the 6 pt gap included). `island` is the island's claimed
+    /// parameters (`hoverParameters`); the hidden/peek forgiveness belongs to
+    /// it alone. Pure, so it is pinned without a window.
+    nonisolated static func hoverPart(
+        at point: CGPoint,
+        island: NotchShapeParameters,
+        tab: NotchTabParameters?,
+        metrics: NotchMetrics
+    ) -> NotchController.HoverPart? {
+        if islandPath(for: island).contains(point) { return .island }
+        if let tab,
+           NotchTabShape(island: island, tab: tabHoverParameters(tab)).path(in: canvas).contains(point) {
+            return .tab
+        }
+        return nil
+    }
+
     /// Converts a point in AppKit global screen coordinates (e.g.
     /// `NSEvent.mouseLocation`) into the local space `islandPath(for:)` is
     /// defined in, given the screen the island's canvas is anchored to.
@@ -674,5 +727,20 @@ extension NotchPresenter {
             x: globalPoint.x - screenFrame.midX + canvas.width / 2,
             y: screenFrame.maxY - globalPoint.y
         )
+    }
+}
+
+/// The claimed region: the island's forgiving path plus, while it shows, the
+/// tab's. Anything else passes through.
+struct IslandRegionShape: Shape {
+    var island: NotchShapeParameters
+    var tab: NotchTabParameters?
+
+    func path(in rect: CGRect) -> Path {
+        var path = NotchShape(island).path(in: rect)
+        if let tab {
+            path.addPath(NotchTabShape(island: island, tab: NotchPresenter.tabHoverParameters(tab)).path(in: rect))
+        }
+        return path
     }
 }
