@@ -1876,3 +1876,4 @@ open:
 6. A new item in the tab swaps its glyph with a blur, and a landing tab pulses
    once while an island blip leaves the tab still.
 7. With Reduce Motion, the tab fades in and out in place.
+8. Clicking the island still pins the music card and opens a blip's link.
