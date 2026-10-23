@@ -351,9 +351,11 @@ public final class NotchPresenter {
         } else {
             let created = NotchWindow(
                 screen: screen,
-                content: AnyView(NotchRootView(controller: controller, onTap: { [weak self] in
-                    self?.tapOnIsland()
-                }))
+                content: AnyView(NotchRootView(
+                    controller: controller,
+                    onTap: { [weak self] in self?.tapOnIsland() },
+                    onTabTap: { [weak self] in self?.tapOnTab() }
+                ))
             )
             window = created
             space?.adopt(created)
@@ -515,6 +517,13 @@ public final class NotchPresenter {
     /// same reason `toggle()` is.
     private func tapOnIsland() {
         controller.tap()
+        syncWindowToVisibility()
+    }
+
+    /// A tap on the tab (`NotchRootView.onTabTap`), as `tapOnIsland` but for
+    /// `NotchController.tapTab()`: pinning the music card changes the shape.
+    private func tapOnTab() {
+        controller.tapTab()
         syncWindowToVisibility()
     }
 
