@@ -48,3 +48,22 @@ import Testing
     #expect(decoded == message)
     #expect(decoded.event == "command" && decoded.v == 1)
 }
+
+/// A password is often a plain word: after a program that prints its
+/// arguments, or mixing letters and digits, it stops the label (2026-10-23).
+@Test func aPasswordShapedWordNeverReachesTheLabel() {
+    #expect(CommandTrim.label("echo hunter2 | sudo -S softwareupdate -ia") == "echo")
+    #expect(CommandTrim.label("printf s3cretPass99 | docker login --password-stdin") == "printf")
+    #expect(CommandTrim.label("print correcthorse") == "print")
+    #expect(CommandTrim.label("bw unlock MyVaultPass1") == "bw unlock")
+    #expect(CommandTrim.label("sleep 12") == "sleep 12", "digits alone are a count")
+    #expect(CommandTrim.label("make test") == "make test")
+}
+
+/// A line typed after a space is kept out of history by choice: it stays
+/// off the island too.
+@Test func aLineLedByASpaceIsSkipped() {
+    #expect(CommandTrim.isSkipped(" make deploy"))
+    #expect(CommandTrim.label(" make deploy") == nil)
+    #expect(!CommandTrim.isSkipped("make deploy"))
+}

@@ -68,6 +68,74 @@ import Testing
     #expect(ShellHookBlock.state(of: try String(contentsOf: target, encoding: .utf8)) == .present)
 }
 
+/// A commented or indented copy of the markers is the user's own text: only
+/// the exact-line block Ledge added comes out (2026-10-23).
+@Test func aCopyOfTheMarkersInTheUsersLinesIsNeverTakenOut() {
+    let original = "if true; then\n  \(ShellHookBlock.begin)\nfi\n# \(ShellHookBlock.begin)\n# \(ShellHookBlock.end)\n"
+    #expect(ShellHookBlock.state(of: original) == .absent)
+    let installed = ShellHookBlock.installing(into: original)
+    #expect(ShellHookBlock.state(of: installed) == .present)
+    #expect(ShellHookBlock.removing(from: installed) == original)
+    #expect(ShellHookBlock.removing(from: "a\n\n" + ShellHookBlock.text + "b\n") == "a\nb\n")
+}
+
+/// `nounset` and `warn_create_global` in the user's shell, and the helper
+/// gone after the shell started: the block says nothing. The helper still
+/// gets its arguments, with stdin closed so it never waits on the terminal.
+@Test func theBlockIsQuietUnderStrictOptions() throws {
+    let home = try temporaryHome()
+    let folder = home.appending(path: "Library/Application Support/Ledge")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let helper = folder.appending(path: "ledge-agent-hook")
+    try "#!/bin/sh\nread -r x\nprintf '%s\\n' \"$@\" \"stdin:$x\" > \"$HOME/args\"\n"
+        .write(to: helper, atomically: true, encoding: .utf8)
+    chmod(helper.path, 0o755)
+    try ShellHookBlock.text.write(to: home.appending(path: "block.zsh"), atomically: true, encoding: .utf8)
+    let errors = try runZsh("""
+        setopt nounset warn_create_global
+        source "$HOME/block.zsh"
+        __ledge_cmd_precmd
+        __ledge_cmd_preexec 'make test'
+        __ledge_cmd_start=$(( EPOCHREALTIME - 20 ))
+        false
+        __ledge_cmd_precmd
+        sleep 0.5
+        rm "$HOME/Library/Application Support/Ledge/ledge-agent-hook"
+        __ledge_cmd_preexec 'make test'
+        __ledge_cmd_start=$(( EPOCHREALTIME - 20 ))
+        __ledge_cmd_precmd
+        """, home: home)
+    #expect(errors == "")
+    let args = home.appending(path: "args")
+    for _ in 0..<30 where !FileManager.default.fileExists(atPath: args.path) { usleep(100_000) }
+    let lines = (try? String(contentsOf: args, encoding: .utf8))?.split(separator: "\n").map(String.init) ?? []
+    #expect(lines.count == 5)
+    #expect(lines.first == "command" && lines.dropFirst().first == "1")
+    #expect(lines.dropFirst(2).first?.hasPrefix("20.") == true)
+    #expect(Array(lines.suffix(2)) == ["make test", "stdin:"])
+}
+
+/// An interactive zsh without the user's files. Its stdin is a pipe left
+/// open, as a terminal would be; stderr goes to a file, so a helper that
+/// keeps it open can't hang the test.
+private func runZsh(_ script: String, home: URL) throws -> String {
+    let errors = home.appending(path: "stderr")
+    FileManager.default.createFile(atPath: errors.path, contents: nil)
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+    process.arguments = ["-f", "-i", "-c", script]
+    process.environment = ["HOME": home.path, "PATH": "/usr/bin:/bin"]
+    process.currentDirectoryURL = home
+    let input = Pipe()
+    process.standardInput = input
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = try FileHandle(forWritingTo: errors)
+    try process.run()
+    process.waitUntilExit()
+    withExtendedLifetime(input) {}
+    return try String(contentsOf: errors, encoding: .utf8)
+}
+
 private func temporaryHome() throws -> URL {
     let url = FileManager.default.temporaryDirectory.appending(path: "ledge-zshrc-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

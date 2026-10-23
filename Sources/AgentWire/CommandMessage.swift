@@ -29,9 +29,11 @@ public struct CommandMessage: Codable, Sendable, Equatable {
 
 /// What of a command line may be shown (2026-10-23): the program's base
 /// name and up to two plain words straight after it — only letters, digits,
-/// `-` and `_`, not a flag, at most 20 characters — at most 24 characters in
+/// `-` and `_`, not a flag, at most 20 characters, and not letters and
+/// digits mixed, the shape of most passwords — at most 24 characters in
 /// all, cut at a word. Collection stops at the first word that isn't plain,
-/// so a header, token, path, URL or assignment never leaves the shell.
+/// so a header, token, path, URL or assignment never leaves the shell. A
+/// program that prints its arguments keeps none of them.
 public enum CommandTrim {
     static let maxWord = 20
     static let maxLabel = 24
@@ -40,9 +42,12 @@ public enum CommandTrim {
         "vi", "vim", "nvim", "nano", "emacs", "hx", "less", "more", "man", "ssh", "mosh", "top", "htop", "btop",
         "watch", "tmux", "screen", "zsh", "bash", "fish", "claude", "codex",
     ]
+    /// Their arguments are what they print, often into a pipe: a password.
+    static let printers: Set<String> = ["echo", "printf", "print", "yes"]
 
     public static func label(_ line: String) -> String? {
         guard !isSkipped(line), let program = program(of: line) else { return nil }
+        guard !printers.contains(program) else { return String(program.prefix(maxLabel)) }
         let words = line.split(whereSeparator: \.isWhitespace).dropFirst()
         var label = program
         var taken = 0
@@ -55,7 +60,10 @@ public enum CommandTrim {
         return String(label.prefix(maxLabel))
     }
 
+    /// Also a line typed after a space, which zsh users do to keep it out
+    /// of history.
     public static func isSkipped(_ line: String) -> Bool {
+        if line.first == " " { return true }
         guard let program = program(of: line) else { return false }
         if skipped.contains(program) { return true }
         if program == "tail" {
@@ -74,7 +82,8 @@ public enum CommandTrim {
 
     private static func isPlain(_ word: Substring) -> Bool {
         guard !word.isEmpty, word.count <= maxWord, word.first != "-" else { return false }
-        return word.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
+        guard word.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { return false }
+        return !(word.contains(where: \.isLetter) && word.contains(where: \.isNumber))
     }
 }
 

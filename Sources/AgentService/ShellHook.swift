@@ -13,13 +13,15 @@ public enum ShellHookBlock {
         if [[ -o interactive && -x "$HOME/Library/Application Support/Ledge/ledge-agent-hook" ]]; then
           zmodload zsh/datetime
           autoload -Uz add-zsh-hook
+          typeset -g __ledge_cmd_start= __ledge_cmd_line=
           __ledge_cmd_preexec() { __ledge_cmd_start=$EPOCHREALTIME; __ledge_cmd_line=$1 }
           __ledge_cmd_precmd() {
-            local s=$?
-            [[ -n $__ledge_cmd_start ]] || return
+            local s=$? h="$HOME/Library/Application Support/Ledge/ledge-agent-hook"
+            [[ -n $__ledge_cmd_start ]] || return 0
             local d=$(( EPOCHREALTIME - __ledge_cmd_start ))
-            unset __ledge_cmd_start
-            (( d >= 10 )) && "$HOME/Library/Application Support/Ledge/ledge-agent-hook" command "$s" "$d" "$__ledge_cmd_line" &!
+            __ledge_cmd_start=
+            (( d >= 10 )) && [[ -x $h ]] && "$h" command "$s" "$d" "$__ledge_cmd_line" </dev/null >/dev/null 2>&1 &!
+            return 0
           }
           add-zsh-hook preexec __ledge_cmd_preexec
           add-zsh-hook precmd __ledge_cmd_precmd
@@ -48,15 +50,18 @@ public enum ShellHookBlock {
         return base + "\n" + Self.text
     }
 
-    /// Takes out the block and the blank line installing put before it.
+    /// Takes out the block and the blank line installing put before it: the
+    /// exact marker lines `state(of:)` finds, never a copy inside the user's
+    /// own lines (a comment, an indented one).
     public static func removing(from text: String) -> String {
-        guard state(of: text) == .present,
-              let beginRange = text.range(of: begin + "\n"),
-              let endRange = text.range(of: end + "\n", range: beginRange.upperBound..<text.endIndex)
-                ?? text.range(of: end, range: beginRange.upperBound..<text.endIndex) else { return text }
-        var head = String(text[..<beginRange.lowerBound])
-        if head.hasSuffix("\n\n") { head.removeLast() }
-        return head + String(text[endRange.upperBound...])
+        guard state(of: text) == .present else { return text }
+        var lines = text.components(separatedBy: "\n")
+        guard let first = lines.firstIndex(of: begin), let last = lines.firstIndex(of: end) else { return text }
+        let hasMore = last + 1 < lines.count
+        lines.removeSubrange(first...last)
+        // The blank line before it, unless it now ends the file's last line.
+        if hasMore, first > 0, lines[first - 1].isEmpty { lines.remove(at: first - 1) }
+        return lines.joined(separator: "\n")
     }
 }
 
