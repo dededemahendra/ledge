@@ -133,7 +133,7 @@ struct AnimatedIslandParameters: ViewModifier, Animatable {
 /// what makes a held key feel like a stream of presses rather than a
 /// number quietly ticking. Keyed on `trigger`; nothing happens at rest.
 /// Reduce Motion: no scaling at all.
-struct ValueBump<Trigger: Equatable>: ViewModifier {
+struct ValueBump<Trigger: Equatable & Sendable>: ViewModifier {
     let trigger: Trigger
     let enabled: Bool
 
@@ -152,7 +152,7 @@ struct ValueBump<Trigger: Equatable>: ViewModifier {
 /// The cover flips in edge-on when the track changes (the reference app's
 /// "artwork flip", 2026-09-29): a jump to -90° about the vertical axis,
 /// then a bouncy spring back to flat, keyed on the title. Nothing at rest.
-struct FlipOnChange<Trigger: Equatable>: ViewModifier {
+struct FlipOnChange<Trigger: Equatable & Sendable>: ViewModifier {
     let trigger: Trigger
     let enabled: Bool
 
@@ -479,8 +479,8 @@ public struct NotchRootView: View {
         // swells ~5% from its top edge — the notch stays welded — and
         // springs back, for a blip that lands with no shape change to
         // announce it. Keyframed, so the resting frame is exactly 1.0.
-        .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { view, scale in
-            view.scaleEffect(controller.reduceMotion ? 1 : scale, anchor: .top)
+        .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { [reduceMotion = controller.reduceMotion] view, scale in
+            view.scaleEffect(reduceMotion ? 1 : scale, anchor: .top)
         } keyframes: { _ in
             SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
             SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
@@ -658,14 +658,15 @@ public struct NotchRootView: View {
         let title = split.map { String(caption[..<$0.lowerBound]) } ?? caption
         let artist = split.map { String(caption[$0.upperBound...]) } ?? ""
         let overdue = controller.isPreviewingUpcoming && controller.upcoming?.isPastDue == true
+        let titleText = Text(title).font(.system(size: 11, weight: .semibold))
+        let separatorText = Text(artist.isEmpty ? "" : " · ")
+            .font(.system(size: 11, weight: .regular))
+            .foregroundStyle(contentColor.opacity(0.6))
+        let artistText = Text(artist)
+            .font(.system(size: 11, weight: .regular))
+            .foregroundStyle((overdue ? pastDueColor : nil) ?? contentColor.opacity(0.6))
         return HStack(spacing: 0) {
-            (Text(title).font(.system(size: 11, weight: .semibold))
-             + Text(artist.isEmpty ? "" : " · ")
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle(contentColor.opacity(0.6))
-             + Text(artist)
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle((overdue ? pastDueColor : nil) ?? contentColor.opacity(0.6)))
+            Text("\(titleText)\(separatorText)\(artistText)")
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
@@ -1209,7 +1210,7 @@ public struct NotchRootView: View {
                 let isGitHub = activity.id == NotchController.githubActivityID
                 compactValue(compact, bump: !isTicking, color: (isTicking || isGitHub) ? tintColor(for: activity.tint) : nil)
             } else if activity.id == Self.mediaActivityID,
-                      let media = controller.media,
+                      controller.media != nil,
                       controller.state != .expanded {
                 // Compact now-playing: the current output's glyph, bright
                 // while playing and dim while paused (2026-09-29 — it
