@@ -63,6 +63,11 @@ reuse or redistribute the code.
 Browsers and everything else that MediaRemote reports are ignored on purpose
 (`MediaSourcePolicy`). One blip owns the island at a time; the rest queue.
 
+Two live things show at once: the most important in the island, the next in a
+tab beside it (on a MacBook a second notch-height tab, on other screens a
+circle). Hover the tab for its item's card, click it for its action. The
+island's "+N" appears only from three.
+
 **The card** (rest the cursor on the island for a beat with music playing — passing through to the menu bar does nothing): artwork and titles — click them to
 bring the app forward — with a favourite star and the output button beside
 them — a scrubber with times, then Apple Music's transport row: shuffle ·

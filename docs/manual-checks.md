@@ -1847,3 +1847,32 @@ Pending until the user reports them:
    lookup was fixed after the first check).
 9. A click brings that VS Code window forward (the host lookup was fixed after
    the first check).
+
+## Two at once: the tab (2026-10-23)
+
+Headless renders checked: on a notch (179 × 32), the timer ring and "4:12" in
+the island and the call's app icon with a green dot in a notch-height tab
+beside it, its fillets meeting the island's at the top edge; on a pill, the
+music disc in the pill and the orange asterisk with "2" in a circle beside it;
+a tab half-way through its bud; the Agents card opened from the tab with
+nothing above it.
+
+Confirmed live on 2026-10-23 on the external monitor (the pill), with
+`ledge://probe/tab` sent to the dev build (`open -a dist/Ledge.app
+"ledge://probe/tab"`): the timer ring and "4:12" in the pill, the turning
+orange asterisk with "2" in the circle beside it.
+
+Pending until the user reports them, on the MacBook's own screen with the lid
+open:
+
+1. The tab sits on the bezel line with the island and its fillets meet the top
+   edge cleanly.
+2. Status items around the island and tab stay clickable, and the 6 pt gap
+   passes clicks through.
+3. Hovering the tab opens its item's card (a call, the Agents card); a timer
+   tab opens nothing.
+4. Clicking the tab does its item's action.
+5. A timer ending during a call merges the tab and the call takes the island.
+6. A new item in the tab swaps its glyph with a blur, and a landing tab pulses
+   once while an island blip leaves the tab still.
+7. With Reduce Motion, the tab fades in and out in place.
