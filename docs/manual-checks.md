@@ -1800,3 +1800,20 @@ Pending until the user reports them:
 5. A Zoom meeting in Zoom's app shows Zoom's icon and the title.
 6. Joining 15 minutes early: "On a call" until 10 minutes before, then the
    title.
+
+## The meeting's own mute (2026-10-23)
+
+Found live with the debug probe (`ledge://probe/call-ax`, debug builds):
+
+- Zoom's Meeting menu item `onMuteAudio:` ("Unmute audio" / "Mute audio").
+- Meet's "Turn on microphone" / "Turn off microphone" button in Dia's Meet
+  window.
+
+Pending until the user reports them:
+
+1. Zoom: muting from the card mutes in Zoom itself (its toolbar shows muted),
+   and muting in Zoom turns the island red within a second.
+2. Meet in Dia: the same, both ways.
+3. Meet with another tab in front: the card falls back to the system-wide
+   mute.
+4. FaceTime, WhatsApp and other apps: unchanged, system-wide mute.

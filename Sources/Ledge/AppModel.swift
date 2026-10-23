@@ -1262,6 +1262,11 @@ final class AppModel {
             Self.log.notice("probe: card written")
             return
         }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/call-ax" {
+            CallAppProbe.arm()
+            Self.log.notice("probe: call controls armed for ten minutes")
+            return
+        }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/menubar" {
             let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Ledge")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -1291,6 +1296,9 @@ final class AppModel {
     /// length for 3 s when it ends. Republished only when what shows
     /// changes. Never logs which app or how long.
     private func refreshCall() {
+        #if DEBUG
+        for file in CallAppProbe.tick() { Self.log.notice("probe: wrote \(file, privacy: .public)") }
+        #endif
         guard settings.showsCalls else { return }
         let now = Date()
         // The calendar's meetings (2026-10-22), whatever the "Calendar
