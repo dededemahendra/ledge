@@ -14,6 +14,21 @@ private final class FakeCamera: CameraSource {
     func refresh() { reads += 1 }
 }
 
+/// A call app's own mute, made up (2026-10-23).
+@MainActor
+private final class FakeAppMute: AppMuteSource {
+    var muted: Bool?
+    private(set) var updatedFor: [String?] = []
+    private(set) var presses = 0
+    func update(for app: CallAppInfo?) { updatedFor.append(app?.bundleID) }
+    func press() -> Bool {
+        guard let current = muted else { return false }
+        presses += 1
+        muted = !current
+        return true
+    }
+}
+
 /// A calendar event `start` to `end` minutes from `t0`.
 private func event(_ id: String, start: Double, end: Double, url: String = "https://meet.google.com/abc-defg-hij",
                    title: String = "Design review") -> MeetingCandidate {
@@ -97,11 +112,13 @@ private final class Rig {
     }
     let devices: FakeDevices
     let camera = FakeCamera()
+    let appMute = FakeAppMute()
     let defaults = UserDefaults(suiteName: UUID().uuidString)!
     lazy var service = CallService(
         holders: source,
         devices: devices,
         camera: camera,
+        appMute: appMute,
         lookup: ProcessLookup(regularApp: { [100: zoom, 300: chrome][$0] }, responsiblePID: { _ in nil },
                               parentPID: { _ in nil }),
         defaults: defaults,
@@ -485,4 +502,57 @@ private final class Rig {
     let rig = Rig()
     rig.service.start()
     #expect(rig.camera.reads == 1)
+}
+
+// MARK: - The meeting's own mute (2026-10-23)
+
+@MainActor @Test func muteUsesTheAppsOwnMuteWhenItHasOne() {
+    let rig = Rig()
+    rig.appMute.muted = false
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    #expect(rig.appMute.presses == 1)
+    #expect(!rig.devices.device("a").isMuted)
+}
+
+@MainActor @Test func withoutAControlTheSystemMuteIsUsed() {
+    let rig = Rig()
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    #expect(rig.devices.device("a").isMuted)
+    #expect(rig.appMute.presses == 0)
+}
+
+/// Muting from Zoom's or Meet's own window shows on the island.
+@MainActor @Test func theAppsOwnStateIsWhatTheIslandShows() {
+    let rig = Rig()
+    rig.appMute.muted = true
+    let update = rig.refresh(to: 2)
+    #expect(update.isMuted)
+    #expect(update.appMuted == true)
+    #expect(!rig.devices.device("a").isMuted)
+}
+
+/// A system mute from before the app's control was found is undone, never
+/// stacked with the app's own.
+@MainActor @Test func aSystemMuteIsUndoneWhenTheAppsOwnTakesOver() {
+    let rig = Rig()
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    #expect(rig.devices.device("a").isMuted)
+    rig.appMute.muted = false
+    rig.refresh(from: 2.25, to: 2.25)
+    rig.service.toggleMute()
+    #expect(!rig.devices.device("a").isMuted)
+    #expect(rig.appMute.presses == 0)
+    #expect(!rig.refresh(from: 2.5, to: 2.5).isMuted)
+}
+
+@MainActor @Test func theLiveAppIsHandedToTheControl() {
+    let rig = Rig()
+    rig.refresh(to: 2)
+    #expect(rig.appMute.updatedFor.last == "us.zoom.xos")
+    rig.holders = []
+    rig.refresh(from: 2.25, to: 6)
+    #expect(rig.appMute.updatedFor.last == .some(nil))
 }

@@ -11,15 +11,19 @@ public struct CallUpdate: Sendable, Equatable {
     /// The calendar meeting this call is, when it is one (2026-10-22).
     public let meeting: CallMeeting?
     public let isCameraOn: Bool
+    /// The call app's own mute, when Ledge can read it (Zoom, Meet;
+    /// 2026-10-23). `isMuted` is true when this is, or Ledge's system mute.
+    public let appMuted: Bool?
 
     public init(state: CallState, isMuted: Bool, canMute: Bool, micName: String?, meeting: CallMeeting? = nil,
-                isCameraOn: Bool = false) {
+                isCameraOn: Bool = false, appMuted: Bool? = nil) {
         self.state = state
         self.isMuted = isMuted
         self.canMute = canMute
         self.micName = micName
         self.meeting = meeting
         self.isCameraOn = isCameraOn
+        self.appMuted = appMuted
     }
 }
 
@@ -40,6 +44,7 @@ public final class CallService {
     private let holders: MicHolderSource
     private let devices: InputDeviceIO
     private let camera: CameraSource
+    private let appMute: AppMuteSource
     private let lookup: ProcessLookup
     private let defaults: UserDefaults
     private let ownPID: pid_t
@@ -72,11 +77,13 @@ public final class CallService {
     public static let hiddenOverrun: TimeInterval = 30 * 60
 
     public init(holders: MicHolderSource? = nil, devices: InputDeviceIO = CoreAudioInputDevices(),
-                camera: CameraSource? = nil, lookup: ProcessLookup = .live, defaults: UserDefaults = .standard,
+                camera: CameraSource? = nil, appMute: AppMuteSource? = nil, lookup: ProcessLookup = .live,
+                defaults: UserDefaults = .standard,
                 ownPID: pid_t = getpid()) {
         self.holders = holders ?? MicHolders()
         self.devices = devices
         self.camera = camera ?? CameraWatcher()
+        self.appMute = appMute ?? AXAppMuteControls()
         self.lookup = lookup
         self.defaults = defaults
         self.ownPID = ownPID
@@ -117,6 +124,7 @@ public final class CallService {
         }
         guard let pids = holders.holderPIDs else {
             availability = .unavailable(reason: "can't read which apps use the microphone")
+            appMute.update(for: nil)
             if isLive { restoreMute() }
             isLive = false
             tracker = CallTracker()
@@ -153,13 +161,18 @@ public final class CallService {
             matched = nil
             matchedApp = nil
             exemptApp = nil
+            appMute.update(for: nil)
             return CallUpdate(state: state, isMuted: false, canMute: false, micName: nil)
         }
         updateMeeting(for: app.bundleID, at: now, in: meetings, isHidden: hidden.contains(app.bundleID))
         camera.refresh()
+        appMute.update(for: app)
+        let appMuted = appMute.muted
 
         var states = micStates()
-        if wantsMute {
+        // With the app's own mute in use, no system mute is applied to new
+        // mics: the two are never stacked.
+        if wantsMute, appMuted == nil {
             // A mic that starts while muted (AirPods connecting) is muted too.
             // One unmuted elsewhere stays as the user left it.
             let plan = InputMutePlan.mute(states, changes: changes)
@@ -169,9 +182,9 @@ public final class CallService {
             }
             if plan.changes != changes { changes = plan.changes }
         }
-        return CallUpdate(state: state, isMuted: InputMutePlan.isMuted(states, changes: changes),
-                          canMute: InputMutePlan.canMute(states), micName: InputMutePlan.micName(states),
-                          meeting: matched, isCameraOn: camera.isCameraOn)
+        return CallUpdate(state: state, isMuted: appMuted == true || InputMutePlan.isMuted(states, changes: changes),
+                          canMute: appMuted != nil || InputMutePlan.canMute(states), micName: InputMutePlan.micName(states),
+                          meeting: matched, isCameraOn: camera.isCameraOn, appMuted: appMuted)
     }
 
     /// Keeps the live call's meeting (2026-10-22): matched afresh for a new
@@ -217,6 +230,17 @@ public final class CallService {
     }
 
     public func toggleMute() {
+        // Zoom's or Meet's own mute when Ledge can reach it (2026-10-23):
+        // Ledge's system mute is undone first, so the two never stack, and
+        // the app's control is pressed only if it isn't already as wanted.
+        if let appMuted = appMute.muted {
+            let all = devices.states()
+            let systemMuted = InputMutePlan.isMuted(micStates(all), changes: InputMutePlan.stillHeld(all, changes: changes))
+            let target = !(appMuted || systemMuted)
+            restoreMute()
+            if appMuted != target { _ = appMute.press() }
+            return
+        }
         // Plan against what still stands: a mute undone elsewhere is no
         // longer Ledge's to skip.
         let all = devices.states()
