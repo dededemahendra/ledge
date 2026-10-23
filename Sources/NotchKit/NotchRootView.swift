@@ -361,6 +361,19 @@ public struct NotchRootView: View {
 
     /// See `previousHeight` above — same reasoning, same toolchain
     /// workaround, kept in the view (not `NotchController`) per spec §4.
+    /// The last tab item, held while Reduce Motion fades the tab out in place.
+    private var _heldTab: State<NotchController.ActivityDisplay?> = State(initialValue: nil)
+    private var heldTab: NotchController.ActivityDisplay? {
+        get { _heldTab.wrappedValue }
+        nonmutating set { _heldTab.wrappedValue = newValue }
+    }
+    /// Counts tabs landing (nil to an item), the tab's own pulse trigger.
+    private var _tabLanded: State<Int> = State(initialValue: 0)
+    private var tabLanded: Int {
+        get { _tabLanded.wrappedValue }
+        nonmutating set { _tabLanded.wrappedValue = newValue }
+    }
+
     private var _previousWidth: State<CGFloat>
     private var previousWidth: CGFloat {
         get { _previousWidth.wrappedValue }
@@ -415,7 +428,7 @@ public struct NotchRootView: View {
         let expanded = controller.state == .expanded
         let showEffects = expanded && !visualEffectsSuppressed
 
-        ZStack(alignment: .top) {
+        let islandLayer = ZStack(alignment: .top) {
             shape
                 // Flat, fully opaque black in every state — the real Alcove
                 // card is a flat slab, and it has to be: the island sits
@@ -474,8 +487,14 @@ public struct NotchRootView: View {
                         lineWidth: 1
                     )
                 }
-            tabLayer(island: parameters, showEffects: showEffects)
         }
+        // The press dip belongs to the island's own area, never the tab's.
+        .contentShape(shape)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in if !pressed { pressed = true } }
+                .onEnded { _ in pressed = false }
+        )
         // The blip pulse (`NotchController.blipPulse`): the whole island
         // swells ~5% from its top edge — the notch stays welded — and
         // springs back, for a blip that lands with no shape change to
@@ -493,6 +512,14 @@ public struct NotchRootView: View {
             color: .black.opacity(showEffects ? 0.5 : 0),
             radius: 16, y: 6
         )
+
+        // The tab sits outside the island's pulse, with its own shadow.
+        return ZStack(alignment: .top) {
+            islandLayer
+            tabLayer(island: parameters, showEffects: showEffects)
+                .compositingGroup()
+                .shadow(color: .black.opacity(showEffects ? 0.5 : 0), radius: 16, y: 6)
+        }
         .frame(
             width: NotchMetrics.canvasSize.width,
             height: NotchMetrics.canvasSize.height,
@@ -505,13 +532,6 @@ public struct NotchRootView: View {
         // `interactivePath`) already restricts which points ever reach this
         // view, so no extra region check is needed here.
         .onTapGesture { onTap() }
-        // Press state for the dip above. Simultaneous, so the tap still
-        // fires; zero distance, so it flips on mouse-down.
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in if !pressed { pressed = true } }
-                .onEnded { _ in pressed = false }
-        )
         // The link pointer over a clickable island, the arrow elsewhere.
         .pointerStyle(controller.linkURL != nil ? .link : .default)
         .animation(
@@ -532,6 +552,18 @@ public struct NotchRootView: View {
         .allowsHitTesting(controller.isVisible)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ledge notch island")
+        .onChange(of: controller.tab) { _, newValue in
+            if let newValue { heldTab = newValue }
+        }
+        .onChange(of: controller.tab?.id) { old, new in
+            if old == nil, new != nil { tabLanded += 1 }
+        }
+        .task(id: controller.tab == nil) {
+            // Reduce Motion: drop the held item once its fade has played.
+            guard controller.tab == nil, heldTab != nil else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            if controller.tab == nil { heldTab = nil }
+        }
         .onChange(of: parameters) { _, newValue in
             // Recorded AFTER this transition's spring was already chosen
             // above, so it becomes the "before" height/width for whichever
@@ -548,7 +580,8 @@ public struct NotchRootView: View {
     private func tabLayer(island: NotchShapeParameters, showEffects: Bool) -> some View {
         let reduceMotion = controller.reduceMotion
         // Reduce Motion: no bud. The shape stays at full size and fades in place.
-        let tab = reduceMotion && controller.tab != nil
+        let shownTab = controller.tab ?? (reduceMotion ? heldTab : nil)
+        let tab = reduceMotion && shownTab != nil
             ? controller.metrics.tab(beside: island)
             : controller.tabParameters
         let tabShape = NotchTabShape(island: island, tab: tab)
@@ -559,13 +592,14 @@ public struct NotchRootView: View {
         )
         ZStack(alignment: .top) {
             tabShape.fill(.black)
-            if let display = controller.tab {
+            if let display = shownTab {
                 TabGlyph(
                     display: display, controller: controller, contentColor: contentColor,
                     tintColor: { tintColor(for: $0) }
                 )
                 .id(display.id)
                 .transition(.blurReplace)
+                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: display.id)
                 .frame(width: max(tab.width, 1), height: tab.height)
                 .position(x: centerX, y: centerY)
                 .clipShape(tabShape)
@@ -575,8 +609,9 @@ public struct NotchRootView: View {
         .opacity(reduceMotion && !controller.isTabShowing ? 0 : 1)
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : nil, value: controller.isTabShowing)
         .contentShape(tabShape)
+        .allowsHitTesting(controller.isTabShowing)
         .onTapGesture { controller.tapTab() }
-        .keyframeAnimator(initialValue: 1.0, trigger: controller.tab?.id) { view, scale in
+        .keyframeAnimator(initialValue: 1.0, trigger: tabLanded) { view, scale in
             view.scaleEffect(reduceMotion ? 1 : scale, anchor: pulseAnchor)
         } keyframes: { _ in
             SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
