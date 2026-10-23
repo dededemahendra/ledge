@@ -1915,3 +1915,16 @@ its edge was removed at the user's request.
 With an agent in it, the asterisk turns while it works and goes yellow, with
 one pulse, when it waits for you. Pending: watch it go from working to
 waiting, and check the pulse plays once.
+
+## Long commands (2026-10-23)
+
+1. Switch on Settings › Island › Long commands: the marked block appears at
+   the end of `~/.zshrc`, and `~/.zshrc.ledge-backup` holds the file as it was.
+2. In a new terminal window, run `sleep 12` and switch to another app: a green
+   check with "0:12", and "sleep 12 · 12s" under the hole for 5 s. Clicking it
+   brings the terminal back.
+3. Run `sleep 12; false`: a red cross, "sleep failed · 12s".
+4. Ctrl-C a `sleep 30`: nothing.
+5. Run `sleep 12` and stay in the terminal: nothing.
+6. Run `vim` or `ssh` for longer than 10 s: nothing.
+7. Switch the setting off: the block is gone, the rest of `~/.zshrc` as it was.
