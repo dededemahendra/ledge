@@ -1303,7 +1303,7 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var detailRow: some View {
-        if controller.state == .expanded, controller.panel == .liveActivity, let score = controller.score {
+        if controller.state == .expanded, controller.panel == .liveActivity, let score = controller.liveActivityDisplay?.score {
             ScorePanelView(
                 score: score, homeCrest: controller.homeCrestImage, awayCrest: controller.awayCrestImage,
                 contentColor: contentColor, crestNamespace: artworkNamespace
@@ -1312,7 +1312,7 @@ public struct NotchRootView: View {
             .id("live-activity")
             .transition(panelTransition)
         } else if controller.state == .expanded, controller.panel == .liveActivity, controller.hasCard,
-                  let activity = controller.activities.first, !activity.lines.isEmpty {
+                  let activity = controller.liveActivityDisplay, !activity.lines.isEmpty {
             // Not a match: what the card says, line by line, the first
             // line carrying the weight (2026-10-01).
             VStack(alignment: .leading, spacing: 6) {
