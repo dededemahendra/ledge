@@ -58,14 +58,15 @@ extension NotchMetrics {
     /// the island is tall, at the island's own top inset.
     public func tab(beside island: NotchShapeParameters) -> NotchTabParameters {
         if isVirtual {
-            let diameter = island.height
+            // The pill's resting height, never the island's live one.
+            let diameter = oneActivity.height
             return NotchTabParameters(
                 gap: Self.tabGap, width: diameter, height: diameter, bottomRadius: diameter / 2,
                 outerFillet: 0, topInset: Self.pillTopInset, topRadius: diameter / 2
             )
         }
         return NotchTabParameters(
-            gap: Self.tabGap, width: Self.tabWidth, height: island.height, bottomRadius: 12, outerFillet: 6
+            gap: Self.tabGap, width: Self.tabWidth, height: notchRect.height, bottomRadius: 12, outerFillet: 6
         )
     }
 
@@ -116,7 +117,9 @@ public struct NotchTabShape: Shape, Animatable {
             bottomRadius = min(tab.bottomRadius, width / 2, height)
             topRadius = 0
         }
-        let fillet = isPill ? 0 : max(0, min(tab.outerFillet, height - bottomRadius))
+        // The fillet grows with the bud, so a sliver has no 6 pt flares.
+        let budding = min(1, width / NotchMetrics.tabWidth)
+        let fillet = isPill ? 0 : max(0, min(tab.outerFillet * budding, height - bottomRadius))
 
         let left = rect.midX + max(0, island.width) / 2 + tab.gap
         let right = left + width
