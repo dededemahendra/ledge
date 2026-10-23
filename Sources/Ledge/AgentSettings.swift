@@ -87,7 +87,7 @@ struct AgentSettings: View {
 
     private func readyLine(_ lastHeard: Date?, now: Date) -> String {
         let hooks = "Hooks in ~/.claude/settings.json"
-        guard let lastHeard else { return "\(hooks) · Nothing heard yet: start a new session" }
+        guard let lastHeard else { return "\(hooks) · Nothing heard yet: it starts with a session's next step" }
         let ago = RelativeDateTimeFormatter()
         ago.unitsStyle = .abbreviated
         return "\(hooks) · Last heard from a session \(ago.localizedString(for: lastHeard, relativeTo: now))"
