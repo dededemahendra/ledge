@@ -14,6 +14,7 @@ import SettingsKit
 import UpdateService
 import GitHubService
 import AgentService
+import AgentWire
 import CallService
 import LedgeSettings
 import OSLog
@@ -79,6 +80,7 @@ final class AppModel {
         note("Calendar", calendar.availability)
         note("Focus", focus.availability)
         if settings.showsCalls { note("Calls", call.availability) }
+        if settings.agentsEnabled, case .problem(let text) = agents.status { note("Agents", .unavailable(reason: text)) }
         if let login = LoginItem.issue {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
@@ -179,6 +181,9 @@ final class AppModel {
             self?.handle(intent)
         }
 
+        agents.onMoment = { [weak self] in self?.showAgentMoment($0) }
+        agents.onChange = { [weak self] in self?.publishAgentPanel() }
+
         settings.onChange = { [weak self] in self?.applySettings() }
         applySettings()
 
@@ -197,6 +202,7 @@ final class AppModel {
                 self?.refreshLiveActivityOnHover()
                 self?.showPendingUpdate()
                 self?.refreshGitHub()
+                self?.refreshAgents()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -235,6 +241,7 @@ final class AppModel {
         githubConnecting?.cancel()
         githubConnecting = nil
         github.stop()
+        agents.suspend()
         call.stop()
         clearMediaTask?.cancel()
         clearMediaTask = nil
@@ -329,6 +336,227 @@ final class AppModel {
     private let agents = AgentMonitor()
     var agentsStatus: AgentMonitor.Status { agents.status }
     func repairAgents() { agents.enable() }
+
+    /// What the sticky items and the card last drew, so they are republished
+    /// only on change (the `githubRunShown` pattern).
+    private var agentWaitingShown: ActivityRecord?
+    private var agentRunShown: ActivityRecord?
+    private var agentPanelShown: AgentPanelData?
+    private var agentWasLocked = false
+    /// The caption the last agent blip put up, so taking the blip away takes
+    /// its caption too, and nobody else's.
+    private var agentCaptionShown: String?
+    private var agentIcons: [String: Data] = [:]
+
+    private func agentURL(_ id: String) -> URL {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        return URL(string: "ledge://agent/\(encoded)") ?? URL(string: "ledge://agent")!
+    }
+
+    /// A session waits, finishes or fails: a blip, unless its switch is off,
+    /// the screen is locked, or the user is already looking at that session.
+    private func showAgentMoment(_ moment: AgentMoment) {
+        let session: AgentSession
+        switch moment {
+        case .waiting(let s):  guard settings.agentWaiting else { return }; session = s
+        case .finished(let s): guard settings.agentFinished else { return }; session = s
+        case .failed(let s):   guard settings.agentFailed else { return }; session = s
+        }
+        guard settings.agentsEnabled, !presenter.isLocked, !agents.isLooking(at: session) else { return }
+        let blip = AgentNotice.blip(for: moment)
+        queue.insert(ActivityRecord(
+            id: NotchController.agentActivityID, kind: .agent, insertedAt: Date(), ttl: blip.ttl,
+            title: blip.title, compactText: blip.word, symbolName: "asterisk",
+            tint: .system(blip.tintName), url: agentURL(blip.sessionID)
+        ))
+        publish()
+        agentCaptionShown = blip.caption
+        showCaption(blip.caption, for: blip.ttl)
+    }
+
+    /// Clears the caption only while it is still the agent blip's.
+    private func clearAgentCaption() {
+        defer { agentCaptionShown = nil }
+        guard let shown = agentCaptionShown, presenter.controller.caption == shown else { return }
+        presenter.setCaption(nil)
+    }
+
+    /// Every tick: the monitor's clock, then the waiting and working items
+    /// (none on the lock screen or with the switch off), and the card
+    /// following a lock.
+    private func refreshAgents() {
+        let now = Date()
+        agents.tick(now: now)
+        let locked = presenter.isLocked
+        var changed = false
+        if locked || !settings.agentsEnabled {
+            if agentWaitingShown != nil || agentRunShown != nil {
+                agentWaitingShown = nil
+                agentRunShown = nil
+                queue.remove(kind: .agentWaiting)
+                queue.remove(kind: .agentRun)
+                changed = true
+            }
+        } else {
+            let sessions = agents.sessions.sessions
+            let waiting = settings.agentWaiting ? sessions.filter { if case .waiting = $0.state { true } else { false } } : []
+            if let longest = waiting.min(by: { $0.stateSince < $1.stateSince }) {
+                let record = ActivityRecord(
+                    id: NotchController.agentWaitingActivityID, kind: .agentWaiting,
+                    insertedAt: agentWaitingShown?.insertedAt ?? now, ttl: nil,
+                    title: waiting.count > 1 ? "\(waiting.count) waiting" : "Waiting · \(longest.name)",
+                    compactText: waiting.count > 1 ? "\(waiting.count) waiting" : longest.name,
+                    symbolName: "asterisk", tint: .system(AgentNotice.waitingTintName),
+                    url: agentURL(longest.id), badge: waiting.count > 1 ? waiting.count : nil
+                )
+                if record.compactText != agentWaitingShown?.compactText || record.badge != agentWaitingShown?.badge
+                    || record.url != agentWaitingShown?.url {
+                    agentWaitingShown = record
+                    queue.insert(record)
+                    changed = true
+                }
+            } else if agentWaitingShown != nil {
+                agentWaitingShown = nil
+                queue.remove(kind: .agentWaiting)
+                changed = true
+            }
+            let working = settings.agentWorking ? sessions.filter { $0.state == .working } : []
+            if let oldest = working.min(by: { ($0.turnStart ?? $0.stateSince) < ($1.turnStart ?? $1.stateSince) }) {
+                let since = oldest.turnStart ?? oldest.stateSince
+                let record = ActivityRecord(
+                    id: NotchController.agentRunActivityID, kind: .agentRun,
+                    insertedAt: agentRunShown?.insertedAt ?? now, ttl: nil,
+                    title: working.count > 1 ? "\(working.count) working" : "Working · \(oldest.name)",
+                    compactText: TimerText.format(seconds: now.timeIntervalSince(since).rounded(.down)),
+                    symbolName: "asterisk",
+                    tint: .color(red: AgentNotice.orange.red, green: AgentNotice.orange.green, blue: AgentNotice.orange.blue),
+                    url: agentURL(oldest.id), badge: working.count > 1 ? working.count : nil
+                )
+                if record.compactText != agentRunShown?.compactText || record.badge != agentRunShown?.badge
+                    || record.url != agentRunShown?.url {
+                    agentRunShown = record
+                    queue.insert(record)
+                    changed = true
+                }
+            } else if agentRunShown != nil {
+                agentRunShown = nil
+                queue.remove(kind: .agentRun)
+                changed = true
+            }
+        }
+        if changed { publish() }
+        if locked != agentWasLocked {
+            agentWasLocked = locked
+            publishAgentPanel()
+        }
+    }
+
+    /// The card's list, or none: off, locked, or no sessions.
+    private func publishAgentPanel() {
+        var data: AgentPanelData?
+        let sessions = agents.sessions.sessions
+        if settings.agentsEnabled, !presenter.isLocked, !sessions.isEmpty {
+            data = AgentPanelData(rows: AgentPanelRows.make(sessions).map { row in
+                AgentPanelData.Row(
+                    id: row.id, name: row.name, icon: row.host.flatMap(agentIcon(for:)),
+                    mark: Self.agentMark(row.mark), url: agentURL(row.id)
+                )
+            })
+        }
+        guard data != agentPanelShown else { return }
+        agentPanelShown = data
+        presenter.setAgentPanel(data)
+    }
+
+    private func agentIcon(for app: CallAppInfo) -> Data? {
+        if let cached = agentIcons[app.bundleID] { return cached }
+        let png = Self.appIconPNG(app.bundleID)
+        agentIcons[app.bundleID] = png
+        return png
+    }
+
+    private static func agentMark(_ mark: AgentRow.Mark) -> AgentPanelData.Row.Mark {
+        switch mark {
+        case .waiting(let text):    .waiting(text)
+        case .working(let since):   .working(since: since)
+        case .done(let at):         .done(at: at)
+        case .failed(let text):     .failed(text)
+        case .idle:                 .idle
+        }
+    }
+
+    #if DEBUG
+    /// `ledge://probe/agents`, debug builds only (2026-10-23): two made-up
+    /// sessions through a working turn, a permission ask, a finish and a
+    /// rate-limit failure, a step every three seconds; then thirty seconds
+    /// to hover the card, and both sessions end. Needs the switch on to show.
+    private func playAgentStory() {
+        let facts = AgentFacts(claudePID: nil, isHeadless: false, host: nil)
+        let alpha = "probe-alpha", beta = "probe-beta"
+        func message(_ event: String, _ session: String, _ project: String, _ stamp: Int64,
+                     tool: String? = nil, summary: String? = nil, reason: String? = nil, error: String? = nil) -> AgentMessage {
+            AgentMessage(event: event, session: session, stamp: stamp, project: project,
+                         tool: tool, summary: summary, error: error, reason: reason)
+        }
+        let steps: [AgentMessage] = [
+            message("UserPromptSubmit", alpha, "/tmp/alpha", 1),
+            message("UserPromptSubmit", beta, "/tmp/beta", 2),
+            message("PermissionRequest", alpha, "/tmp/alpha", 3, tool: "Bash", summary: "make test"),
+            message("PostToolUse", alpha, "/tmp/alpha", 4, tool: "Bash"),
+            message("Stop", alpha, "/tmp/alpha", 5),
+            message("StopFailure", beta, "/tmp/beta", 6, error: "rate_limit"),
+        ]
+        Task { @MainActor [weak self] in
+            for step in steps {
+                guard let self else { return }
+                self.agents.receive(step, facts: facts, now: Date())
+                try? await Task.sleep(for: .seconds(3))
+            }
+            try? await Task.sleep(for: .seconds(30))
+            self?.agents.receive(message("SessionEnd", alpha, "/tmp/alpha", 7), facts: facts, now: Date())
+            self?.agents.receive(message("SessionEnd", beta, "/tmp/beta", 8), facts: facts, now: Date())
+        }
+    }
+
+    /// `ledge://probe/agents-panel`, debug builds only (2026-10-23): four
+    /// made-up sessions, one in each mark, pinned open for twenty seconds.
+    private func openAgentPanelProbe() {
+        let facts = AgentFacts(claudePID: nil, isHeadless: false, host: nil)
+        let names = ["alpha", "beta", "gamma", "delta"]
+        let steps: [(event: String, tool: String?, summary: String?, error: String?)] = [
+            ("UserPromptSubmit", nil, nil, nil),
+            ("PermissionRequest", "Bash", "make test", nil),
+            ("Stop", nil, nil, nil),
+            ("StopFailure", nil, nil, "rate_limit"),
+        ]
+        var stamp: Int64 = 100
+        for (name, step) in zip(names, steps) {
+            let id = "probe-panel-\(name)"
+            if step.event != "UserPromptSubmit" {
+                stamp += 1
+                agents.receive(AgentMessage(event: "UserPromptSubmit", session: id, stamp: stamp, project: "/tmp/\(name)"), facts: facts, now: Date())
+            }
+            stamp += 1
+            agents.receive(AgentMessage(event: step.event, session: id, stamp: stamp, project: "/tmp/\(name)",
+                                        tool: step.tool, summary: step.summary, error: step.error), facts: facts, now: Date())
+        }
+        // The idle one: a session that has started and gone quiet.
+        stamp += 1
+        agents.receive(AgentMessage(event: "SessionStart", session: "probe-panel-idle", stamp: stamp, project: "/tmp/epsilon"), facts: facts, now: Date())
+        publishAgentPanel()
+        presenter.debugOpen(.agents)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            self?.presenter.controller.dismiss()
+            for id in ["alpha", "beta", "gamma", "delta"].map({ "probe-panel-\($0)" }) + ["probe-panel-idle"] {
+                stamp += 1
+                self?.agents.receive(AgentMessage(event: "SessionEnd", session: id, stamp: stamp), facts: facts, now: Date())
+            }
+        }
+    }
+    #endif
 
     // MARK: - GitHub (2026-10-22)
 
@@ -832,6 +1060,22 @@ final class AppModel {
             stopGitHub()
         }
         publishGitHubPanel()
+        // Agents (2026-10-23): on, listen; off, undo Ledge's hooks and take
+        // everything it put on the island away. A `.problem` is not retried
+        // here: Repair does that.
+        if settings.agentsEnabled {
+            if agents.status == .off { agents.enable() }
+        } else if agents.status != .off {
+            agents.disable()
+            agentRunShown = nil
+            agentWaitingShown = nil
+            queue.remove(kind: .agentWaiting)
+            queue.remove(kind: .agentRun)
+            queue.remove(kind: .agent)
+            clearAgentCaption()
+            publish()
+            publishAgentPanel()
+        }
     }
 
     /// The Calendar pane's list.
@@ -967,9 +1211,10 @@ final class AppModel {
         // favourite star follows the track the same way.
         if title != captionedTitle {
             captionedTitle = title
-            // A meeting or update blip owns the caption line for its
-            // lifetime (2026-10-22): a track change under it posts none.
-            if settings.showsSongCaption, !presenter.controller.isCalendarLeading, !presenter.controller.isUpdateLeading, !presenter.controller.isGitHubLeading {
+            // A meeting, update, GitHub or agent blip owns the caption line
+            // for its lifetime (2026-10-22): a track change under it posts none.
+            if settings.showsSongCaption, !presenter.controller.isCalendarLeading, !presenter.controller.isUpdateLeading,
+               !presenter.controller.isGitHubLeading, !presenter.controller.isAgentLeading {
                 showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
             }
             favorites.trackChanged(bundleIdentifier: payload.bundleIdentifier)
@@ -1204,6 +1449,12 @@ final class AppModel {
             liveActivities.press()
             return
         }
+        // A Claude Code session (2026-10-23): its window comes forward.
+        if url.scheme == "ledge", url.host() == "agent" {
+            let id = url.lastPathComponent
+            if !id.isEmpty, id != "/" { agents.focus(sessionID: id) }
+            return
+        }
         let appFor: [String: String] = [
             "ledge": url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal",
             "ical": "com.apple.iCal",
@@ -1253,6 +1504,16 @@ final class AppModel {
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/github-panel" {
             Self.log.notice("probe: github panel")
             openGitHubPanelProbe()
+            return
+        }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/agents" {
+            Self.log.notice("probe: agents\(self.settings.agentsEnabled ? "" : " (switch on Settings › Agents to see it)")")
+            playAgentStory()
+            return
+        }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/agents-panel" {
+            Self.log.notice("probe: agents panel\(self.settings.agentsEnabled ? "" : " (switch on Settings › Agents to see it)")")
+            openAgentPanelProbe()
             return
         }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/settings" {
