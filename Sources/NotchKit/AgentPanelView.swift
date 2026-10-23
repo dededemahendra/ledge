@@ -20,7 +20,7 @@ struct AgentGlyph: View {
     var body: some View {
         ZStack {
             if turning, !reduceMotion {
-                TimelineView(.animation) { context in
+                TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
                     let turn = context.date.timeIntervalSinceReferenceDate
                         .truncatingRemainder(dividingBy: 2.4) / 2.4
                     asterisk.rotationEffect(.degrees(turn * 360))

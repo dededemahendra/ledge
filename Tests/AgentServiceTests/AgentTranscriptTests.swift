@@ -22,3 +22,14 @@ private func line(_ s: String) -> Data { Data(s.utf8) }
     #expect(!AgentTranscript.isInterrupt(line("not json")))
     #expect(!AgentTranscript.isInterrupt(line("[1,2]")))
 }
+
+@Test func aLongLineWithoutTheMarkerIsNotParsed() {
+    // 2 MB of a tool result: valid JSON, a user line, and no marker.
+    let big = #"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"x","content":""# + String(repeating: "x", count: 2_000_000) + #""}]}}"#
+    #expect(!AgentTranscript.mentionsInterrupt(line(big)))
+    #expect(!AgentTranscript.isInterrupt(line(big)))
+    // The marker is found however long the line.
+    let padded = #"{"type":"user","pad":""# + String(repeating: "x", count: 2_000_000) + #"","message":{"role":"user","content":"[Request interrupted by user]"}}"#
+    #expect(AgentTranscript.mentionsInterrupt(line(padded)))
+    #expect(AgentTranscript.isInterrupt(line(padded)))
+}
