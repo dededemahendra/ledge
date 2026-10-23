@@ -21,6 +21,7 @@ let package = Package(
         .target(name: "GitHubService"),
         .target(name: "CallService", dependencies: ["ActivityKit"]),
         .target(name: "AgentWire"),
+        .executableTarget(name: "LedgeAgentHook", dependencies: ["AgentWire"]),
         .target(name: "SettingsKit", dependencies: ["NotchKit", "LedgeSettings", "HUDService", "PowerService", "DeviceService", "FocusService", "UpdateService", "GitHubService"]),
         .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
         .testTarget(name: "NotchWindowTests", dependencies: ["NotchKit"]),
@@ -38,7 +39,7 @@ let package = Package(
         .testTarget(name: "UpdateServiceTests", dependencies: ["UpdateService"]),
         .testTarget(name: "GitHubServiceTests", dependencies: ["GitHubService"]),
         .testTarget(name: "CallServiceTests", dependencies: ["CallService", "ActivityKit"]),
-        .testTarget(name: "AgentWireTests", dependencies: ["AgentWire"]),
+        .testTarget(name: "AgentWireTests", dependencies: ["AgentWire", "LedgeAgentHook"]),
         .testTarget(
             name: "MediaServiceTests",
             dependencies: ["MediaService"],
