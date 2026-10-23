@@ -792,9 +792,14 @@ public struct NotchRootView: View {
                     || activity.id == NotchController.agentRunActivityID {
             // An agent item (2026-10-23): Claude's orange asterisk, turning
             // while one works, the count of sessions it stands for.
-            AgentGlyph(color: AgentColors.orange,
-                       turning: activity.id == NotchController.agentRunActivityID,
-                       count: activity.badge, reduceMotion: controller.reduceMotion)
+            // The open Agents card says it all, so the ear gives way.
+            if controller.state == .expanded, controller.panel == .agents {
+                Color.clear
+            } else {
+                AgentGlyph(color: AgentColors.orange,
+                           turning: activity.id == NotchController.agentRunActivityID,
+                           count: activity.badge, reduceMotion: controller.reduceMotion)
+            }
         } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
@@ -1204,6 +1209,12 @@ public struct NotchRootView: View {
             } else if activity.id == NotchController.callActivityID, controller.state == .expanded,
                       controller.panel == .call {
                 // The call card's own clock is the one that shows (2026-10-22).
+                Color.clear
+            } else if (activity.id == NotchController.agentActivityID
+                        || activity.id == NotchController.agentWaitingActivityID
+                        || activity.id == NotchController.agentRunActivityID),
+                      controller.state == .expanded, controller.panel == .agents {
+                // The Agents card carries it (2026-10-23).
                 Color.clear
             } else if let compact = activity.compactText {
                 // A ticking clock must not bump every second; its digits

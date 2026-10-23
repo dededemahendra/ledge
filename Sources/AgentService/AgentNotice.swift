@@ -1,4 +1,5 @@
 import Foundation
+import AgentWire
 
 /// How one agent moment looks on the island (2026-10-23).
 public struct AgentBlip: Sendable, Equatable {
@@ -42,13 +43,37 @@ public enum AgentNotice {
         }
     }
 
-    public static func detail(_ waiting: AgentSession.Waiting) -> String {
+    public static func detail(_ waiting: AgentSession.Waiting, home: String = AgentSocket.home.path) -> String {
+        let text: String
         switch waiting {
-        case .permission(let what): what
-        case .question(let q): q ?? "Asks a question"
-        case .plan: "Plan ready"
-        case .input(let message): message ?? "Needs you"
+        case .permission(let what): text = what
+        case .question(let q): text = q ?? "Asks a question"
+        case .plan: text = "Plan ready"
+        case .input(let message): text = message ?? "Needs you"
         }
+        return shortened(text, home: home)
+    }
+
+    /// The home folder as "~" (2026-10-23): "/Users/x/Developer/a" → "~/Developer/a".
+    /// Only a whole path component matches: "/Users/xy/a" stays.
+    public static func shortened(_ text: String, home: String = AgentSocket.home.path) -> String {
+        var home = home
+        while home.count > 1, home.hasSuffix("/") { home.removeLast() }
+        guard home.count > 1, text.contains(home) else { return text }
+        let pathChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+        var out = ""
+        var rest = Substring(text)
+        while let r = rest.range(of: home) {
+            out += rest[..<r.lowerBound]
+            let next = rest[r.upperBound...].unicodeScalars.first
+            if let next, pathChars.contains(next) {
+                out += home
+            } else {
+                out += "~"
+            }
+            rest = rest[r.upperBound...]
+        }
+        return out + rest
     }
 
     /// Claude's error code in words.
@@ -63,8 +88,9 @@ public enum AgentNotice {
     }
 
     /// What a tool call reads as while it runs ("Running make test").
-    public static func action(tool: String?, summary: String?) -> String {
+    public static func action(tool: String?, summary: String?, home: String = AgentSocket.home.path) -> String {
         guard let tool else { return "Thinking" }
+        let summary = summary.map { shortened($0, home: home) }
         func with(_ verb: String, _ fallback: String) -> String { summary.map { "\(verb) \($0)" } ?? fallback }
         switch tool {
         case "Bash": return with("Running", "Running a command")
