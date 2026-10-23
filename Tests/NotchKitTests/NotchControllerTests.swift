@@ -1333,11 +1333,11 @@ private func tabGitHubPanel() -> GitHubPanelData {
     c.setMedia(someMedia())
     c.setActivities([mediaDisplay()], overflow: 0,
                     tab: .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x"))
-    #expect(c.tabParameters == c.metrics.tab(beside: c.parameters))
+    #expect(c.tabParameters == c.metrics.tab)
     c.setCaption("Song · Artist")
-    #expect(c.tabParameters == c.metrics.tab(beside: c.parameters))
+    #expect(c.tabParameters == c.metrics.tab)
     c.setTucked(true)
-    #expect(c.tabParameters == c.metrics.tabTucked(beside: c.parameters))
+    #expect(c.tabParameters == c.metrics.tabTucked)
 }
 
 @MainActor

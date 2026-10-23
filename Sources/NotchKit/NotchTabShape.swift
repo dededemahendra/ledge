@@ -54,9 +54,10 @@ extension NotchMetrics {
     public static let tabWidth: CGFloat = 40
     public static let tabGap: CGFloat = 6
 
-    /// The tab beside `island`, shown. On a pill it is a circle as wide as
-    /// the island is tall, at the island's own top inset.
-    public func tab(beside island: NotchShapeParameters) -> NotchTabParameters {
+    /// The tab, shown, beside whichever island it is drawn with (`NotchTabShape`
+    /// takes the island's width). On a pill it is a circle as wide as the
+    /// pill is tall at rest, at the pill's top inset.
+    public var tab: NotchTabParameters {
         if isVirtual {
             // The pill's resting height, never the island's live one.
             let diameter = oneActivity.height
@@ -71,9 +72,9 @@ extension NotchMetrics {
     }
 
     /// The tab's budding and merging state: no gap, no width, at the island's
-    /// right edge, else as `tab(beside:)`.
-    public func tabTucked(beside island: NotchShapeParameters) -> NotchTabParameters {
-        var tucked = tab(beside: island)
+    /// right edge, else as `tab`.
+    public var tabTucked: NotchTabParameters {
+        var tucked = tab
         tucked.gap = 0
         tucked.width = 0
         return tucked
