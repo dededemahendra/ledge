@@ -102,6 +102,14 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         }
     }
 
+    /// Whether this kind may take the island's tab (2026-10-23): a sticky
+    /// kind, because a blip passes in seconds and would make the tab bud and
+    /// merge for nothing, and never charging, which is the island's resting
+    /// face rather than a second thing going on.
+    public var canSitInTab: Bool {
+        defaultTTL == nil && self != .charging
+    }
+
     public static func < (lhs: ActivityKind, rhs: ActivityKind) -> Bool {
         lhs.priority < rhs.priority
     }

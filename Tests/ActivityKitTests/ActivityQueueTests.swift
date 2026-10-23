@@ -195,3 +195,63 @@ private func record(
     #expect(ActivityKind.agentRun.priority == 8 && ActivityKind.agentRun.defaultTTL == nil)
     #expect(ActivityKind.agentRun < .media && ActivityKind.agentRun > .charging)
 }
+
+private func queue(_ kinds: ActivityKind...) -> ActivityQueue {
+    var q = ActivityQueue()
+    for k in kinds { q.insert(record(k)) }
+    return q
+}
+
+@Test func onlyStickyKindsButChargingCanSitInTheTab() {
+    for kind in ActivityKind.allCases {
+        #expect(kind.canSitInTab == (kind.defaultTTL == nil && kind != .charging), "\(kind)")
+    }
+    for kind in [ActivityKind.call, .agentWaiting, .timer, .githubRun, .liveActivity, .media, .agentRun] {
+        #expect(kind.canSitInTab)
+    }
+    #expect(!ActivityKind.charging.canSitInTab && !ActivityKind.hud.canSitInTab)
+}
+
+@Test func oneLiveItemHasNoTab() {
+    #expect(queue(.media).tab == nil)
+}
+
+@Test func theSecondLiveItemTakesTheTab() {
+    let q = queue(.media, .agentRun)
+    #expect(q.ordered.first?.kind == .media)
+    #expect(q.tab?.kind == .agentRun)
+}
+
+@Test func chargingNeverTakesTheTab() {
+    let q = queue(.media, .charging)
+    #expect(q.tab == nil)
+    #expect(q.overflowBeyondTab == 0)
+}
+
+@Test func aBlipLeadsAndTheTopStickyTakesTheTab() {
+    let q = queue(.hud, .timer, .media)
+    #expect(q.ordered.first?.kind == .hud)
+    #expect(q.tab?.kind == .timer)
+    #expect(q.overflowBeyondTab == 1)
+}
+
+@Test func theTabIsNeverTheLead() {
+    #expect(queue(.call).ordered.first?.kind == .call)
+    #expect(queue(.call).tab == nil)
+    #expect(queue(.call, .timer).tab?.kind == .timer)
+}
+
+@Test func whenTheLeadGoesTheTabMovesUp() {
+    var q = queue(.call, .timer, .agentRun)
+    #expect(q.tab?.kind == .timer)
+    q.remove(kind: .call)
+    #expect(q.ordered.first?.kind == .timer)
+    #expect(q.tab?.kind == .agentRun)
+}
+
+@Test func thePipCountsBeyondTheTwoShownAndNotCharging() {
+    let q = queue(.call, .timer, .media, .agentRun, .charging)
+    #expect(q.ordered.first?.kind == .call)
+    #expect(q.tab?.kind == .timer)
+    #expect(q.overflowBeyondTab == 2)
+}
