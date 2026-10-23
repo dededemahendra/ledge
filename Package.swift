@@ -5,7 +5,7 @@ let package = Package(
     name: "Ledge",
     platforms: [.macOS("27.0")],
     targets: [
-        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService", "FocusService", "LiveActivityService", "LedgeSettings", "SettingsKit", "UpdateService", "GitHubService", "CallService"], path: "Sources/Ledge"),
+        .executableTarget(name: "Ledge", dependencies: ["NotchKit", "ActivityKit", "PowerService", "HUDService", "MediaService", "DeviceService", "CalendarService", "TimerService", "FocusService", "LiveActivityService", "LedgeSettings", "SettingsKit", "UpdateService", "GitHubService", "CallService", "AgentService"], path: "Sources/Ledge"),
         .target(name: "NotchKit"),
         .target(name: "ActivityKit"),
         .target(name: "PowerService", dependencies: ["ActivityKit"]),
@@ -21,6 +21,7 @@ let package = Package(
         .target(name: "GitHubService"),
         .target(name: "CallService", dependencies: ["ActivityKit"]),
         .target(name: "AgentWire"),
+        .target(name: "AgentService", dependencies: ["AgentWire", "CallService"]),
         .executableTarget(name: "LedgeAgentHook", dependencies: ["AgentWire"]),
         .target(name: "SettingsKit", dependencies: ["NotchKit", "LedgeSettings", "HUDService", "PowerService", "DeviceService", "FocusService", "UpdateService", "GitHubService"]),
         .testTarget(name: "NotchKitTests", dependencies: ["NotchKit"]),
@@ -39,6 +40,7 @@ let package = Package(
         .testTarget(name: "UpdateServiceTests", dependencies: ["UpdateService"]),
         .testTarget(name: "GitHubServiceTests", dependencies: ["GitHubService"]),
         .testTarget(name: "CallServiceTests", dependencies: ["CallService", "ActivityKit"]),
+        .testTarget(name: "AgentServiceTests", dependencies: ["AgentService", "AgentWire"]),
         .testTarget(name: "AgentWireTests", dependencies: ["AgentWire", "LedgeAgentHook"]),
         .testTarget(
             name: "MediaServiceTests",
