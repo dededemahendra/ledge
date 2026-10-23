@@ -113,8 +113,9 @@ With the switch on, Ledge adds to `~/.claude/settings.json`, for each of
   "command": "[ -x \"$HOME/Library/Application Support/Ledge/ledge-agent-hook\" ] && \"$HOME/Library/Application Support/Ledge/ledge-agent-hook\" || true" } ] }
 ```
 
-`matcher` only on the events that take one, mirroring the entries other tools
-already keep there. The guard means a deleted helper still exits 0.
+`"matcher": "*"` only on `PreToolUse`, `PostToolUse`, `PostToolUseFailure` and
+`PermissionRequest`, as the entries other tools keep there do (checked in this
+Mac's file). The guard means a deleted helper still exits 0.
 
 - Ledge's entries are known by the helper path in `command`. Ledge only adds,
   updates or removes those; Superset's, Orca's and RTK's stay as they are.
@@ -124,8 +125,10 @@ already keep there. The guard means a deleted helper still exits 0.
   touch nothing and show why in Settings.
 - Turning the switch off removes Ledge's entries and drops any group or event
   left empty by that.
-- Written with sorted keys: every value is kept, but key order and indentation
-  may change, since Foundation's writer keeps no order.
+- *(My call, after the chat, which said keys might be reordered.)* Read and
+  written by a small order-keeping JSON reader and writer laid out the way
+  Claude Code writes the file (two-space indent, `"key": value`, numbers as
+  they were), so the file changes only where Ledge's entries go in or out.
 
 ## Tracking sessions: `AgentSessions`
 
@@ -246,6 +249,7 @@ show.
 | --- | --- | --- |
 | `AgentMessage`, `AgentTrim` | `AgentWire` | The line's fields, the summaries, the caps |
 | `ledge-agent-hook` | executable | stdin to the socket, always exit 0 |
+| `OrderedJSON` | `AgentService` | Read and write JSON keeping key order and number text |
 | `AgentHooks` | `AgentService` | Merge and remove Ledge's entries in a settings JSON object |
 | `AgentSessions` | `AgentService` | The state machine, moments, names, forgetting |
 | `AgentNotice` | `AgentService` | Each moment's word, colour and caption |
