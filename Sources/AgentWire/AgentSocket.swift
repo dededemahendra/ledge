@@ -18,6 +18,11 @@ public enum AgentSocket {
         supportDirectory(home: home).appending(path: "agents.sock")
     }
 
+    /// Finished terminal commands (2026-10-23), beside the agents' socket.
+    public static func commandsSocketURL(home: URL = AgentSocket.home) -> URL {
+        supportDirectory(home: home).appending(path: "commands.sock")
+    }
+
     public static func helperURL(home: URL = AgentSocket.home) -> URL {
         supportDirectory(home: home).appending(path: "ledge-agent-hook")
     }
