@@ -7,7 +7,7 @@ private let t0 = Date(timeIntervalSince1970: 1_000)
 
 private func session(_ state: AgentSession.State, id: String = "s1", since: Date = t0,
                      turnStart: Date? = nil) -> AgentSession {
-    AgentSession(id: id, name: "ledge", baseName: "ledge", project: "ledge", transcript: nil, host: nil,
+    AgentSession(id: id, name: "Ledge", baseName: "Ledge", project: "ledge", transcript: nil, host: nil,
                  claudePID: nil, state: state, stateSince: since, turnStart: turnStart,
                  lastStamp: 1, lastEvent: since)
 }
@@ -22,20 +22,20 @@ private func session(_ state: AgentSession.State, id: String = "s1", since: Date
         #expect(blip.word == word)
         #expect(blip.tintName == "yellow")
         #expect(blip.ttl == 8)
-        #expect(blip.title == "Waiting · ledge")
+        #expect(blip.title == "Waiting · Ledge")
         #expect(blip.sessionID == "s1")
     }
     let permission = AgentNotice.blip(for: .waiting(session(.waiting(.permission("Bash: make test")))))
-    #expect(permission.caption == "ledge · Bash: make test")
+    #expect(permission.caption == "Ledge · Bash: make test")
 }
 
 @Test func doneSaysHowLong() {
     let blip = AgentNotice.blip(for: .finished(session(.finished(took: 200))))
     #expect(blip.word == "Done")
     #expect(blip.tintName == "green")
-    #expect(blip.caption == "ledge · 3m 20s")
+    #expect(blip.caption == "Ledge · 3m 20s")
     #expect(blip.ttl == 3)
-    #expect(blip.title == "Done · ledge")
+    #expect(blip.title == "Done · Ledge")
 }
 
 @Test func failedSaysWhy() {
@@ -44,13 +44,13 @@ private func session(_ state: AgentSession.State, id: String = "s1", since: Date
     #expect(blip.word == "Failed")
     #expect(blip.tintName == "red")
     #expect(blip.ttl == 3)
-    #expect(blip.title == "Failed · ledge")
-    #expect(caption("rate_limit") == "ledge · Rate limited")
-    #expect(caption("overloaded") == "ledge · Overloaded")
-    #expect(caption("authentication_failed") == "ledge · Signed out")
-    #expect(caption("billing_error") == "ledge · Billing")
-    #expect(caption("server_error") == "ledge · API error")
-    #expect(caption("x") == "ledge · API error")
+    #expect(blip.title == "Failed · Ledge")
+    #expect(caption("rate_limit") == "Ledge · Rate limited")
+    #expect(caption("overloaded") == "Ledge · Overloaded")
+    #expect(caption("authentication_failed") == "Ledge · Signed out")
+    #expect(caption("billing_error") == "Ledge · Billing")
+    #expect(caption("server_error") == "Ledge · API error")
+    #expect(caption("x") == "Ledge · API error")
 }
 
 @Test func durationsReadAsSpoken() {
@@ -71,18 +71,24 @@ private func session(_ state: AgentSession.State, id: String = "s1", since: Date
     #expect(AgentNotice.detail(.input(nil)) == "Needs you")
 }
 
-@Test func rowsFollowTheSessions() {
-    let t1 = t0.addingTimeInterval(50)
-    let rows = AgentPanelRows.make([
-        session(.working, id: "a", since: t1, turnStart: t0),
-        session(.waiting(.permission("Bash: ls")), id: "b"),
-        session(.finished(took: 5), id: "c", since: t1),
-        session(.failed(reason: "rate_limit"), id: "d"),
-        session(.idle, id: "e"),
-    ])
-    #expect(rows.map(\.id) == ["a", "b", "c", "d", "e"])
-    #expect(rows.map(\.mark) == [
-        .working(since: t0), .waiting("Bash: ls"), .done(at: t1), .failed("Rate limited"), .idle,
-    ])
-    #expect(rows[0].name == "ledge")
+@Test func theActionTable() {
+    let table: [(String?, String?, String)] = [
+        (nil, nil, "Thinking"), (nil, "x", "Thinking"),
+        ("Bash", "make test", "Running make test"), ("Bash", nil, "Running a command"),
+        ("Edit", "a.swift", "Editing a.swift"), ("MultiEdit", "a.swift", "Editing a.swift"),
+        ("NotebookEdit", "n.ipynb", "Editing n.ipynb"), ("Edit", nil, "Editing a file"),
+        ("Write", "a.swift", "Writing a.swift"), ("Write", nil, "Writing a file"),
+        ("Read", "a.swift", "Reading a.swift"), ("Read", nil, "Reading a file"),
+        ("Grep", "foo", "Searching foo"), ("Glob", "*.swift", "Searching *.swift"),
+        ("Grep", nil, "Searching"), ("Glob", nil, "Searching"),
+        ("WebFetch", "example.com", "Fetching example.com"), ("WebFetch", nil, "Fetching a page"),
+        ("WebSearch", "swift", "Searching the web for swift"), ("WebSearch", nil, "Searching the web"),
+        ("Agent", "x", "Running a subagent"), ("Task", nil, "Running a subagent"),
+        ("TodoWrite", "x", "Planning"), ("TodoWrite", nil, "Planning"),
+        ("mcp__github__list", "github: list", "github: list"), ("mcp__github__list", nil, "Using a tool"),
+        ("Skill", "x", "Using Skill"), ("Skill", nil, "Using Skill"),
+    ]
+    for (tool, summary, expected) in table {
+        #expect(AgentNotice.action(tool: tool, summary: summary) == expected, "\(tool ?? "nil") \(summary ?? "nil")")
+    }
 }

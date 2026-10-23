@@ -151,7 +151,7 @@ private func island() -> NotchController {
     #expect(waiting.text == "Waiting for you · Sample: no session")
     #expect(c.activities.first?.id == NotchController.agentActivityID)
     #expect(c.activities.first?.compactText == "Allow?")
-    #expect(c.captionText == "ledge · Bash: make test")
+    #expect(c.captionText == "Ledge · Bash: make test")
     _ = PreviewStage.apply(.agentWorking, content: PreviewContent(), to: c)
     #expect(c.activities.first?.id == NotchController.agentRunActivityID)
     #expect(c.activities.first?.compactText == "4:12")
@@ -159,10 +159,10 @@ private func island() -> NotchController {
     _ = PreviewStage.apply(.agentFinished, content: PreviewContent(), to: c)
     #expect(c.activities.first?.id == NotchController.agentActivityID)
     #expect(c.activities.first?.compactText == "Done")
-    #expect(c.captionText == "ledge · 3m 20s")
+    #expect(c.captionText == "Ledge · 3m 20s")
     _ = PreviewStage.apply(.agentFailed, content: PreviewContent(), to: c)
     #expect(c.activities.first?.compactText == "Failed")
-    #expect(c.captionText == "ledge · Rate limited")
+    #expect(c.captionText == "Ledge · Rate limited")
 }
 
 @MainActor
