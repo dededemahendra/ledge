@@ -1,0 +1,82 @@
+import Foundation
+
+/// How one agent moment looks on the island (2026-10-23).
+public struct AgentBlip: Sendable, Equatable {
+    public let sessionID: String
+    public let title: String
+    /// The trailing ear's word.
+    public let word: String
+    /// An Apple system colour by name (`SystemTint`).
+    public let tintName: String
+    /// "name · detail".
+    public let caption: String
+    public let ttl: TimeInterval
+}
+
+public enum AgentNotice {
+    /// Claude's orange, #D97757.
+    public static let orange = (red: 0.851, green: 0.467, blue: 0.341)
+    public static let waitingTintName = "yellow"
+
+    public static func blip(for moment: AgentMoment) -> AgentBlip {
+        switch moment {
+        case .waiting(let s):
+            guard case .waiting(let waiting) = s.state else { return plain(s, "Waiting", "Waiting", "yellow", 8) }
+            let word: String
+            switch waiting {
+            case .permission: word = "Allow?"
+            case .question: word = "Question"
+            case .plan: word = "Plan"
+            case .input: word = "Waiting"
+            }
+            return AgentBlip(sessionID: s.id, title: "Waiting · \(s.name)", word: word, tintName: waitingTintName,
+                             caption: "\(s.name) · \(detail(waiting))", ttl: 8)
+        case .finished(let s):
+            guard case .finished(let took) = s.state else { return plain(s, "Done", "Done", "green", 3) }
+            return AgentBlip(sessionID: s.id, title: "Done · \(s.name)", word: "Done", tintName: "green",
+                             caption: "\(s.name) · \(duration(took))", ttl: 3)
+        case .failed(let s):
+            guard case .failed(let error) = s.state else { return plain(s, "Failed", "Failed", "red", 3) }
+            return AgentBlip(sessionID: s.id, title: "Failed · \(s.name)", word: "Failed", tintName: "red",
+                             caption: "\(s.name) · \(reason(error))", ttl: 3)
+        }
+    }
+
+    public static func detail(_ waiting: AgentSession.Waiting) -> String {
+        switch waiting {
+        case .permission(let what): what
+        case .question(let q): q ?? "Asks a question"
+        case .plan: "Plan ready"
+        case .input(let message): message ?? "Needs you"
+        }
+    }
+
+    /// Claude's error code in words.
+    public static func reason(_ error: String) -> String {
+        switch error {
+        case "rate_limit": "Rate limited"
+        case "overloaded": "Overloaded"
+        case "authentication_failed": "Signed out"
+        case "billing_error": "Billing"
+        default: "API error"
+        }
+    }
+
+    /// "45s", "3m 20s", "3m", "1h 4m", "1h".
+    public static func duration(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        if total < 60 { return "\(total)s" }
+        if total < 3600 {
+            let (m, s) = (total / 60, total % 60)
+            return s == 0 ? "\(m)m" : "\(m)m \(s)s"
+        }
+        let (h, m) = (total / 3600, total % 3600 / 60)
+        return m == 0 ? "\(h)h" : "\(h)h \(m)m"
+    }
+
+    /// A moment whose session no longer carries its state: just the name.
+    private static func plain(_ s: AgentSession, _ title: String, _ word: String, _ tint: String,
+                              _ ttl: TimeInterval) -> AgentBlip {
+        AgentBlip(sessionID: s.id, title: "\(title) · \(s.name)", word: word, tintName: tint, caption: s.name, ttl: ttl)
+    }
+}
