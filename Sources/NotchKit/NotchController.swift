@@ -1140,9 +1140,10 @@ public final class NotchController {
     private func recomputeState() {
         if isPinnedOpen {
             state = .expanded
-        } else if isHovered, hoveredPart == .tab, state != .expanded, panel != tabPanel {
+        } else if isHovered, hoveredPart == .tab, activityCount > 0, state != .expanded, panel != tabPanel {
             // The pointer is on a tab whose item has no card (or no data for
             // it): hover keeps the island at activity size, never expands.
+            // Only while there is an activity to be that size for.
             state = .activity
         } else if isHovered, media != nil {
             state = .expanded

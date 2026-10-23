@@ -28,9 +28,11 @@ public struct ActivityQueue: Sendable, Equatable {
     }
 
     /// The record beside the island (2026-10-23): the highest-priority one
-    /// other than the lead whose kind can sit in a tab. None means no tab.
+    /// other than the lead whose kind can sit in a tab, and only while it is
+    /// sticky itself: a call's 3 s "call ended" is a `.call` record with a
+    /// TTL, and must not show as a live call. None means no tab.
     public var tab: ActivityRecord? {
-        ordered.dropFirst().first { $0.kind.canSitInTab }
+        ordered.dropFirst().first { $0.kind.canSitInTab && $0.isSticky }
     }
 
     /// Records the island and its tab do not show, not counting charging:
