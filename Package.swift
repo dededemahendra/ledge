@@ -40,7 +40,7 @@ let package = Package(
         .testTarget(name: "UpdateServiceTests", dependencies: ["UpdateService"]),
         .testTarget(name: "GitHubServiceTests", dependencies: ["GitHubService"]),
         .testTarget(name: "CallServiceTests", dependencies: ["CallService", "ActivityKit"]),
-        .testTarget(name: "AgentServiceTests", dependencies: ["AgentService", "AgentWire"]),
+        .testTarget(name: "AgentServiceTests", dependencies: ["AgentService", "AgentWire", "CallService"]),
         .testTarget(name: "AgentWireTests", dependencies: ["AgentWire", "LedgeAgentHook"]),
         .testTarget(
             name: "MediaServiceTests",
