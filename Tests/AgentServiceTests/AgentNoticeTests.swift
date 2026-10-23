@@ -107,3 +107,16 @@ private func session(_ state: AgentSession.State, id: String = "s1", since: Date
     #expect(AgentNotice.action(tool: "Bash", summary: "make -C /Users/x/p test", home: "/Users/x") == "Running make -C ~/p test")
     #expect(AgentNotice.detail(.permission("Bash: ls /Users/x/a"), home: "/Users/x") == "Bash: ls ~/a")
 }
+
+@Test func theHomeBoundariesHold() {
+    func s(_ t: String) -> String { AgentNotice.shortened(t, home: "/Users/x") }
+    for same in ["/Users/x-old/a", "/Users/x_old", "/Users/x2", "/Users/x.bak", "/mnt/backup/Users/x/a"] {
+        #expect(s(same) == same, "\(same)")
+    }
+    #expect(s("/Users/x") == "~")
+    #expect(s("/Users/x/") == "~/")
+    #expect(s("cd /Users/x") == "cd ~")
+    #expect(s("'/Users/x/a'") == "'~/a'")
+    #expect(s("=/Users/x/a") == "=~/a")
+    #expect(s("(/Users/x/a") == "(~/a")
+}
