@@ -176,3 +176,60 @@ private func tempFile() -> URL {
     let after = try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
     #expect(after == past)
 }
+
+private func otherGroup(_ cmd: String) -> OrderedJSON { parse(#"{"hooks":[{"type":"command","command":"\#(cmd)"}]}"#) }
+
+private func appending(_ group: OrderedJSON, to settings: OrderedJSON, event: String) -> OrderedJSON {
+    guard case .object(var top) = settings, let hi = top.firstIndex(where: { $0.key == "hooks" }),
+          case .object(var evs) = top[hi].value, let ei = evs.firstIndex(where: { $0.key == event }),
+          case .array(var gs) = evs[ei].value else { return settings }
+    gs.append(group)
+    evs[ei].value = .array(gs)
+    top[hi].value = .object(evs)
+    return .object(top)
+}
+
+@Test func ledgesGroupKeepsItsPlaceWhenAnotherToolAppendsAfterIt() {
+    let once = AgentHooks.installing(into: parse("{}"), helper: helper)
+    let after = appending(otherGroup("/x/other"), to: once, event: "Stop")
+    let again = AgentHooks.installing(into: after, helper: helper)
+    #expect(again == after)
+    #expect(again.written() == after.written())
+    #expect(groups(again, "Stop").count == 2)
+    #expect(groups(again, "Stop")[1] == otherGroup("/x/other"))
+}
+
+@Test func anOldHelperPathInALedgeOnlyGroupIsUpdatedInPlace() {
+    var s = AgentHooks.installing(into: parse("{}"), helper: "/old/Ledge/ledge-agent-hook")
+    s = appending(otherGroup("/x/other"), to: s, event: "Stop")
+    let out = AgentHooks.installing(into: s, helper: helper)
+    let g = groups(out, "Stop")
+    #expect(g.count == 2)
+    #expect(String(decoding: g[0].written(), as: UTF8.self).contains(helper))
+    #expect(g[1] == otherGroup("/x/other"))
+}
+
+@Test func aMixedGroupLosesLedgesHookAndLedgesGroupGoesLast() {
+    let l = AgentHooks.command(helper: helper)
+    let lj = String(decoding: OrderedJSON.string(l).written().dropLast(), as: UTF8.self)
+    let mixed = parse(#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/x/other"},{"type":"command","command":\#(lj)}]}]}}"#)
+    let out = AgentHooks.installing(into: mixed, helper: helper)
+    let g = groups(out, "Stop")
+    #expect(g.count == 2)
+    #expect(g[0] == otherGroup("/x/other"))
+    #expect(String(decoding: g[1].written(), as: UTF8.self).contains(AgentHooks.marker))
+}
+
+@Test func aSymlinkedSettingsFileStaysALink() throws {
+    let dir = tempFile().deletingLastPathComponent()
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let real = dir.appendingPathComponent("real.json")
+    let link = dir.appendingPathComponent("settings.json")
+    try Data(#"{"theme":"dark"}"#.utf8).write(to: real)
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+    try AgentSettingsFile(url: link).install(helper: helper)
+    #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)) != nil)
+    let parsed = try OrderedJSON.parse(Data(contentsOf: real))
+    #expect(AgentHooks.isInstalled(in: parsed, helper: helper))
+    #expect(FileManager.default.fileExists(atPath: real.appendingPathExtension("ledge-backup").path))
+}
