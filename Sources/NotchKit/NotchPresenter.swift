@@ -274,8 +274,9 @@ public final class NotchPresenter {
     }
 
     /// Latest visible activities, rendered by `NotchRootView`.
-    public func setActivities(_ activities: [NotchController.ActivityDisplay], overflow: Int) {
-        controller.setActivities(activities, overflow: overflow)
+    public func setActivities(_ activities: [NotchController.ActivityDisplay], overflow: Int,
+                              tab: NotchController.ActivityDisplay? = nil) {
+        controller.setActivities(activities, overflow: overflow, tab: tab)
         // Was its own copy of `syncWindowToVisibility()`'s body; consolidated
         // so an activity expiring goes through the same hover re-evaluation
         // every other mutation does — see item 8 in the fix-wave report.
