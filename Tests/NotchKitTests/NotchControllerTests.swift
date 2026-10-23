@@ -1229,3 +1229,66 @@ private func callDisplay(artwork: Data? = nil) -> NotchController.ActivityDispla
                            symbolName: "phone.down.fill")], overflow: 0)
     #expect(c.blipPulse == before + 1, "the ended moment")
 }
+
+// MARK: - Agents (2026-10-23)
+
+private let agentPanel = AgentPanelData(rows: [
+    .init(id: "s1", name: "ledge", icon: nil, mark: .idle, url: URL(string: "ledge://agent/s1")!)
+])
+
+@MainActor
+@Test func hoveringAnAgentItemOpensTheAgentsCard() {
+    for id in [NotchController.agentActivityID, NotchController.agentWaitingActivityID,
+               NotchController.agentRunActivityID] {
+        let c = makeController()
+        c.setAgentPanel(agentPanel)
+        c.setActivities([.init(id: id, title: "Agent", compactText: "x")], overflow: 0)
+        c.setHovered(true)
+        #expect(c.state == .expanded && c.panel == .agents, "\(id)")
+    }
+}
+
+@MainActor
+@Test func theAgentsCardGoesWithItsData() {
+    let c = makeController()
+    c.setAgentPanel(agentPanel)
+    c.setActivities([.init(id: NotchController.agentWaitingActivityID, title: "Waiting", compactText: "x")], overflow: 0)
+    c.setHovered(true)
+    #expect(c.panel == .agents)
+    c.setAgentPanel(nil)
+    #expect(c.panel == .media && c.state == .activity)
+}
+
+@MainActor
+@Test func theAgentsCardComesAfterGitHub() {
+    let c = makeController()
+    c.setGitHubPanel(gitHubPanel)
+    c.setAgentPanel(agentPanel)
+    #expect(Array(c.availablePanels.suffix(2)) == [.github, .agents])
+}
+
+@MainActor
+@Test func anAgentBlipCarriesItsCaption() {
+    let c = makeController()
+    c.setActivities([.init(id: NotchController.agentActivityID, title: "Done", compactText: "x")], overflow: 0)
+    c.setCaption("ledge · 3m")
+    #expect(c.isAgentLeading && c.hasCaption && c.captionText == "ledge · 3m")
+}
+
+@MainActor
+@Test func theWaitingItemCarriesNoCaption() {
+    let c = makeController()
+    c.setActivities([.init(id: NotchController.agentWaitingActivityID, title: "Waiting", compactText: "x")], overflow: 0)
+    c.setCaption("ledge · 3m")
+    #expect(!c.isAgentLeading && !c.hasCaption)
+}
+
+@MainActor
+@Test func theEmptyPeeksSwipeFallsBackToAgents() {
+    let c = makeController()
+    c.setHovered(true)
+    #expect(c.state == .peek)
+    c.setAgentPanel(agentPanel)
+    #expect(c.swipe(.next))
+    #expect(c.state == .expanded && c.panel == .agents)
+}

@@ -453,6 +453,13 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    /// The Agents card (2026-10-23); can open or close the card.
+    public func setAgentPanel(_ data: AgentPanelData?) {
+        guard data != controller.agentPanel else { return }
+        controller.setAgentPanel(data)
+        syncWindowToVisibility()
+    }
+
     /// The call card (2026-10-22); can open or close the card.
     public func setCallPanel(_ data: CallPanelData?) {
         guard data != controller.callPanel else { return }
