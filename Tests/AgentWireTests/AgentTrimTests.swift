@@ -91,8 +91,8 @@ private func hook(_ json: String, env: [String: String] = [:]) -> AgentMessage? 
 
     let path = String(repeating: "p", count: 1200)
     var n = AgentMessage(event: "Notification", session: "s", stamp: 1, cwd: path, project: path, transcript: path,
-                         title: "t", tool: "Bash", notification: "idle", message: big, error: "e")
-    n.summary = "sum"
+                         title: String(repeating: "t", count: 400), tool: "Bash", notification: "idle", message: big, error: "e")
+    n.summary = String(repeating: "s", count: 400)
     let b = try #require(AgentTrim.line(n))
     #expect(b.count <= AgentTrim.maxLine)
     let db = try JSONDecoder().decode(AgentMessage.self, from: b)
