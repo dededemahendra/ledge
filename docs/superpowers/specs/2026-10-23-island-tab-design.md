@@ -45,10 +45,11 @@ behind music or a timer any more, and the island never grows a third shape.
 
 ## Shape
 
-**Round, since 2026-10-23 (user's call).** On a notch the tab is now a circle
-as tall as the notch (32 pt on the measured notch), 6 pt right of the island,
-its top against the screen's edge like the island's, with no fillets: a
-round bubble beside the island, as the iPhone's second island is. The
+**Round, since 2026-10-23 (user's call).** On a notch the tab is now a circle that
+floats 3 pt inside the notch's height (26 pt across on the measured 32 pt
+notch), centred on the island's row and clear of the screen's edge, 8 pt
+right of the island, with no fillets: a round bubble beside the island, as
+the iPhone's second island is. The
 welded 40 pt tab below is how it first shipped. The pill keeps its circle.
 
 **Agents' state on the bubble (2026-10-23, user's call).**

@@ -7,25 +7,25 @@ private let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
 private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32))
 
 /// A round bubble beside the island, as the iPhone's second island is
-/// (2026-10-23, user's call): as tall as the notch, 8 pt to its right, its
-/// top against the screen's edge like the island's.
+/// (2026-10-23, user's call): floating 3 pt inside the island's height —
+/// clear of the screen's edge — 8 pt to its right.
 @Test func onANotchTheTabIsACircleBesideTheIsland() {
     let island = notch.oneActivity
     let tab = notch.tab
     #expect(tab.gap == 8)
-    #expect(tab.width == 32)
-    #expect(tab.height == 32)
-    #expect(tab.bottomRadius == 16)
-    #expect(tab.topRadius == 16)
+    #expect(tab.width == 26)
+    #expect(tab.height == 26)
+    #expect(tab.bottomRadius == 13)
+    #expect(tab.topRadius == 13)
     #expect(tab.outerFillet == 0)
-    #expect(tab.topInset == 0)
+    #expect(tab.topInset == 3)
 
     let bounds = NotchTabShape(island: island, tab: tab).path(in: canvas).boundingRect
     let left = canvas.midX + island.width / 2 + 8
     #expect(abs(bounds.minX - left) < 0.001)
-    #expect(abs(bounds.width - 32) < 0.001)
-    #expect(abs(bounds.minY) < 0.001)
-    #expect(abs(bounds.height - 32) < 0.001)
+    #expect(abs(bounds.width - 26) < 0.001)
+    #expect(abs(bounds.minY - 3) < 0.001)
+    #expect(abs(bounds.height - 26) < 0.001)
 }
 
 @Test func onAPillTheTabIsACircleBesideThePill() {
@@ -70,7 +70,7 @@ private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, heigh
 @Test func aCaptionedIslandDoesNotStretchTheTab() {
     let island = notch.captioned(fitting: 400)
     let bounds = NotchTabShape(island: island, tab: notch.tab).path(in: canvas).boundingRect
-    #expect(abs(bounds.height - 32) < 0.001)
+    #expect(abs(bounds.height - notch.tab.height) < 0.001, "its own 26 pt, not the captioned island's height")
 
     let pill = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 44, height: 28), isVirtual: true)
     let big = pill.captioned(fitting: 400)

@@ -56,17 +56,22 @@ extension NotchMetrics {
     /// as its own bubble, as the iPhone's does.
     public static let tabGap: CGFloat = 8
 
+    /// How far inside the island's height the round tab floats on a notch:
+    /// clear of the screen's edge rather than touching it (2026-10-23,
+    /// user's call).
+    public static let tabInset: CGFloat = 3
+
     /// The tab, shown, beside whichever island it is drawn with (`NotchTabShape`
     /// takes the island's width): a round bubble, as the iPhone's second
-    /// island is (2026-10-23, user's call). On a notch it is as tall as the
-    /// notch, its top against the screen's edge like the island's; on a
-    /// pill, as tall as the pill at rest, at the pill's top inset.
+    /// island is (2026-10-23, user's call). On a notch it floats `tabInset`
+    /// inside the notch's height, centred on the island's row; on a pill it
+    /// is as tall as the pill at rest, at the pill's top inset.
     public var tab: NotchTabParameters {
         // The resting height, never the island's live one.
-        let diameter = isVirtual ? oneActivity.height : notchRect.height
+        let diameter = isVirtual ? oneActivity.height : notchRect.height - 2 * Self.tabInset
         return NotchTabParameters(
             gap: Self.tabGap, width: diameter, height: diameter, bottomRadius: diameter / 2,
-            outerFillet: 0, topInset: isVirtual ? Self.pillTopInset : 0, topRadius: diameter / 2
+            outerFillet: 0, topInset: isVirtual ? Self.pillTopInset : Self.tabInset, topRadius: diameter / 2
         )
     }
 
