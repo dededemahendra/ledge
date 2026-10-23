@@ -243,3 +243,75 @@ private func at(_ s: TimeInterval) -> Date { t0.addingTimeInterval(s) }
     _ = s.apply(msg("Stop", stamp: 4), facts: facts, now: at(3))
     #expect(s.transcriptsToWatch.isEmpty)
 }
+
+@Test func aNameStaysPutWhenAnotherSessionEnds() {
+    var s = AgentSessions()
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "a"), facts: facts, now: t0)
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "b"), facts: facts, now: at(1))
+    _ = s.apply(msg("SessionEnd", stamp: 2, session: "a"), facts: facts, now: at(2))
+    _ = s.apply(msg("PreToolUse", stamp: 2, session: "b", tool: "Read"), facts: facts, now: at(3))
+    #expect(s.sessions.first { $0.id == "b" }?.name == "ledge 2")
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "c"), facts: facts, now: at(4))
+    #expect(s.sessions.first { $0.id == "c" }?.name == "ledge")
+}
+
+@Test func aRepeatedStopOrStopFailureChangesNothing() {
+    var s = AgentSessions()
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1), facts: facts, now: t0)
+    _ = s.apply(msg("Stop", stamp: 2), facts: facts, now: at(10))
+    let before = s.sessions[0]
+    #expect(s.apply(msg("Stop", stamp: 3), facts: facts, now: at(50)) == nil)
+    #expect(s.apply(msg("StopFailure", stamp: 4, error: "x"), facts: facts, now: at(60)) == nil)
+    #expect(s.sessions[0].state == before.state)
+    #expect(s.sessions[0].stateSince == before.stateSince)
+    var f = AgentSessions()
+    _ = f.apply(msg("StopFailure", stamp: 1, error: "overloaded"), facts: facts, now: t0)
+    #expect(f.apply(msg("StopFailure", stamp: 2, error: "rate_limit"), facts: facts, now: at(5)) == nil)
+    #expect(f.apply(msg("Stop", stamp: 3), facts: facts, now: at(6)) == nil)
+    #expect(f.sessions[0].state == .failed(reason: "overloaded"))
+}
+
+@Test func stopWhileIdleTakesTimeSinceTheStateBegan() {
+    var s = AgentSessions()
+    _ = s.apply(msg("SessionStart", stamp: 1), facts: facts, now: t0)
+    _ = s.apply(msg("Stop", stamp: 2), facts: facts, now: at(2))
+    #expect(s.sessions[0].state == .finished(took: 2))
+}
+
+@Test func laterFactsReplaceEarlierOnes() {
+    var s = AgentSessions()
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1), facts: facts, now: t0)
+    let ghostty = CallAppInfo(bundleID: "com.mitchellh.ghostty", name: "Ghostty", pid: 9)
+    _ = s.apply(msg("PreToolUse", stamp: 2), facts: AgentFacts(claudePID: 77, isHeadless: false, host: ghostty), now: at(1))
+    #expect(s.sessions[0].host == ghostty)
+    #expect(s.sessions[0].claudePID == 77)
+    _ = s.apply(msg("PreToolUse", stamp: 3), facts: AgentFacts(claudePID: nil, isHeadless: false, host: nil), now: at(2))
+    #expect(s.sessions[0].host == ghostty)
+    #expect(s.sessions[0].claudePID == 77)
+}
+
+@Test func stopWhileWaitingFinishesWithAMoment() {
+    var s = AgentSessions()
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1), facts: facts, now: t0)
+    _ = s.apply(msg("PermissionRequest", stamp: 2, tool: "Bash"), facts: facts, now: at(5))
+    let m = s.apply(msg("Stop", stamp: 3), facts: facts, now: at(20))
+    #expect(s.sessions[0].state == .finished(took: 20))
+    #expect(m == .finished(s.sessions[0]))
+}
+
+@Test func stopFailureWhileWaitingFailsWithAMoment() {
+    var s = AgentSessions()
+    _ = s.apply(msg("PermissionRequest", stamp: 2, tool: "Bash"), facts: facts, now: t0)
+    let m = s.apply(msg("StopFailure", stamp: 3, error: "overloaded"), facts: facts, now: at(5))
+    #expect(s.sessions[0].state == .failed(reason: "overloaded"))
+    #expect(m == .failed(s.sessions[0]))
+}
+
+@Test func aLaterClashingTitleGetsASuffix() {
+    var s = AgentSessions()
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "a", title: "Island"), facts: facts, now: t0)
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "b"), facts: facts, now: at(1))
+    _ = s.apply(msg("PreToolUse", stamp: 2, session: "b", title: "Island", tool: "Read"), facts: facts, now: at(2))
+    #expect(s.sessions.first { $0.id == "a" }?.name == "Island")
+    #expect(s.sessions.first { $0.id == "b" }?.name == "Island 2")
+}
