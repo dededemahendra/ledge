@@ -53,7 +53,7 @@ public enum CallMeetingMatcher {
     public static let lead: TimeInterval = 600
     public static let nextWithin: TimeInterval = 600
 
-    static let browsers: Set<String> = [
+    public static let browsers: Set<String> = [
         "com.apple.Safari", "com.google.Chrome", "company.thebrowser.Browser", "company.thebrowser.dia",
         "com.microsoft.edgemac", "org.mozilla.firefox", "com.brave.Browser", "com.operasoftware.Opera",
         "com.vivaldi.Vivaldi", "com.kagi.kagimacOS",
