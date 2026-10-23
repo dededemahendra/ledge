@@ -68,6 +68,7 @@ public struct AgentSessions: Sendable, Equatable {
         guard !facts.isHeadless, Self.handled.contains(message.event) else { return nil }
 
         var session: AgentSession
+        var needsName = existing == nil
         if let existing {
             session = sessions[existing]
             if message.stamp < session.lastStamp { return nil }
@@ -84,12 +85,15 @@ public struct AgentSessions: Sendable, Equatable {
         if let transcript = message.transcript { session.transcript = transcript }
         if let host = facts.host { session.host = host }
         if let pid = facts.claudePID { session.claudePID = pid }
-        if let title = message.title, title != session.baseName { session.baseName = title }
+        if let title = message.title, title != session.baseName {
+            session.baseName = title
+            needsName = true
+        }
 
         let moment = transition(&session, message, now: now)
 
         sessions.removeAll { $0.id == session.id }
-        session.name = Self.freeName(for: session.baseName, among: sessions)
+        if needsName { session.name = Self.freeName(for: session.baseName, among: sessions) }
         sessions.append(session)
         sortSessions()
         return moment.map { $0(session) }
@@ -149,15 +153,24 @@ public struct AgentSessions: Sendable, Equatable {
             return wait(&s, m, now: now)
         case "Notification":
             guard let kind = m.notification, Self.waitingNotifications.contains(kind) else { return nil }
+            // Already waiting: keep the existing detail, which (e.g. "Bash: make test") is more specific than the notification's text.
             if case .waiting = s.state { return nil }
             enter(&s, .waiting(.input(m.message)), now: now)
             return { .waiting($0) }
         case "Stop":
+            switch s.state {
+            case .finished, .failed: return nil
+            default: break
+            }
             let took = now.timeIntervalSince(s.turnStart ?? s.stateSince)
             set(&s, .finished(took: took), now: now)
             s.turnStart = nil
             return { .finished($0) }
         case "StopFailure":
+            switch s.state {
+            case .finished, .failed: return nil
+            default: break
+            }
             set(&s, .failed(reason: m.error ?? ""), now: now)
             s.turnStart = nil
             return { .failed($0) }
