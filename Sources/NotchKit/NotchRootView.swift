@@ -81,6 +81,14 @@ public enum NotchAnimation {
         reduceMotion ? reduced : textCrossfade
     }
 
+    /// The blip pulse's swell and settle (`NotchController.blipPulse`):
+    /// the island scales by it, and the tab steps aside by it in step.
+    @KeyframesBuilder<Double>
+    static func blipPulseKeyframes() -> some Keyframes<Double> {
+        SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
+        SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+    }
+
     /// Which spring a transition gets: the confident one when the island
     /// GROWS, the dull one when it shrinks. By area, not height: height
     /// alone called peek (179×38) -> activity (255×32) a collapse because
@@ -364,13 +372,20 @@ public struct NotchRootView: View {
         nonmutating set { _previousHeight.wrappedValue = newValue }
     }
 
-    /// See `previousHeight` above — same reasoning, same toolchain
-    /// workaround, kept in the view (not `NotchController`) per spec §4.
     /// The last tab item, held while Reduce Motion fades the tab out in place.
-    private var _heldTab: State<NotchController.ActivityDisplay?> = State(initialValue: nil)
+    /// Seeded from the controller, so a tab already there at launch fades too.
+    private var _heldTab: State<NotchController.ActivityDisplay?>
     private var heldTab: NotchController.ActivityDisplay? {
         get { _heldTab.wrappedValue }
         nonmutating set { _heldTab.wrappedValue = newValue }
+    }
+    /// The island at activity size when last seen there: under Reduce Motion
+    /// the hidden tab stays beside it (card open, tucked), so it fades out
+    /// and back in where it stood rather than sliding beside the card.
+    private var _tabIsland: State<NotchShapeParameters?>
+    private var tabIsland: NotchShapeParameters? {
+        get { _tabIsland.wrappedValue }
+        nonmutating set { _tabIsland.wrappedValue = newValue }
     }
     /// Counts tabs landing (nil to an item), the tab's own pulse trigger.
     private var _tabLanded: State<Int> = State(initialValue: 0)
@@ -379,6 +394,8 @@ public struct NotchRootView: View {
         nonmutating set { _tabLanded.wrappedValue = newValue }
     }
 
+    /// See `previousHeight` above — same reasoning, same toolchain
+    /// workaround, kept in the view (not `NotchController`) per spec §4.
     private var _previousWidth: State<CGFloat>
     private var previousWidth: CGFloat {
         get { _previousWidth.wrappedValue }
@@ -417,6 +434,13 @@ public struct NotchRootView: View {
         self.onTabTap = onTabTap
         _previousHeight = State(initialValue: controller.parameters.height)
         _previousWidth = State(initialValue: controller.parameters.width)
+        _heldTab = State(initialValue: controller.tab)
+        _tabIsland = State(initialValue: Self.isAtActivitySize(controller) ? controller.parameters : nil)
+    }
+
+    /// The island is at activity size (not tucked), where the tab stands beside it.
+    private static func isAtActivitySize(_ controller: NotchController) -> Bool {
+        controller.state == .activity && !controller.isTucked
     }
 
     public var body: some View {
@@ -515,8 +539,7 @@ public struct NotchRootView: View {
         .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { [reduceMotion = controller.reduceMotion] view, scale in
             view.scaleEffect(reduceMotion ? 1 : scale, anchor: .top)
         } keyframes: { _ in
-            SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
-            SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+            NotchAnimation.blipPulseKeyframes()
         }
         // Flatten before shadowing so the island casts ONE silhouette shadow
         // rather than every layer casting its own.
@@ -574,6 +597,7 @@ public struct NotchRootView: View {
             // transition comes next.
             previousHeight = newValue.height
             previousWidth = newValue.width
+            if Self.isAtActivitySize(controller) { tabIsland = newValue }
         }
     }
 
@@ -581,13 +605,14 @@ public struct NotchRootView: View {
     /// material, its item's short form centred in it. Its tap is its own
     /// (`onTabTap`) and never reaches the island's.
     @ViewBuilder
-    private func tabLayer(island: NotchShapeParameters, showEffects: Bool) -> some View {
+    private func tabLayer(island live: NotchShapeParameters, showEffects: Bool) -> some View {
         let reduceMotion = controller.reduceMotion
-        // Reduce Motion: no bud. The shape stays at full size and fades in place.
+        // Reduce Motion: no bud. The shape stays at full size and fades in
+        // place: while hidden (card open, tucked) beside the island it last
+        // stood by, not the card, so it never slides as it fades.
         let shownTab = controller.tab ?? (reduceMotion ? heldTab : nil)
-        let tab = reduceMotion && shownTab != nil
-            ? controller.metrics.tab(beside: island)
-            : controller.tabParameters
+        let tab = reduceMotion && shownTab != nil ? controller.metrics.tab : controller.tabParameters
+        let island = reduceMotion && !controller.isTabShowing ? (tabIsland ?? live) : live
         let tabShape = NotchTabShape(island: island, tab: tab)
         let centerX = NotchMetrics.canvasSize.width / 2 + island.width / 2 + tab.gap + tab.width / 2
         let centerY = tab.topInset + tab.height / 2
@@ -622,6 +647,13 @@ public struct NotchRootView: View {
         } keyframes: { _ in
             SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
             SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+        }
+        // The island's blip pulse swells its right edge into the gap: the
+        // tab, unscaled, steps aside by as much, so the 6 pt gap holds.
+        .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { view, scale in
+            view.offset(x: reduceMotion ? 0 : live.width / 2 * (scale - 1))
+        } keyframes: { _ in
+            NotchAnimation.blipPulseKeyframes()
         }
     }
 
