@@ -60,17 +60,20 @@ public enum AgentNotice {
         var home = home
         while home.count > 1, home.hasSuffix("/") { home.removeLast() }
         guard home.count > 1, text.contains(home) else { return text }
+        // A name can continue with "." (".config", "x.bak"), so "." is a path character.
         let pathChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+        let leadChars = pathChars.union(CharacterSet(charactersIn: "/"))
         var out = ""
         var rest = Substring(text)
+        var before: Unicode.Scalar?
         while let r = rest.range(of: home) {
             out += rest[..<r.lowerBound]
+            if let last = rest[..<r.lowerBound].unicodeScalars.last { before = last }
             let next = rest[r.upperBound...].unicodeScalars.first
-            if let next, pathChars.contains(next) {
-                out += home
-            } else {
-                out += "~"
-            }
+            let startsOK = before.map { !leadChars.contains($0) } ?? true
+            let endsOK = next.map { !pathChars.contains($0) } ?? true
+            out += (startsOK && endsOK) ? "~" : home
+            before = home.unicodeScalars.last
             rest = rest[r.upperBound...]
         }
         return out + rest
