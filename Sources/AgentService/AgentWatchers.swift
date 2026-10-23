@@ -94,6 +94,8 @@ final class AgentWatchers {
                 }
             }
         }
+        let watchedFD = fd
+        source.setCancelHandler { close(watchedFD) }
         source.resume()
         watch.source = source
         transcripts[session] = watch
@@ -103,7 +105,6 @@ final class AgentWatchers {
         guard let source = watch.source else { return }
         watch.source = nil
         source.cancel()
-        close(watch.fd)
     }
 
     private func read(_ watch: TranscriptWatch, session: String) {
@@ -117,13 +118,18 @@ final class AgentWatchers {
         guard (try? handle.seek(toOffset: watch.offset)) != nil,
               let data = try? handle.readToEnd(), !data.isEmpty else { return }
         watch.offset += UInt64(data.count)
-        var buffer = watch.tail + data
+        let buffer = watch.tail + data
         var lines: [Data] = []
-        while let newline = buffer.firstIndex(of: 0x0A) {
-            lines.append(Data(buffer[buffer.startIndex..<newline]))
-            buffer = Data(buffer[buffer.index(after: newline)...])
+        var start = buffer.startIndex
+        var i = start
+        while i < buffer.endIndex {
+            if buffer[i] == 0x0A {
+                lines.append(Data(buffer[start..<i]))
+                start = buffer.index(after: i)
+            }
+            i = buffer.index(after: i)
         }
-        watch.tail = buffer
+        watch.tail = Data(buffer[start...])
         for line in lines where !line.isEmpty { onLine(session, line) }
     }
 }

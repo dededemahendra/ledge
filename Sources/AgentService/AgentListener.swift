@@ -13,6 +13,7 @@ public final class AgentListener {
 
     static let maxLine = 8192
     static let patience: TimeInterval = 2
+    static let maxConnections = 64
 
     private final class Connection {
         let fd: Int32
@@ -20,11 +21,16 @@ public final class AgentListener {
         var source: DispatchSourceRead?
         var timer: DispatchSourceTimer?
         init(fd: Int32) { self.fd = fd }
+        /// The source's cancel handler closes the fd, once libdispatch is done with it.
         func cancel() {
-            source?.cancel()
             timer?.cancel()
-            source = nil
             timer = nil
+            if let source {
+                source.cancel()
+                self.source = nil
+            } else {
+                close(fd)
+            }
         }
     }
 
@@ -78,6 +84,7 @@ public final class AgentListener {
         source.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.accept() }
         }
+        source.setCancelHandler { close(fd) }
         source.resume()
         acceptSource = source
     }
@@ -88,7 +95,6 @@ public final class AgentListener {
         for connection in connections.values { drop(connection) }
         connections.removeAll()
         if listenFD >= 0 {
-            close(listenFD)
             listenFD = -1
             unlink(url.path)
         }
@@ -102,7 +108,11 @@ public final class AgentListener {
     private func accept() {
         while listenFD >= 0 {
             let fd = Darwin.accept(listenFD, nil, nil)
-            guard fd >= 0 else { return }
+            guard fd >= 0 else {
+                if errno == EMFILE || errno == ENFILE { pauseAccepting() }
+                return
+            }
+            guard connections.count < Self.maxConnections else { close(fd); continue }
             var on: Int32 = 1
             setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
             guard makeNonBlocking(fd) else { close(fd); continue }
@@ -115,6 +125,7 @@ public final class AgentListener {
                     self.read(connection)
                 }
             }
+            source.setCancelHandler { close(fd) }
             source.resume()
             let timer = DispatchSource.makeTimerSource(queue: .main)
             timer.schedule(deadline: .now() + Self.patience)
@@ -128,6 +139,18 @@ public final class AgentListener {
             connection.source = source
             connection.timer = timer
             connections[fd] = connection
+        }
+    }
+
+    /// Out of descriptors: a level-triggered accept source would spin, so rest it for a second.
+    private func pauseAccepting() {
+        guard let source = acceptSource else { return }
+        source.suspend()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.acceptSource === source else { source.resume(); return }
+                source.resume()
+            }
         }
     }
 
@@ -168,6 +191,5 @@ public final class AgentListener {
 
     private func drop(_ connection: Connection) {
         connection.cancel()
-        close(connection.fd)
     }
 }

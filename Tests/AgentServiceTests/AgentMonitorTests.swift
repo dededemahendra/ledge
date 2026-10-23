@@ -20,7 +20,7 @@ private struct Rig {
     var settings: AgentSettingsFile { AgentSettingsFile(url: paths.settingsFile) }
 }
 
-private func rig(withHelper: Bool = true, settings: String? = nil) throws -> Rig {
+private func rig(withHelper: Bool = true, settings: String? = nil, shortSocket: Bool = false) throws -> Rig {
     let dir = FileManager.default.temporaryDirectory.appending(path: "ledge-m-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     var source: URL?
@@ -35,7 +35,7 @@ private func rig(withHelper: Bool = true, settings: String? = nil) throws -> Rig
         try FileManager.default.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(settings.utf8).write(to: settingsURL)
     }
-    return Rig(dir: dir, paths: AgentPaths(settingsFile: settingsURL, socket: dir.appending(path: "s.sock"),
+    return Rig(dir: dir, paths: AgentPaths(settingsFile: settingsURL, socket: shortSocket ? URL(fileURLWithPath: "/tmp/ledge-m-\(UInt32.random(in: 0...UInt32.max)).sock") : dir.appending(path: "s.sock"),
                                             helper: dir.appending(path: "support/Ledge/ledge-agent-hook"),
                                             helperSource: source))
 }
@@ -94,6 +94,7 @@ private func line(_ event: String, session: String = "s1", transcript: String? =
 @MainActor @Test func aLineUpdatesTheSessionsAndSaysTheMoment() throws {
     let r = try rig()
     let monitor = AgentMonitor(paths: r.paths, host: lookup(), listens: false)
+    monitor.enable()
     var moments: [AgentMoment] = []
     monitor.onMoment = { moments.append($0) }
     let now = Date()
@@ -161,4 +162,58 @@ private func line(_ event: String, session: String = "s1", transcript: String? =
     monitor.receive(try line("UserPromptSubmit"))      // pid 42 is not running
     await waitFor { monitor.sessions.sessions.isEmpty }
     #expect(monitor.sessions.sessions.isEmpty)
+}
+
+@MainActor @Test func neverEnabledAppliesTheSessionButStaysOff() throws {
+    let r = try rig()
+    let monitor = AgentMonitor(paths: r.paths, host: lookup(), listens: false)
+    monitor.receive(try line("UserPromptSubmit"))
+    #expect(monitor.sessions.sessions.count == 1)
+    #expect(monitor.status == .off)
+}
+
+@MainActor @Test func aProblemSurvivesALaterLine() throws {
+    let r = try rig(withHelper: false)
+    let monitor = AgentMonitor(paths: r.paths, host: lookup(), listens: false)
+    monitor.enable()
+    monitor.receive(try line("UserPromptSubmit"))
+    #expect(monitor.status == .problem("The helper is missing from Ledge.app"))
+}
+
+@MainActor @Test func aDeadPidDropsTheSessionAndStaysDropped() async throws {
+    let r = try rig()
+    let monitor = AgentMonitor(paths: r.paths, host: lookup(), listens: false)
+    monitor.receive(try line("UserPromptSubmit"))      // pid 42 is not running
+    await waitFor { monitor.sessions.sessions.isEmpty }
+    #expect(monitor.sessions.sessions.isEmpty)
+    try await Task.sleep(for: .milliseconds(100))
+    monitor.tick(now: Date())
+    #expect(monitor.sessions.sessions.isEmpty)
+}
+
+@MainActor @Test func enablingAgainRestartsAListenerWhoseSocketFileIsGone() async throws {
+    let r = try rig(shortSocket: true)
+    let monitor = AgentMonitor(paths: r.paths, host: lookup(), listens: true)
+    defer { monitor.suspend() }
+    monitor.enable()
+    try FileManager.default.removeItem(at: r.paths.socket)
+    monitor.enable()
+    #expect(FileManager.default.fileExists(atPath: r.paths.socket.path))
+    #expect(AgentSocket.send(try line("UserPromptSubmit", pids: [10, livePID, 7]) + Data("\n".utf8), to: r.paths.socket, timeout: 1))
+    await waitFor { !monitor.sessions.sessions.isEmpty }
+    #expect(monitor.sessions.sessions.count == 1)
+}
+
+@MainActor @Test func enablingTwiceKeepsOneListener() async throws {
+    let r = try rig(shortSocket: true)
+    let monitor = AgentMonitor(paths: r.paths, host: lookup(), listens: true)
+    defer { monitor.suspend() }
+    monitor.enable()
+    monitor.enable()
+    var changes = 0
+    monitor.onChange = { changes += 1 }
+    #expect(AgentSocket.send(try line("UserPromptSubmit", pids: [10, livePID, 7]) + Data("\n".utf8), to: r.paths.socket, timeout: 1))
+    await waitFor { changes > 0 }
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(changes == 1)
 }
