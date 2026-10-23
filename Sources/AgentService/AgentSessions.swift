@@ -37,13 +37,18 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
     public var turnStart: Date?
     public var lastStamp: Int64
     public var lastEvent: Date
+    /// What a working session is doing now ("Thinking", "Running make test").
+    public var action: String?
+    /// True when `action` is a shell command, which is drawn monospaced.
+    public var actionIsCommand: Bool
 
     /// A session as a preview or a test sample (2026-10-23).
     public init(id: String, name: String, project: String, state: AgentSession.State,
                 stateSince: Date = Date(), turnStart: Date? = nil) {
+        let shown = AgentNames.display(name)
         self.id = id
-        self.name = name
-        self.baseName = name
+        self.name = shown
+        self.baseName = shown
         self.project = project
         self.transcript = nil
         self.host = nil
@@ -53,10 +58,13 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
         self.turnStart = turnStart
         self.lastStamp = 0
         self.lastEvent = stateSince
+        self.action = nil
+        self.actionIsCommand = false
     }
 
     init(id: String, name: String, baseName: String, project: String, transcript: String?, host: CallAppInfo?,
-         claudePID: Int32?, state: State, stateSince: Date, turnStart: Date?, lastStamp: Int64, lastEvent: Date) {
+         claudePID: Int32?, state: State, stateSince: Date, turnStart: Date?, lastStamp: Int64, lastEvent: Date,
+         action: String? = nil, actionIsCommand: Bool = false) {
         self.id = id
         self.name = name
         self.baseName = baseName
@@ -69,6 +77,8 @@ public struct AgentSession: Sendable, Equatable, Identifiable {
         self.turnStart = turnStart
         self.lastStamp = lastStamp
         self.lastEvent = lastEvent
+        self.action = action
+        self.actionIsCommand = actionIsCommand
     }
 }
 
@@ -118,7 +128,7 @@ public struct AgentSessions: Sendable, Equatable {
         if let transcript = message.transcript { session.transcript = transcript }
         if let host = facts.host { session.host = host }
         if let pid = facts.claudePID { session.claudePID = pid }
-        if let title = message.title, title != session.baseName {
+        if let title = message.title.map(AgentNames.display), title != session.baseName {
             session.baseName = title
             needsName = true
         }
@@ -137,6 +147,8 @@ public struct AgentSessions: Sendable, Equatable {
         sessions[i].state = .idle
         sessions[i].stateSince = now
         sessions[i].turnStart = nil
+        sessions[i].action = nil
+        sessions[i].actionIsCommand = false
     }
 
     public mutating func processExited(_ pid: Int32) {
@@ -174,12 +186,17 @@ public struct AgentSessions: Sendable, Equatable {
         case "SessionStart":
             set(&s, .idle, now: now)
             s.turnStart = nil
+            clearAction(&s)
         case "UserPromptSubmit":
             set(&s, .working, now: now)
             s.turnStart = now
+            s.action = "Thinking"
+            s.actionIsCommand = false
         case "PreToolUse":
             if m.tool == "AskUserQuestion" || m.tool == "ExitPlanMode" { return wait(&s, m, now: now) }
             work(&s, now: now)
+            s.action = AgentNotice.action(tool: m.tool, summary: m.summary)
+            s.actionIsCommand = m.tool == "Bash"
         case "PostToolUse", "PostToolUseFailure":
             work(&s, now: now)
         case "PermissionRequest":
@@ -198,6 +215,7 @@ public struct AgentSessions: Sendable, Equatable {
             let took = now.timeIntervalSince(s.turnStart ?? s.stateSince)
             set(&s, .finished(took: took), now: now)
             s.turnStart = nil
+            clearAction(&s)
             return { .finished($0) }
         case "StopFailure":
             switch s.state {
@@ -206,6 +224,7 @@ public struct AgentSessions: Sendable, Equatable {
             }
             set(&s, .failed(reason: m.error ?? ""), now: now)
             s.turnStart = nil
+            clearAction(&s)
             return { .failed($0) }
         default:
             break
@@ -239,6 +258,11 @@ public struct AgentSessions: Sendable, Equatable {
         return { .waiting($0) }
     }
 
+    private func clearAction(_ s: inout AgentSession) {
+        s.action = nil
+        s.actionIsCommand = false
+    }
+
     private func work(_ s: inout AgentSession, now: Date) {
         set(&s, .working, now: now)
         if s.turnStart == nil { s.turnStart = now }
@@ -257,9 +281,8 @@ public struct AgentSessions: Sendable, Equatable {
     }
 
     private static func baseName(_ m: AgentMessage) -> String {
-        if let title = m.title { return title }
-        let folder = projectName(m)
-        return folder.isEmpty || folder == "/" ? "Claude" : folder
+        if let title = m.title { return AgentNames.display(title) }
+        return AgentNames.display(projectName(m))
     }
 
     private static func freeName(for base: String, among others: [AgentSession]) -> String {

@@ -342,11 +342,11 @@ final class AppModel {
     private var agentWaitingShown: ActivityRecord?
     private var agentRunShown: ActivityRecord?
     private var agentPanelShown: AgentPanelData?
-    private var agentWasLocked = false
     /// The caption the last agent blip put up, so taking the blip away takes
     /// its caption too, and nobody else's.
     private var agentCaptionShown: String?
     private var agentIcons: [String: Data] = [:]
+    private var agentIconsTried: Set<String> = []
 
     private func agentURL(_ id: String) -> URL {
         var allowed = CharacterSet.urlPathAllowed
@@ -447,23 +447,29 @@ final class AppModel {
             }
         }
         if changed { publish() }
-        if locked != agentWasLocked {
-            agentWasLocked = locked
-            publishAgentPanel()
-        }
+        publishAgentPanel()
     }
 
-    /// The card's list, or none: off, locked, or no sessions.
+    /// The card, or none: off, locked, or no sessions. Called every tick so
+    /// the hero's ten-minute failed window can lapse; equal data republishes
+    /// nothing.
     private func publishAgentPanel() {
         var data: AgentPanelData?
         let sessions = agents.sessions.sessions
         if settings.agentsEnabled, !presenter.isLocked, !sessions.isEmpty {
-            data = AgentPanelData(rows: AgentPanelRows.make(sessions).map { row in
-                AgentPanelData.Row(
-                    id: row.id, name: row.name, icon: row.host.flatMap(agentIcon(for:)),
-                    mark: Self.agentMark(row.mark), url: agentURL(row.id)
-                )
-            })
+            let card = AgentPanelRows.card(sessions, now: Date())
+            data = AgentPanelData(
+                hero: card.hero.map { hero in
+                    AgentPanelData.Hero(
+                        id: hero.id, kind: Self.agentHeroKind(hero.kind), name: hero.name,
+                        icon: hero.host.flatMap(agentIcon(for:)), detail: hero.detail,
+                        isCommand: hero.isCommand, since: hero.since, url: agentURL(hero.id)
+                    )
+                },
+                rows: card.rows.map { row in
+                    AgentPanelData.Row(id: row.id, name: row.name, mark: Self.agentMark(row.mark), url: agentURL(row.id))
+                }
+            )
         }
         guard data != agentPanelShown else { return }
         agentPanelShown = data
@@ -472,18 +478,28 @@ final class AppModel {
 
     private func agentIcon(for app: CallAppInfo) -> Data? {
         if let cached = agentIcons[app.bundleID] { return cached }
+        // An app whose icon fails to encode is tried once, not every publish.
+        guard agentIconsTried.insert(app.bundleID).inserted else { return nil }
         let png = Self.appIconPNG(app.bundleID)
         agentIcons[app.bundleID] = png
         return png
     }
 
+    private static func agentHeroKind(_ kind: AgentHero.Kind) -> AgentPanelData.Hero.Kind {
+        switch kind {
+        case .needsYou: .needsYou
+        case .failed:   .failed
+        case .working:  .working
+        }
+    }
+
     private static func agentMark(_ mark: AgentRow.Mark) -> AgentPanelData.Row.Mark {
         switch mark {
-        case .waiting(let text):    .waiting(text)
-        case .working(let since):   .working(since: since)
-        case .done(let at):         .done(at: at)
-        case .failed(let text):     .failed(text)
-        case .idle:                 .idle
+        case .waiting(let text, let since): .waiting(text, since: since)
+        case .working(let text, let since): .working(text, since: since)
+        case .done(let took, let at):       .done("Done in \(AgentNotice.duration(took))", at: at)
+        case .failed(let text, let at):     .failed(text, at: at)
+        case .idle:                         .idle
         }
     }
 

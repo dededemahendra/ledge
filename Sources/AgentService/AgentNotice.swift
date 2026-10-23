@@ -62,6 +62,26 @@ public enum AgentNotice {
         }
     }
 
+    /// What a tool call reads as while it runs ("Running make test").
+    public static func action(tool: String?, summary: String?) -> String {
+        guard let tool else { return "Thinking" }
+        func with(_ verb: String, _ fallback: String) -> String { summary.map { "\(verb) \($0)" } ?? fallback }
+        switch tool {
+        case "Bash": return with("Running", "Running a command")
+        case "Edit", "MultiEdit", "NotebookEdit": return with("Editing", "Editing a file")
+        case "Write": return with("Writing", "Writing a file")
+        case "Read": return with("Reading", "Reading a file")
+        case "Grep", "Glob": return with("Searching", "Searching")
+        case "WebFetch": return with("Fetching", "Fetching a page")
+        case "WebSearch": return with("Searching the web for", "Searching the web")
+        case "Agent", "Task": return "Running a subagent"
+        case "TodoWrite": return "Planning"
+        default:
+            if tool.hasPrefix("mcp__") { return summary ?? "Using a tool" }
+            return "Using \(tool)"
+        }
+    }
+
     /// "45s", "3m 20s", "3m", "1h 4m", "1h".
     public static func duration(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))

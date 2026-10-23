@@ -48,17 +48,37 @@ struct AgentGlyph: View {
     }
 }
 
-/// The Agents card of the open island (2026-10-23): a row per Claude Code
-/// session, its host's icon, its name, and at the right what it is doing. A
-/// click brings its window forward through `.open`; the controller drops
-/// that on the lock screen, which keeps the card inert there.
+/// The Agents card of the open island (2026-10-23, the user's pick of
+/// "hero plus rows"): the session most worth a look as a card (needs you,
+/// failed, working), then the others as rows. A click brings its window
+/// forward through `.open`; the controller drops that on the lock screen,
+/// which keeps the card inert there. Follows `GitHubPanelView`.
 struct AgentPanelView: View {
     let data: AgentPanelData
     let contentColor: Color
     let reduceMotion: Bool
     let emit: (NotchIntent) -> Void
 
-    static let maxRows = 6
+    /// Rows under a hero, and without one.
+    static let maxRowsWithHero = 3
+    static let maxRowsWithoutHero = 6
+
+    /// About 45 % of the row, so a long name leaves room for what it is doing.
+    private static let nameMaxWidth: CGFloat = 138
+
+    /// The name's own width, held to `nameMaxWidth`.
+    private static func nameWidth(_ name: String) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let width = (name as NSString).size(withAttributes: [.font: font]).width
+        return min(ceil(width) + 1, nameMaxWidth)
+    }
+
+    private static let ageFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        formatter.dateTimeStyle = .numeric
+        return formatter
+    }()
 
     /// Spelled-out `State`, as elsewhere here.
     private var _revealed: State<Bool> = State(initialValue: false)
@@ -77,24 +97,37 @@ struct AgentPanelView: View {
             )
     }
 
-    private var shown: [AgentPanelData.Row] { Array(data.rows.prefix(Self.maxRows)) }
-    private var more: Int { max(0, data.rows.count - Self.maxRows) }
+    private var rowHeight: CGFloat { data.hero == nil ? 20 : 19 }
+    private var limit: Int { data.hero == nil ? Self.maxRowsWithoutHero : Self.maxRowsWithHero }
+    private var shown: [AgentPanelData.Row] { Array(data.rows.prefix(limit)) }
+    private var more: Int { max(0, data.rows.count - limit) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            reveal(Text("AGENTS")
-                .font(.system(size: 9.5, weight: .medium))
-                .tracking(0.6)
-                .foregroundStyle(contentColor.opacity(0.5))
-                .frame(height: 14), order: 0)
+            if let hero = data.hero {
+                reveal(heroCard(hero), order: 0)
+                if !data.rows.isEmpty {
+                    reveal(Rectangle()
+                        .fill(contentColor.opacity(0.12))
+                        .frame(height: 0.5)
+                        .padding(.top, 6)
+                        .padding(.bottom, 3), order: 1)
+                }
+            } else {
+                reveal(Text("AGENTS")
+                    .font(.system(size: 9.5, weight: .medium))
+                    .tracking(0.6)
+                    .foregroundStyle(contentColor.opacity(0.5))
+                    .frame(height: 14), order: 0)
+            }
             ForEach(Array(shown.enumerated()), id: \.element.id) { index, row in
-                reveal(button(row), order: 1 + index)
+                reveal(button(row), order: 2 + index)
             }
             if more > 0 {
                 reveal(Text("\(more) more")
                     .font(.system(size: 10.5))
                     .foregroundStyle(contentColor.opacity(0.5))
-                    .padding(.leading, 22), order: 1 + shown.count)
+                    .padding(.leading, 20), order: 2 + shown.count)
             }
         }
         .padding(.leading, 16)
@@ -104,12 +137,99 @@ struct AgentPanelView: View {
         .onAppear { revealed = true }
     }
 
+    // MARK: - Hero
+
+    private func heroCard(_ hero: AgentPanelData.Hero) -> some View {
+        Button {
+            emit(.open(hero.url))
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) {
+                    heroGlyph(hero.kind)
+                    Text(Self.tag(hero.kind))
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .tracking(0.6)
+                        .foregroundStyle(accent(hero.kind))
+                    if let icon = hero.icon.flatMap(NSImage.init(data:)) {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFit()
+                            .frame(width: 14, height: 14)
+                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                    }
+                    Spacer(minLength: 4)
+                    if hero.kind != .failed, let since = hero.since {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(GitHubPanelView.clock(context.date.timeIntervalSince(since)))
+                                .font(.system(size: 9.5, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(accent(hero.kind))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(contentColor.opacity(0.1)))
+                        }
+                    }
+                }
+                .frame(height: 16)
+                Text(hero.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(contentColor)
+                    .lineLimit(1)
+                    .padding(.top, 2)
+                Text(hero.detail)
+                    .font(.system(size: 10, design: hero.isCommand ? .monospaced : .default))
+                    .foregroundStyle(contentColor.opacity(0.55))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.top, 1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ListRowButtonStyle(reduceMotion: reduceMotion))
+    }
+
+    @ViewBuilder
+    private func heroGlyph(_ kind: AgentPanelData.Hero.Kind) -> some View {
+        switch kind {
+        case .needsYou:
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AgentColors.waiting)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AgentColors.failed)
+        case .working:
+            AgentGlyph(color: AgentColors.orange, turning: true, count: nil, reduceMotion: reduceMotion)
+        }
+    }
+
+    private func accent(_ kind: AgentPanelData.Hero.Kind) -> Color {
+        switch kind {
+        case .needsYou: AgentColors.waiting
+        case .failed: AgentColors.failed
+        case .working: AgentColors.orange
+        }
+    }
+
+    private static func tag(_ kind: AgentPanelData.Hero.Kind) -> String {
+        switch kind {
+        case .needsYou: "NEEDS YOU"
+        case .failed: "FAILED"
+        case .working: "WORKING"
+        }
+    }
+
+    // MARK: - Rows
+
     private func button(_ row: AgentPanelData.Row) -> some View {
         Button {
             emit(.open(row.url))
         } label: {
             label(row)
-                .frame(height: 20)
+                .frame(height: rowHeight)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
         }
@@ -118,68 +238,90 @@ struct AgentPanelView: View {
 
     private func label(_ row: AgentPanelData.Row) -> some View {
         HStack(spacing: 6) {
-            icon(row)
+            glyph(row.mark)
             Text(row.name)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(contentColor.opacity(0.92))
                 .lineLimit(1)
                 .truncationMode(.tail)
-            Spacer(minLength: 6)
-            mark(row.mark)
+                .frame(width: Self.nameWidth(row.name), alignment: .leading)
+                .layoutPriority(1)
+            Text(middle(row.mark))
+                .font(.system(size: 11))
+                .foregroundStyle(middleColor(row.mark))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 4)
+            right(row.mark)
         }
     }
 
-    private func icon(_ row: AgentPanelData.Row) -> some View {
+    private func glyph(_ mark: AgentPanelData.Row.Mark) -> some View {
         Group {
-            if let image = row.icon.flatMap(NSImage.init(data:)) {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .frame(width: 16, height: 16)
-                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-            } else {
-                AgentGlyph(color: AgentColors.orange, turning: false, count: nil, reduceMotion: reduceMotion)
+            switch mark {
+            case .waiting:
+                Image(systemName: "hand.raised.fill").foregroundStyle(AgentColors.waiting)
+            case .working:
+                Image(systemName: "asterisk").foregroundStyle(AgentColors.orange)
+            case .done:
+                Image(systemName: "checkmark").foregroundStyle(AgentColors.done)
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(AgentColors.failed)
+            case .idle:
+                Image(systemName: "moon.fill").foregroundStyle(contentColor.opacity(0.35))
             }
         }
-        .frame(width: 16, height: 16)
+        .font(.system(size: 10, weight: .semibold))
+        .frame(width: 14)
     }
 
-    private func word(_ text: String, _ color: Color) -> some View {
-        Text(text)
-            .font(.system(size: 12))
-            .monospacedDigit()
-            .foregroundStyle(color)
-            .lineLimit(1)
-            .truncationMode(.tail)
+    private func middle(_ mark: AgentPanelData.Row.Mark) -> String {
+        switch mark {
+        case .waiting(let text, _), .working(let text, _), .done(let text, _), .failed(let text, _): text
+        case .idle: "Idle"
+        }
+    }
+
+    private func middleColor(_ mark: AgentPanelData.Row.Mark) -> Color {
+        if case .failed = mark { return AgentColors.failed }
+        return contentColor.opacity(0.5)
     }
 
     @ViewBuilder
-    private func mark(_ mark: AgentPanelData.Row.Mark) -> some View {
+    private func right(_ mark: AgentPanelData.Row.Mark) -> some View {
         switch mark {
-        case .waiting(let detail):
-            word(detail, AgentColors.waiting)
-        case .working(let since):
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                word(GitHubPanelView.clock(context.date.timeIntervalSince(since)), AgentColors.orange)
-            }
-        case .done(let at):
+        case .waiting(_, let since):
+            clock(since, AgentColors.waiting)
+        case .working(_, let since):
+            clock(since, AgentColors.orange)
+        case .done(_, let at), .failed(_, let at):
             TimelineView(.periodic(from: .now, by: 30)) { context in
-                word(Self.doneText(at, now: context.date), AgentColors.done)
+                Text(Self.age(at, now: context.date))
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(contentColor.opacity(0.5))
+                    .lineLimit(1)
+                    .fixedSize()
             }
-        case .failed(let reason):
-            word(reason, AgentColors.failed)
         case .idle:
-            word("Idle", contentColor.opacity(0.5))
+            EmptyView()
         }
     }
 
-    /// "Done just now" under a minute, else "Done 2 min. ago".
-    static func doneText(_ at: Date, now: Date) -> String {
-        if now.timeIntervalSince(at) < 60 { return "Done just now" }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.dateTimeStyle = .numeric
-        return "Done " + formatter.localizedString(for: at, relativeTo: now)
+    private func clock(_ since: Date, _ color: Color) -> some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            Text(GitHubPanelView.clock(context.date.timeIntervalSince(since)))
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+
+    /// "just now" under a minute, else "2 min. ago".
+    static func age(_ at: Date, now: Date) -> String {
+        if now.timeIntervalSince(at) < 60 { return "just now" }
+        return ageFormatter.localizedString(for: at, relativeTo: now)
     }
 }

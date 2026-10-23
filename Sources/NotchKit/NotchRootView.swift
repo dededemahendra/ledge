@@ -792,7 +792,7 @@ public struct NotchRootView: View {
                     || activity.id == NotchController.agentRunActivityID {
             // An agent item (2026-10-23): Claude's orange asterisk, turning
             // while one works, the count of sessions it stands for.
-            AgentGlyph(color: tintColor(for: .color(red: 0.851, green: 0.467, blue: 0.341)) ?? contentColor,
+            AgentGlyph(color: AgentColors.orange,
                        turning: activity.id == NotchController.agentRunActivityID,
                        count: activity.badge, reduceMotion: controller.reduceMotion)
         } else if let activity = controller.activities.first,

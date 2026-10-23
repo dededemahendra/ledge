@@ -1232,8 +1232,8 @@ private func callDisplay(artwork: Data? = nil) -> NotchController.ActivityDispla
 
 // MARK: - Agents (2026-10-23)
 
-private let agentPanel = AgentPanelData(rows: [
-    .init(id: "s1", name: "ledge", icon: nil, mark: .idle, url: URL(string: "ledge://agent/s1")!)
+private let agentPanel = AgentPanelData(hero: nil, rows: [
+    .init(id: "s1", name: "Ledge", mark: .idle, url: URL(string: "ledge://agent/s1")!)
 ])
 
 @MainActor

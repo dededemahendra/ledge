@@ -35,7 +35,7 @@ private func at(_ s: TimeInterval) -> Date { t0.addingTimeInterval(s) }
     _ = s.apply(msg("PreToolUse", stamp: 1, tool: "Read"), facts: facts, now: at(5))
     #expect(s.sessions[0].state == .working)
     #expect(s.sessions[0].turnStart == at(5))
-    #expect(s.sessions[0].name == "ledge")
+    #expect(s.sessions[0].name == "Ledge")
     #expect(s.sessions[0].project == "ledge")
 }
 
@@ -197,11 +197,50 @@ private func at(_ s: TimeInterval) -> Date { t0.addingTimeInterval(s) }
     var s = AgentSessions()
     _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "a"), facts: facts, now: t0)
     _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "b"), facts: facts, now: at(1))
-    #expect(Set(s.sessions.map(\.name)) == ["ledge", "ledge 2"])
+    #expect(Set(s.sessions.map(\.name)) == ["Ledge", "Ledge 2"])
     _ = s.apply(msg("SessionEnd", stamp: 2, session: "a"), facts: facts, now: at(2))
     _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "c"), facts: facts, now: at(3))
-    #expect(s.sessions.first { $0.id == "c" }?.name == "ledge")
-    #expect(s.sessions.first { $0.id == "b" }?.name == "ledge 2")
+    #expect(s.sessions.first { $0.id == "c" }?.name == "Ledge")
+    #expect(s.sessions.first { $0.id == "b" }?.name == "Ledge 2")
+}
+
+@Test func namesArePrettified() {
+    var s = AgentSessions()
+    _ = s.apply(msg("SessionStart", stamp: 1, project: "/p/mornington-green"), facts: facts, now: t0)
+    #expect(s.sessions[0].name == "Mornington green")
+    _ = s.apply(msg("UserPromptSubmit", stamp: 2, title: "fix the login_bug"), facts: facts, now: at(1))
+    #expect(s.sessions[0].name == "Fix the login bug")
+}
+
+@Test func theActionFollowsTheTurn() {
+    var s = AgentSessions()
+    _ = s.apply(msg("UserPromptSubmit", stamp: 1), facts: facts, now: t0)
+    #expect(s.sessions[0].action == "Thinking")
+    #expect(s.sessions[0].actionIsCommand == false)
+    _ = s.apply(msg("PreToolUse", stamp: 2, tool: "Bash", summary: "make test"), facts: facts, now: at(1))
+    #expect(s.sessions[0].action == "Running make test")
+    #expect(s.sessions[0].actionIsCommand)
+    _ = s.apply(msg("PostToolUse", stamp: 3, tool: "Bash"), facts: facts, now: at(2))
+    #expect(s.sessions[0].action == "Running make test")
+    _ = s.apply(msg("PreToolUse", stamp: 4, tool: "Read", summary: "a.swift"), facts: facts, now: at(3))
+    #expect(s.sessions[0].action == "Reading a.swift")
+    #expect(s.sessions[0].actionIsCommand == false)
+    _ = s.apply(msg("Stop", stamp: 5), facts: facts, now: at(4))
+    #expect(s.sessions[0].action == nil)
+    #expect(s.sessions[0].actionIsCommand == false)
+}
+
+@Test func aSessionFirstSeenMidTurnTakesTheFirstToolAction() {
+    var s = AgentSessions()
+    _ = s.apply(msg("PreToolUse", stamp: 1, tool: "Grep", summary: "foo"), facts: facts, now: t0)
+    #expect(s.sessions[0].action == "Searching foo")
+}
+
+@Test func anInterruptClearsTheAction() {
+    var s = AgentSessions()
+    _ = s.apply(msg("PreToolUse", stamp: 1, tool: "Bash", summary: "ls"), facts: facts, now: t0)
+    s.interrupt(session: "s1", now: at(1))
+    #expect(s.sessions[0].action == nil)
 }
 
 @Test func aTitleNamesTheSession() {
@@ -250,9 +289,9 @@ private func at(_ s: TimeInterval) -> Date { t0.addingTimeInterval(s) }
     _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "b"), facts: facts, now: at(1))
     _ = s.apply(msg("SessionEnd", stamp: 2, session: "a"), facts: facts, now: at(2))
     _ = s.apply(msg("PreToolUse", stamp: 2, session: "b", tool: "Read"), facts: facts, now: at(3))
-    #expect(s.sessions.first { $0.id == "b" }?.name == "ledge 2")
+    #expect(s.sessions.first { $0.id == "b" }?.name == "Ledge 2")
     _ = s.apply(msg("UserPromptSubmit", stamp: 1, session: "c"), facts: facts, now: at(4))
-    #expect(s.sessions.first { $0.id == "c" }?.name == "ledge")
+    #expect(s.sessions.first { $0.id == "c" }?.name == "Ledge")
 }
 
 @Test func aRepeatedStopOrStopFailureChangesNothing() {
