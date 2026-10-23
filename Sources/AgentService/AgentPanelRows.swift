@@ -40,9 +40,25 @@ public enum AgentPanelRows {
     /// A failure stays the hero this long.
     static let failedHeroWindow: TimeInterval = 600
 
+    /// While any session is waiting or working, the rows leave out done and idle ones (2026-10-23).
     public static func card(_ sessions: [AgentSession], now: Date) -> AgentCard {
         let hero = pickHero(sessions, now: now)
-        let rest = sessions.filter { $0.id != hero?.id }
+        let live = sessions.contains {
+            switch $0.state {
+            case .waiting, .working: true
+            default: false
+            }
+        }
+        let rest = sessions.filter { s in
+            if s.id == hero?.id { return false }
+            if live {
+                switch s.state {
+                case .finished, .idle: return false
+                default: break
+                }
+            }
+            return true
+        }
         let ordered = rest.enumerated().sorted { a, b in
             let (ga, gb) = (group(a.element), group(b.element))
             if ga != gb { return ga < gb }

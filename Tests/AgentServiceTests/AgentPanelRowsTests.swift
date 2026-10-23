@@ -92,13 +92,52 @@ private func session(_ state: AgentSession.State, id: String, since: Date = t0, 
     ], now: at(3000))
     // failed is stale (older than 600 s), so no failed hero; the longest waiting is the hero.
     #expect(card.hero?.id == "p1")
-    #expect(card.rows.map(\.id) == ["p2", "w2", "w1", "f1", "d2", "d1", "i2", "i1"])
+    // done and idle are hidden while anything is waiting or working.
+    #expect(card.rows.map(\.id) == ["p2", "w2", "w1", "f1"])
     #expect(card.rows[0].mark == .waiting(detail: "Needs you", since: at(3)))
     #expect(card.rows[1].mark == .working(action: "Thinking", since: at(6)))
     #expect(card.rows[2].mark == .working(action: "Editing a file", since: at(4)))
     #expect(card.rows[3].mark == .failed(reason: "Rate limited", at: at(2000)))
-    #expect(card.rows[4].mark == .done(took: 9, at: at(60)))
-    #expect(card.rows[7].mark == .idle)
+}
+
+@Test func doneAndIdleRowsAppearOnceNothingIsLive() {
+    let card = AgentPanelRows.card([
+        session(.idle, id: "i1", last: at(90)),
+        session(.finished(took: 9), id: "d1", since: at(60), last: at(60)),
+        session(.failed(reason: "rate_limit"), id: "f1", since: at(2000), last: at(2000)),
+    ], now: at(3000))
+    #expect(card.hero == nil)
+    #expect(card.rows.map(\.id) == ["f1", "d1", "i1"])
+    #expect(card.rows[1].mark == .done(took: 9, at: at(60)))
+    #expect(card.rows[2].mark == .idle)
+}
+
+@Test func whileOneWorksDoneAndIdleAreHidden() {
+    let card = AgentPanelRows.card([
+        session(.working, id: "w"), session(.finished(took: 3), id: "d"), session(.idle, id: "i"),
+    ], now: at(10))
+    #expect(card.hero?.id == "w")
+    #expect(card.rows.isEmpty)
+}
+
+@Test func whileSomeRunFailedStaysAndDoneIsHidden() {
+    let card = AgentPanelRows.card([
+        session(.waiting(.plan), id: "p", since: at(1)),
+        session(.working, id: "w", since: at(2), last: at(2)),
+        session(.finished(took: 3), id: "d", last: at(3)),
+        session(.failed(reason: "rate_limit"), id: "f", since: at(4), last: at(4)),
+    ], now: at(5000))
+    #expect(card.hero?.id == "p")
+    #expect(card.rows.map(\.id) == ["w", "f"])
+}
+
+@Test func aRecentFailureHeroLeavesTheDoneRow() {
+    let card = AgentPanelRows.card([
+        session(.failed(reason: "rate_limit"), id: "f", since: at(90)),
+        session(.finished(took: 3), id: "d"),
+    ], now: at(100))
+    #expect(card.hero?.id == "f" && card.hero?.kind == .failed)
+    #expect(card.rows.map(\.id) == ["d"])
 }
 
 @Test func aWorkingRowWithoutAnActionIsThinking() {
