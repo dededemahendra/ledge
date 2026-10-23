@@ -319,6 +319,11 @@ public struct NotchRootView: View {
     /// the menu bar's "Toggle Panel".
     private let onTap: () -> Void
 
+    /// A click on the tab (2026-10-23). A no-op by default, like `onTap`;
+    /// `NotchPresenter` routes it to `NotchController.tapTab()` and resyncs
+    /// the window, as it does the island's.
+    private let onTabTap: () -> Void
+
     /// Mouse held down on a clickable island (`controller.linkURL`): the
     /// content dips like a button's, on press-down, not release.
     private var _pressed: State<Bool> = State(initialValue: false)
@@ -406,9 +411,10 @@ public struct NotchRootView: View {
         #endif
     }
 
-    public init(controller: NotchController, onTap: @escaping () -> Void = {}) {
+    public init(controller: NotchController, onTap: @escaping () -> Void = {}, onTabTap: @escaping () -> Void = {}) {
         self.controller = controller
         self.onTap = onTap
+        self.onTabTap = onTabTap
         _previousHeight = State(initialValue: controller.parameters.height)
         _previousWidth = State(initialValue: controller.parameters.width)
     }
@@ -488,13 +494,20 @@ public struct NotchRootView: View {
                     )
                 }
         }
-        // The press dip belongs to the island's own area, never the tab's.
+        // The island's tap and press dip belong to its own area, never the
+        // tab's. The tap sits here, before the press drag (2026-10-23): on
+        // the canvas it lost to this zero-distance drag, and a click on the
+        // island did nothing.
         .contentShape(shape)
+        .onTapGesture { onTap() }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in if !pressed { pressed = true } }
                 .onEnded { _ in pressed = false }
         )
+        // The link pointer over a clickable island, the arrow elsewhere.
+        // The tab has its own (`tabLayer`).
+        .pointerStyle(controller.linkURL != nil ? .link : .default)
         // The blip pulse (`NotchController.blipPulse`): the whole island
         // swells ~5% from its top edge — the notch stays welded — and
         // springs back, for a blip that lands with no shape change to
@@ -525,15 +538,6 @@ public struct NotchRootView: View {
             height: NotchMetrics.canvasSize.height,
             alignment: .top
         )
-        // Spec §5: `hover ──▶ expanded`; a tap pins/unpins, and
-        // `.leftMouseDown`-outside/Escape (both in `NotchPresenter`) unpin.
-        // AppKit's own
-        // hit-testing (`NotchHostingView.hitTest`, driven by
-        // `interactivePath`) already restricts which points ever reach this
-        // view, so no extra region check is needed here.
-        .onTapGesture { onTap() }
-        // The link pointer over a clickable island, the arrow elsewhere.
-        .pointerStyle(controller.linkURL != nil ? .link : .default)
         .animation(
             NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
             value: parameters
@@ -575,7 +579,7 @@ public struct NotchRootView: View {
 
     /// The tab beside the island (2026-10-23): a second shape in the same
     /// material, its item's short form centred in it. Its tap is its own
-    /// (`NotchController.tapTab`) and never reaches the island's.
+    /// (`onTabTap`) and never reaches the island's.
     @ViewBuilder
     private func tabLayer(island: NotchShapeParameters, showEffects: Bool) -> some View {
         let reduceMotion = controller.reduceMotion
@@ -610,7 +614,9 @@ public struct NotchRootView: View {
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : nil, value: controller.isTabShowing)
         .contentShape(tabShape)
         .allowsHitTesting(controller.isTabShowing)
-        .onTapGesture { controller.tapTab() }
+        .onTapGesture { onTabTap() }
+        // It has a click whatever the lead's link is, so its own pointer.
+        .pointerStyle(controller.isTabShowing ? .link : nil)
         .keyframeAnimator(initialValue: 1.0, trigger: tabLanded) { view, scale in
             view.scaleEffect(reduceMotion ? 1 : scale, anchor: pulseAnchor)
         } keyframes: { _ in
