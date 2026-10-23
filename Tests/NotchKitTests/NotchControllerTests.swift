@@ -1504,6 +1504,18 @@ private func tabGitHubPanel() -> GitHubPanelData {
 }
 
 @MainActor
+@Test func atActivitySizeAPartChangeStillPicksTheNewPartsCard() {
+    let c = makeController()
+    c.setCallPanel(callPanel)
+    c.setActivities([.init(id: NotchController.chargingActivityID, title: "Charging", compactText: "80%")], overflow: 0,
+                    tab: .init(id: NotchController.callActivityID, title: "Call", compactText: "1"))
+    c.setHovered(true, part: .island)
+    #expect(c.state == .activity)
+    c.setHovered(true, part: .tab)
+    #expect(c.panel == .call && c.state == .expanded)
+}
+
+@MainActor
 @Test func aTabWithNoActivityBesideItNeverHoldsActivitySize() {
     let c = makeController()
     c.setActivities([], overflow: 0,
