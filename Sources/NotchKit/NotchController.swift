@@ -1066,7 +1066,7 @@ public final class NotchController {
     public var isTabShowing: Bool { tab != nil && state == .activity && !isTucked }
 
     public var tabParameters: NotchTabParameters {
-        isTabShowing ? metrics.tab(beside: parameters) : metrics.tabTucked(beside: parameters)
+        isTabShowing ? metrics.tab : metrics.tabTucked
     }
 
     /// Identity of the leading blip, if the leading activity is one.

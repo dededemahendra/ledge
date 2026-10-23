@@ -11,14 +11,14 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
 
 @Test func aPointOnTheIslandIsTheIsland() {
     let island = notch.oneActivity
-    let tab = notch.tab(beside: island)
+    let tab = notch.tab
     let point = CGPoint(x: NotchPresenter.canvas.midX, y: 10)
     #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab, metrics: notch) == .island)
 }
 
 @Test func aPointOnTheTabIsTheTab() {
     let island = notch.oneActivity
-    let tab = notch.tab(beside: island)
+    let tab = notch.tab
     let frame = tabFrame(island, tab)
     let point = CGPoint(x: frame.midX, y: 10)
     #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab, metrics: notch) == .tab)
@@ -26,7 +26,7 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
 
 @Test func pointsInTheGapAndBesideTheTabPassThrough() {
     let island = notch.oneActivity
-    let tab = notch.tab(beside: island)
+    let tab = notch.tab
     let frame = tabFrame(island, tab)
     let gap = CGPoint(x: NotchPresenter.canvas.midX + island.width / 2 + 3, y: 10)
     let right = CGPoint(x: frame.maxX + 4, y: 10)
@@ -38,7 +38,7 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
 
 @Test func withNoTabOnlyTheIslandCounts() {
     let island = notch.oneActivity
-    let frame = tabFrame(island, notch.tab(beside: island))
+    let frame = tabFrame(island, notch.tab)
     let point = CGPoint(x: frame.midX, y: 10)
     #expect(NotchPresenter.hoverPart(at: point, island: island, tab: nil, metrics: notch) == nil)
 }
@@ -46,7 +46,7 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
 @Test func aPillsTabReachesUpOverItsInsetToTheTopEdge() {
     let pill = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 44, height: 28), isVirtual: true)
     let island = pill.oneActivity
-    let tab = pill.tab(beside: island)
+    let tab = pill.tab
     let frame = tabFrame(island, tab)
     let point = CGPoint(x: frame.midX, y: 1)
     #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab, metrics: pill) == .tab)
