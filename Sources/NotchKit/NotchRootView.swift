@@ -787,6 +787,15 @@ public struct NotchRootView: View {
                 .transition(.blurReplace)
                 .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: activity.title)
         } else if let activity = controller.activities.first,
+                  activity.id == NotchController.agentActivityID
+                    || activity.id == NotchController.agentWaitingActivityID
+                    || activity.id == NotchController.agentRunActivityID {
+            // An agent item (2026-10-23): Claude's orange asterisk, turning
+            // while one works, the count of sessions it stands for.
+            AgentGlyph(color: tintColor(for: .color(red: 0.851, green: 0.467, blue: 0.341)) ?? contentColor,
+                       turning: activity.id == NotchController.agentRunActivityID,
+                       count: activity.badge, reduceMotion: controller.reduceMotion)
+        } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
             // tall in a 32pt ear, width from the render's own aspect (the
@@ -1206,8 +1215,12 @@ public struct NotchRootView: View {
                 let isTicking = activity.id == NotchController.timerActivityID
                     || activity.id == NotchController.githubRunActivityID
                     || activity.id == NotchController.callActivityID
+                    || activity.id == NotchController.agentRunActivityID
                 // …and a GitHub blip's word, in its event's colour (2026-10-22).
+                // …and an agent blip's or waiting item's word, in its record's tint (2026-10-23).
                 let isGitHub = activity.id == NotchController.githubActivityID
+                    || activity.id == NotchController.agentActivityID
+                    || activity.id == NotchController.agentWaitingActivityID
                 compactValue(compact, bump: !isTicking, color: (isTicking || isGitHub) ? tintColor(for: activity.tint) : nil)
             } else if activity.id == Self.mediaActivityID,
                       controller.media != nil,
@@ -1321,6 +1334,15 @@ public struct NotchRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .id("github")
+            .transition(panelTransition)
+        } else if controller.state == .expanded, controller.panel == .agents, let data = controller.agentPanel {
+            // The Agents card (2026-10-23).
+            AgentPanelView(
+                data: data, contentColor: contentColor,
+                reduceMotion: controller.reduceMotion, emit: { controller.emit($0) }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .id("agents")
             .transition(panelTransition)
         } else if controller.state == .expanded, controller.panel == .call, let data = controller.callPanel {
             // The call card (2026-10-22).
