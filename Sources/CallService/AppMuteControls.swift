@@ -10,8 +10,9 @@ import os
 public protocol AppMuteSource: AnyObject {
     func update(for app: CallAppInfo?)
     var muted: Bool? { get }
-    /// Presses the control; whether there was one to press.
-    func press() -> Bool
+    /// Brings the app's own mute to `target`, pressing its control only if
+    /// it isn't already; whether there was a control.
+    func setMuted(_ target: Bool) -> Bool
 }
 
 /// An Accessibility element carried between threads. AXUIElement is a
@@ -21,8 +22,16 @@ struct AXElementRef: @unchecked Sendable {
 }
 
 /// A live element seen through `AXNode`, its children fetched as asked.
+/// Each element it hands out gives up after 0.25 s, so a hung app can't
+/// hold a read up; the limit stays on these elements, not the whole app.
 struct LiveAXNode: AXNode {
+    static let timeout: Float = 0.25
     let element: AXUIElement
+
+    init(element: AXUIElement) {
+        AXUIElementSetMessagingTimeout(element, Self.timeout)
+        self.element = element
+    }
 
     var role: String? { string(kAXRoleAttribute) }
     var identifier: String? { string(kAXIdentifierAttribute) }
@@ -51,27 +60,27 @@ struct LiveAXNode: AXNode {
 }
 
 /// Zoom's and Meet's own mute through Accessibility (2026-10-23). The control
-/// is found once per call by walking the app's tree on a background queue;
-/// after that only its title is read, once a second, and a failed read
-/// means finding it again. Nothing is brought to the front and no keys are
-/// sent. Every Accessibility call in the process gives up after 0.25 s, so a
-/// hung app can't hold anything up.
+/// is found by walking the app's tree on a background queue, then kept, and
+/// only its title is read — once a second, one read at a time; a search
+/// that finds nothing backs off to every 10 s (`ReadPacer`). A press is
+/// decided on the queue by target, against a fresh read, and reads that
+/// began before it or disagree just after it aren't believed
+/// (`MuteReadGate`). Nothing is brought to the front and no keys are sent.
 @MainActor
 public final class AXAppMuteControls: AppMuteSource {
     private struct State: Sendable {
         var bundleID: String?
         var element: AXElementRef?
         var muted: Bool?
+        var gate = MuteReadGate()
+        var pacer = ReadPacer()
     }
 
     private let queue = DispatchQueue(label: "com.dedemahendra.ledge.call-mute")
     private let state = OSAllocatedUnfairLock(initialState: State())
     private var current: CallAppInfo?
-    private var lastUpdate = Date.distantPast
 
-    public init() {
-        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.25)
-    }
+    public init() {}
 
     public var muted: Bool? {
         let bundleID = current?.bundleID
@@ -84,57 +93,80 @@ public final class AXAppMuteControls: AppMuteSource {
             state.withLock { $0 = State() }
             return
         }
-        let now = Date()
-        let changed = current != app
-        guard changed || now.timeIntervalSince(lastUpdate) >= 1 else { return }
-        lastUpdate = now
-        if changed {
+        if current != app {
             current = app
             state.withLock { $0 = State(bundleID: app.bundleID) }
         }
+        let now = Date()
+        let generation = state.withLock { state -> Int? in
+            state.pacer.shouldStart(at: now) ? state.gate.generation : nil
+        }
+        guard let generation else { return }
         let state = self.state
         let bundleID = app.bundleID
         let pid = app.pid
         queue.async {
-            Self.read(kind: kind, bundleID: bundleID, pid: pid, state: state)
+            Self.read(kind: kind, bundleID: bundleID, pid: pid, generation: generation, state: state)
         }
     }
 
-    public func press() -> Bool {
+    public func setMuted(_ target: Bool) -> Bool {
         let bundleID = current?.bundleID
-        let element = state.withLock { state -> AXElementRef? in
-            guard state.bundleID == bundleID, bundleID != nil, state.muted != nil else { return nil }
-            // Shown at once; the next read corrects it if the press missed.
-            state.muted?.toggle()
-            return state.element
+        let now = Date()
+        let found = state.withLock { state -> (element: AXElementRef?, known: Bool) in
+            guard state.bundleID == bundleID, bundleID != nil, let muted = state.muted else { return (nil, false) }
+            guard muted != target, let element = state.element else { return (nil, true) }
+            state.gate.pressed(target, at: now)
+            state.muted = target
+            return (element, true)
         }
-        guard let element else { return false }
-        queue.async { _ = AXUIElementPerformAction(element.element, kAXPressAction as CFString) }
+        guard found.known else { return false }
+        guard let element = found.element, let kind = bundleID.flatMap(MeetingMute.kind(for:)) else { return true }
+        queue.async {
+            // Decided against a fresh read: never pressed the wrong way.
+            let title = LiveAXNode(element: element.element).title
+            if MeetingMute.isMuted(kind, title: title) != target {
+                _ = AXUIElementPerformAction(element.element, kAXPressAction as CFString)
+            }
+        }
         return true
     }
 
-    private nonisolated static func read(kind: MeetingMute, bundleID: String, pid: pid_t,
+    private nonisolated static func read(kind: MeetingMute, bundleID: String, pid: pid_t, generation: Int,
                                          state: OSAllocatedUnfairLock<State>) {
-        let cached = state.withLock { $0.bundleID == bundleID ? $0.element : nil }
+        guard let cached = state.withLock({ $0.bundleID == bundleID ? Optional($0.element) : nil }) else {
+            return   // the call moved on: this read is no longer anyone's
+        }
+        let (element, muted): (AXElementRef?, Bool?)
         if let cached, let title = LiveAXNode(element: cached.element).title {
-            let muted = MeetingMute.isMuted(kind, title: title)
-            state.withLock { if $0.bundleID == bundleID { $0.muted = muted } }
-            return
+            (element, muted) = (cached, MeetingMute.isMuted(kind, title: title))
+        } else {
+            let found = find(kind: kind, pid: pid)
+            (element, muted) = (found.map { AXElementRef(element: $0.element) },
+                                found.flatMap { MeetingMute.isMuted(kind, title: $0.title) })
         }
-        let app = AXUIElementCreateApplication(pid)
-        if kind == .meet {
-            // Chromium builds its pages' tree only when asked.
-            AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
-        }
-        let root = LiveAXNode(element: app)
-        let found = MeetingMute.find(kind, menuBar: kind == .zoom ? root.menuBar : nil,
-                                     windows: kind == .meet ? root.windows : [])
-        let muted = found.flatMap { MeetingMute.isMuted(kind, title: $0.title) }
-        let element = found.map { AXElementRef(element: $0.element) }
+        let now = Date()
         state.withLock { state in
             guard state.bundleID == bundleID else { return }
+            state.pacer.finished(found: element != nil, at: now)
+            guard state.gate.accepts(muted, startedAt: generation, at: now) else { return }
             state.element = element
             state.muted = muted
+        }
+    }
+
+    private nonisolated static func find(kind: MeetingMute, pid: pid_t) -> LiveAXNode? {
+        let app = AXUIElementCreateApplication(pid)
+        let root = LiveAXNode(element: app)
+        switch kind {
+        case .zoom:
+            return MeetingMute.find(kind, menuBar: root.menuBar, windows: [])
+        case .meet:
+            // Chromium builds its pages' trees only when asked, for every tab
+            // from then on: ask only with a Meet window open.
+            guard MeetingMute.needsPageTree(windowTitles: root.windows.compactMap(\.title)) else { return nil }
+            AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+            return MeetingMute.find(kind, menuBar: nil, windows: root.windows)
         }
     }
 }

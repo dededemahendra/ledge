@@ -170,9 +170,10 @@ public final class CallService {
         let appMuted = appMute.muted
 
         var states = micStates()
-        // With the app's own mute in use, no system mute is applied to new
-        // mics: the two are never stacked.
-        if wantsMute, appMuted == nil {
+        // Ledge's own system mute, while it holds, covers a mic that starts
+        // (AirPods connecting) — with or without the app's own control: a
+        // tap with the control known clears it, so it never stacks.
+        if wantsMute {
             // A mic that starts while muted (AirPods connecting) is muted too.
             // One unmuted elsewhere stays as the user left it.
             let plan = InputMutePlan.mute(states, changes: changes)
@@ -235,10 +236,21 @@ public final class CallService {
         // the app's control is pressed only if it isn't already as wanted.
         if let appMuted = appMute.muted {
             let all = devices.states()
-            let systemMuted = InputMutePlan.isMuted(micStates(all), changes: InputMutePlan.stillHeld(all, changes: changes))
+            let held = InputMutePlan.stillHeld(all, changes: changes)
+            let states = micStates(all)
+            let systemMuted = InputMutePlan.isMuted(states, changes: held)
             let target = !(appMuted || systemMuted)
-            restoreMute()
-            if appMuted != target { _ = appMute.press() }
+            if systemMuted {
+                // Whoever muted the mic — Ledge, a headset's button — a tap
+                // meaning "unmute" clears it, as without the app's control.
+                owed += InputMutePlan.absent(all, changes: changes)
+                devices.perform(InputMutePlan.unmute(states, changes: held))
+                changes = []
+                wantsMute = false
+            } else {
+                restoreMute()
+            }
+            _ = appMute.setMuted(target)
             return
         }
         // Plan against what still stands: a mute undone elsewhere is no

@@ -60,3 +60,10 @@ private func window(_ title: String, button: String = "Turn off microphone") -> 
     #expect(MeetingMute.kind(for: "com.google.Chrome") == .meet)
     #expect(MeetingMute.kind(for: "com.apple.FaceTime") == nil)
 }
+
+/// Chromium is asked for its page tree only when a Meet window is open
+/// (review, 2026-10-23): asking makes it build trees for every tab.
+@Test func onlyAMeetWindowNeedsThePageTree() {
+    #expect(MeetingMute.needsPageTree(windowTitles: ["Personal: Meet - abc-defg-hij", "Personal: Home"]))
+    #expect(!MeetingMute.needsPageTree(windowTitles: ["Discord", "Personal: Home"]))
+}

@@ -1817,3 +1817,11 @@ Pending until the user reports them:
 3. Meet with another tab in front: the card falls back to the system-wide
    mute.
 4. FaceTime, WhatsApp and other apps: unchanged, system-wide mute.
+5. Mute from Zoom's own toolbar while Zoom is in the background: the island
+   goes red within about a second.
+6. Mute in Meet, then bring another tab to the front: note what the island
+   shows and what a tap does (review I6; it depends on Chromium).
+7. The iPhone Live Activity card still opens and parks (the 0.25 s
+   Accessibility limit is now scoped to the call controls only).
+8. Meet in Safari: expected to fall back to the system mute; Safari's CPU
+   stays calm during the call.

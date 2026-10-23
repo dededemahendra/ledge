@@ -62,6 +62,12 @@ public enum MeetingMute: Sendable, Equatable {
         }
     }
 
+    /// Whether to ask a browser for its page tree: only with a Meet window
+    /// open, since asking makes Chromium build trees for every tab.
+    public static func needsPageTree(windowTitles: [String]) -> Bool {
+        windowTitles.contains { $0.contains("Meet - ") }
+    }
+
     public static func isMuted(_ kind: MeetingMute, title: String?) -> Bool? {
         guard let title else { return nil }
         switch kind {

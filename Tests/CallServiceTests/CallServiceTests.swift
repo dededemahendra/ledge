@@ -21,10 +21,12 @@ private final class FakeAppMute: AppMuteSource {
     private(set) var updatedFor: [String?] = []
     private(set) var presses = 0
     func update(for app: CallAppInfo?) { updatedFor.append(app?.bundleID) }
-    func press() -> Bool {
+    func setMuted(_ target: Bool) -> Bool {
         guard let current = muted else { return false }
-        presses += 1
-        muted = !current
+        if current != target {
+            presses += 1
+            muted = target
+        }
         return true
     }
 }
@@ -555,4 +557,29 @@ private final class Rig {
     rig.holders = []
     rig.refresh(from: 2.25, to: 6)
     #expect(rig.appMute.updatedFor.last == .some(nil))
+}
+
+/// A mic muted outside Ledge (a headset's button): the tap still unmutes
+/// (review, 2026-10-23).
+@MainActor @Test func aTapUnmutesAMicMutedOutsideLedge() {
+    let rig = Rig([mic("a", muted: true)])
+    rig.appMute.muted = false
+    #expect(rig.refresh(to: 2).isMuted)
+    rig.service.toggleMute()
+    #expect(!rig.devices.device("a").isMuted)
+    #expect(rig.appMute.presses == 0)
+    #expect(!rig.refresh(from: 2.25, to: 2.25).isMuted)
+}
+
+/// Ledge's own mute keeps covering a mic that starts after the app's
+/// control was found (AirPods connecting).
+@MainActor @Test func ledgesMuteStillCoversANewMicOnceTheAppsControlIsFound() {
+    let rig = Rig([mic("a"), mic("b", running: false)])
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    rig.appMute.muted = false
+    rig.devices.setRunning("b", true)
+    let update = rig.refresh(from: 2.25, to: 2.5)
+    #expect(rig.devices.device("b").isMuted)
+    #expect(update.isMuted)
 }
