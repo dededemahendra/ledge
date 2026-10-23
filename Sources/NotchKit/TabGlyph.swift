@@ -25,41 +25,6 @@ struct TimerRing: View {
     }
 }
 
-/// The agents' state around the round tab's edge (2026-10-23, user's
-/// call): a short orange arc turning while one works, a solid ring in the
-/// waiting colour while one needs the user, so busy and waiting read at a
-/// glance. Reduce Motion: a still, dim ring while working.
-struct AgentTabRing: View {
-    enum Mode: Equatable { case working, waiting }
-    let mode: Mode
-    let reduceMotion: Bool
-
-    static func mode(for id: String) -> Mode? {
-        switch id {
-        case NotchController.agentRunActivityID: .working
-        case NotchController.agentWaitingActivityID: .waiting
-        default: nil
-        }
-    }
-
-    var body: some View {
-        switch mode {
-        case .waiting:
-            Circle().inset(by: 1.5).stroke(AgentColors.waiting, lineWidth: 2)
-        case .working where reduceMotion:
-            Circle().inset(by: 1.5).stroke(AgentColors.orange.opacity(0.45), lineWidth: 2)
-        case .working:
-            TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                let turn = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
-                Circle().inset(by: 1.5)
-                    .trim(from: 0, to: 0.28)
-                    .stroke(AgentColors.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(turn * 360 - 90))
-            }
-        }
-    }
-}
-
 /// An item's short form in the tab (2026-10-23): about 20 pt, no text, the
 /// same drawings the leading ear uses.
 struct TabGlyph: View {

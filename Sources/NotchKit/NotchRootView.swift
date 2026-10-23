@@ -632,14 +632,6 @@ public struct NotchRootView: View {
                 .frame(width: max(tab.width, 1), height: tab.height)
                 .position(x: centerX, y: centerY)
                 .clipShape(tabShape)
-                // The agents' state around the bubble's edge (2026-10-23).
-                if let mode = AgentTabRing.mode(for: display.id), controller.isTabShowing {
-                    AgentTabRing(mode: mode, reduceMotion: reduceMotion)
-                        .frame(width: max(tab.width, 1), height: tab.height)
-                        .position(x: centerX, y: centerY)
-                        .transition(.opacity)
-                        .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: mode)
-                }
             }
             tabShape.stroke(Color.white.opacity(showEffects ? 0.09 : 0), lineWidth: 1)
         }

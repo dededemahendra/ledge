@@ -1909,10 +1909,9 @@ open:
 ## The round tab (2026-10-23)
 
 The tab is now a round bubble, as tall as the notch, 8 pt right of the
-island. With an agent in it:
+island and floats 3 pt inside the island's height. The ring tried around
+its edge was removed at the user's request.
 
-- **Working:** an orange arc turns around its edge.
-- **Waiting for you:** a solid yellow ring, with one pulse as it starts.
-
-Headless renders checked both. Pending: watch an agent go from working to
+With an agent in it, the asterisk turns while it works and goes yellow, with
+one pulse, when it waits for you. Pending: watch it go from working to
 waiting, and check the pulse plays once.

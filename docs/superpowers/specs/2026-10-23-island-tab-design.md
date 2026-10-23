@@ -52,15 +52,11 @@ right of the island, with no fillets: a round bubble beside the island, as
 the iPhone's second island is. The
 welded 40 pt tab below is how it first shipped. The pill keeps its circle.
 
-**Agents' state on the bubble (2026-10-23, user's call).**
-
-- **Working:** a short orange arc turns around its edge, once every 1.6 s.
-  Under Reduce Motion it is a still, dim ring.
-- **Waiting for the user:** a solid ring in the waiting colour, with one
-  pulse as it starts waiting.
-
-The gap is 8 pt and the agent glyph 15 pt in the bubble, so it reads as its
-own bubble and fills it.
+**Agents on the bubble (2026-10-23, user's call).** The bubble pulses once
+as its agent starts waiting for the user. A ring around its edge was tried
+(an arc turning while working, a solid ring while waiting) and removed at
+the user's request: the asterisk's own turn and colour say it. The gap is
+8 pt and the agent glyph 15 pt in the bubble.
 
 **On a notch** (as first shipped) (designed against the measured 179 × 32 pt notch, MacBook Air
 13″):
