@@ -106,3 +106,44 @@ private func connectRaw(_ url: URL) -> Int32? {
     try await Task.sleep(for: .milliseconds(100))
     #expect(got == [Data("hello".utf8)])
 }
+
+// MARK: - Final fix wave (2026-10-23)
+
+@MainActor @Test func aSecondListenerRefusesAndLeavesTheFirstsSocket() async throws {
+    let url = shortSocket()
+    var got: [Data] = []
+    let first = AgentListener(url: url) { got.append($0) }
+    try first.start()
+    defer { first.stop() }
+    let second = AgentListener(url: url) { _ in Issue.record("the second listener heard a line") }
+    #expect(throws: AgentListener.Failure.inUse) { try second.start() }
+    #expect(!second.isListening)
+    second.stop()
+    #expect(FileManager.default.fileExists(atPath: url.path))
+    #expect(AgentSocket.send(Data("hello\n".utf8), to: url, timeout: 1))
+    await waitFor { !got.isEmpty }
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(got == [Data("hello".utf8)])
+}
+
+@MainActor @Test func stoppingLeavesASocketFileThatIsNoLongerItsOwn() async throws {
+    let url = shortSocket()
+    let old = AgentListener(url: url) { _ in }
+    try old.start()
+    // Its file is taken away and another listener binds the path.
+    unlink(url.path)
+    var got: [Data] = []
+    let new = AgentListener(url: url) { got.append($0) }
+    try new.start()
+    defer { new.stop() }
+    old.stop()
+    #expect(FileManager.default.fileExists(atPath: url.path))
+    #expect(AgentSocket.send(Data("hi\n".utf8), to: url, timeout: 1))
+    await waitFor { !got.isEmpty }
+    #expect(got == [Data("hi".utf8)])
+}
+
+@Test func aSocketPathMustFitTheAddress() {
+    #expect(AgentListener.fits(URL(fileURLWithPath: "/tmp/" + String(repeating: "x", count: 98))))
+    #expect(!AgentListener.fits(URL(fileURLWithPath: "/tmp/" + String(repeating: "x", count: 99))))
+}

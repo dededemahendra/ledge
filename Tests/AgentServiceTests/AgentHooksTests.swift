@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Darwin
 @testable import AgentService
 
 private let helper = "/H/Ledge/ledge-agent-hook"
@@ -34,7 +35,11 @@ private let othersFixture = """
 
 @Test func everyHookIsAsyncAndGuarded() {
     #expect(AgentHooks.command(helper: "/H/L/ledge-agent-hook")
-        == "[ -x \"/H/L/ledge-agent-hook\" ] && \"/H/L/ledge-agent-hook\" || true")
+        == "[ -x '/H/L/ledge-agent-hook' ] && '/H/L/ledge-agent-hook' || true")
+    let odd = "/Users/o'neil/Library/Application Support/Ledge/ledge-agent-hook"
+    let quoted = #"'/Users/o'\''neil/Library/Application Support/Ledge/ledge-agent-hook'"#
+    #expect(AgentHooks.command(helper: odd) == "[ -x \(quoted) ] && \(quoted) || true")
+    #expect(AgentHooks.command(helper: odd).contains(AgentHooks.marker))
     let out = AgentHooks.installing(into: parse("{}"), helper: helper)
     #expect(AgentHooks.events.count == 10)
     #expect(AgentHooks.matcherEvents == ["PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest"])
@@ -232,4 +237,130 @@ private func appending(_ group: OrderedJSON, to settings: OrderedJSON, event: St
     let parsed = try OrderedJSON.parse(Data(contentsOf: real))
     #expect(AgentHooks.isInstalled(in: parsed, helper: helper))
     #expect(FileManager.default.fileExists(atPath: real.appendingPathExtension("ledge-backup").path))
+}
+
+// MARK: - Final fix wave (2026-10-23)
+
+/// Runs `command` with /bin/sh, as Claude Code runs a hook.
+private func runShell(_ command: String) throws -> Int32 {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = ["-c", command]
+    try process.run()
+    process.waitUntilExit()
+    return process.terminationStatus
+}
+
+@Test func theCommandRunsAHelperWhosePathHasQuotesAndSpaces() throws {
+    let dir = tempFile().deletingLastPathComponent().appendingPathComponent("it's a \"dir\" $HOME", isDirectory: true)
+        .appendingPathComponent("Ledge", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let ran = dir.appendingPathComponent("ran")
+    let helper = dir.appendingPathComponent("ledge-agent-hook")
+    try Data("#!/bin/sh\ntouch \"$(dirname \"$0\")/ran\"\n".utf8).write(to: helper)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: helper.path)
+    #expect(try runShell(AgentHooks.command(helper: helper.path)) == 0)
+    #expect(FileManager.default.fileExists(atPath: ran.path))
+    // A helper that is gone: the guard keeps the hook quiet and successful.
+    try FileManager.default.removeItem(at: helper)
+    #expect(try runShell(AgentHooks.command(helper: helper.path)) == 0)
+}
+
+private func settingsFile(_ text: String) throws -> URL {
+    let url = tempFile()
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data(text.utf8).write(to: url)
+    return url
+}
+
+private let unexpected = AgentSettingsFile.Problem.unexpectedShape("hooks has an unexpected shape")
+
+@Test func hooksOfAnUnexpectedShapeAreLeftAloneOnInstallAndRemoval() throws {
+    let shapes = [
+        #"{"hooks":{"Stop":{"mine":true}}}"#,
+        #"{"hooks":{"Stop":[{"hooks":[]}],"Stop":{"mine":true}}}"#,
+        #"{"hooks":{"Stop":{"mine":true},"Stop":[{"hooks":[]}]}}"#,
+        #"{"hooks":null}"#,
+        #"{"hooks":[]}"#,
+        #"{"hooks":{"Stop":[]},"hooks":5}"#,
+        #"{"hooks":5,"hooks":{"Stop":[]}}"#,
+    ]
+    for text in shapes {
+        let url = try settingsFile(text)
+        let file = AgentSettingsFile(url: url)
+        #expect(throws: unexpected) { try file.install(helper: helper) }
+        #expect(try Data(contentsOf: url) == Data(text.utf8), "install changed \(text)")
+        #expect(throws: unexpected) { try file.uninstall() }
+        #expect(try Data(contentsOf: url) == Data(text.utf8), "removal changed \(text)")
+        #expect(!FileManager.default.fileExists(atPath: url.appendingPathExtension("ledge-backup").path))
+        // The pure edits hand such settings back as they were.
+        #expect(AgentHooks.installing(into: parse(text), helper: helper) == parse(text))
+        #expect(AgentHooks.removing(from: parse(text)) == parse(text))
+    }
+}
+
+@Test func removalLeavesHooksThatHaveTheirOwnShape() throws {
+    // Ledge's hooks in, then someone's Stop made an object: nothing comes out.
+    let installed = AgentHooks.installing(into: parse("{}"), helper: helper)
+    guard case .object(var top) = installed, case .object(var events)? = installed["hooks"] else { return }
+    events = events.map { $0.key == "Stop" ? (key: "Stop", value: parse(#"{"mine":true}"#)) : $0 }
+    top = top.map { $0.key == "hooks" ? (key: "hooks", value: .object(events)) : $0 }
+    let text = String(decoding: OrderedJSON.object(top).written(), as: UTF8.self)
+    let url = try settingsFile(text)
+    #expect(throws: unexpected) { try AgentSettingsFile(url: url).uninstall() }
+    #expect(try Data(contentsOf: url) == Data(text.utf8))
+}
+
+@Test func anEventOutsideTheTenMayHaveAnyShape() throws {
+    let url = try settingsFile(#"{"hooks":{"Custom":{"mine":true}}}"#)
+    let file = AgentSettingsFile(url: url)
+    try file.install(helper: helper)
+    #expect(file.isInstalled(helper: helper))
+    let parsed = try OrderedJSON.parse(Data(contentsOf: url))
+    #expect(parsed["hooks"]?["Custom"] == parse(#"{"mine":true}"#))
+    try file.uninstall()
+    #expect(try OrderedJSON.parse(Data(contentsOf: url)) == parse(#"{"hooks":{"Custom":{"mine":true}}}"#))
+}
+
+@Test func theBackupKeepsTheOriginalsMode() throws {
+    for mode in [0o600, 0o640] {
+        let url = try settingsFile(othersFixture)
+        try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
+        try AgentSettingsFile(url: url).install(helper: helper)
+        let backup = url.appendingPathExtension("ledge-backup")
+        let attributes = try FileManager.default.attributesOfItem(atPath: backup.path)
+        #expect(attributes[.posixPermissions] as? Int == mode)
+        #expect(try Data(contentsOf: backup) == Data(othersFixture.utf8))
+    }
+}
+
+@Test func aChangeMadeWhileLedgeWorksIsKept() throws {
+    let url = try settingsFile(#"{"theme":"dark"}"#)
+    var file = AgentSettingsFile(url: url)
+    let theirs = Data(#"{"theme":"dark","model":"opus"}"#.utf8)
+    file.beforeRecheck = { try? theirs.write(to: url) }
+    try file.install(helper: helper)
+    let installed = try OrderedJSON.parse(Data(contentsOf: url))
+    #expect(installed["model"] == .string("opus"))
+    #expect(AgentHooks.isInstalled(in: installed, helper: helper))
+
+    let again = Data(String(decoding: installed.written(), as: UTF8.self).replacingOccurrences(of: "opus", with: "sonnet").utf8)
+    file.beforeRecheck = { try? again.write(to: url) }
+    try file.uninstall()
+    let removed = try OrderedJSON.parse(Data(contentsOf: url))
+    #expect(removed == parse(#"{"theme":"dark","model":"sonnet"}"#))
+}
+
+@Test func aFailedWriteSaysWrite() throws {
+    let url = try settingsFile("{}")
+    let folder = url.deletingLastPathComponent()
+    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+    defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path) }
+    do {
+        try AgentSettingsFile(url: url).install(helper: helper)
+        Issue.record("expected the write to fail")
+    } catch {
+        guard case .unwritable = error else { Issue.record("expected unwritable, got \(error)"); return }
+    }
+    #expect(try Data(contentsOf: url) == Data("{}".utf8))
 }
