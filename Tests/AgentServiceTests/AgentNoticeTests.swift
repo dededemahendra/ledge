@@ -92,3 +92,18 @@ private func session(_ state: AgentSession.State, id: String = "s1", since: Date
         #expect(AgentNotice.action(tool: tool, summary: summary) == expected, "\(tool ?? "nil") \(summary ?? "nil")")
     }
 }
+
+@Test func theHomeFolderReadsAsTilde() {
+    func s(_ t: String, _ home: String = "/Users/x") -> String { AgentNotice.shortened(t, home: home) }
+    #expect(s("/Users/x/Developer/a") == "~/Developer/a")
+    #expect(s("cd /Users/x && ls /Users/x/a") == "cd ~ && ls ~/a")
+    #expect(s("/Users/xy/a") == "/Users/xy/a")
+    #expect(s("'/Users/x/a b'") == "'~/a b'")
+    #expect(s("/Users/x/a", "") == "/Users/x/a")
+    #expect(s("/Users/x/a", "/") == "/Users/x/a")
+}
+
+@Test func actionsAndDetailsUseTheTilde() {
+    #expect(AgentNotice.action(tool: "Bash", summary: "make -C /Users/x/p test", home: "/Users/x") == "Running make -C ~/p test")
+    #expect(AgentNotice.detail(.permission("Bash: ls /Users/x/a"), home: "/Users/x") == "Bash: ls ~/a")
+}
