@@ -338,9 +338,10 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". An update notice
     /// (2026-10-22) carries its own too. Any other blip
     /// pre-empting the island takes it whole.
-    /// A GitHub blip (2026-10-22) carries its own as well.
+    /// A GitHub blip (2026-10-22) carries its own as well, and so does an
+    /// agent blip (2026-10-23); the waiting and working items don't.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading || isGitHubLeading)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading || isGitHubLeading || isAgentLeading)
     }
 
     public var isLiveActivityLeading: Bool {
@@ -349,12 +350,23 @@ public final class NotchController {
 
     /// The system card to open on hover, when the leading live activity
     /// has one.
-    public var hasCard: Bool { isLiveActivityLeading && hasPanelContent }
+    public var hasCard: Bool { hasPanelContent }
+
+    /// The Live Activity whose card opens: the lead if it is one, else the
+    /// tab if it is (2026-10-23).
+    public var liveActivityDisplay: ActivityDisplay? {
+        if let first = activities.first, first.id == Self.liveActivityID { return first }
+        if let tab, tab.id == Self.liveActivityID { return tab }
+        return nil
+    }
 
     private var hasPanelContent: Bool {
-        guard let first = activities.first else { return false }
-        return first.score != nil || !first.lines.isEmpty
+        guard let live = liveActivityDisplay else { return false }
+        return live.score != nil || !live.lines.isEmpty
     }
+
+    /// The lead is a Live Activity with a card: what hovering the island opens.
+    private var leadHasCard: Bool { isLiveActivityLeading && hasPanelContent }
 
     /// The scoreline the ears are drawing, if any.
     public var score: ActivityDisplay.Score? {
@@ -394,6 +406,23 @@ public final class NotchController {
     /// A GitHub blip or the running item leads: hover opens the panel.
     private var isAnyGitHubLeading: Bool {
         isGitHubLeading || activities.first?.id == Self.githubRunActivityID
+    }
+
+    /// `AppModel` inserts an agent blip with this id, the waiting item with
+    /// `agentWaitingActivityID` and the working item with
+    /// `agentRunActivityID` (2026-10-23).
+    public static let agentActivityID = "agent"
+    public static let agentWaitingActivityID = "agent-waiting"
+    public static let agentRunActivityID = "agent-run"
+
+    public var isAgentLeading: Bool {
+        activities.first?.id == Self.agentActivityID
+    }
+
+    /// Any agent item leads: hover opens the card.
+    private var isAnyAgentLeading: Bool {
+        guard let id = activities.first?.id else { return false }
+        return id == Self.agentActivityID || id == Self.agentWaitingActivityID || id == Self.agentRunActivityID
     }
 
     /// `AppModel` inserts the iPhone Live Activity with this id
@@ -445,6 +474,8 @@ public final class NotchController {
         case github
         /// The call on the mic, with its mute button (2026-10-22).
         case call
+        /// The Claude Code sessions, a row each (2026-10-23).
+        case agents
     }
 
     public private(set) var panel: Panel = .media
@@ -484,6 +515,17 @@ public final class NotchController {
         recomputeState()
     }
 
+    /// What the Agents card lists; `nil` means no card: agents off, no
+    /// sessions, or the screen is locked (2026-10-23).
+    public private(set) var agentPanel: AgentPanelData?
+
+    public func setAgentPanel(_ data: AgentPanelData?) {
+        guard data != agentPanel else { return }
+        agentPanel = data
+        if agentPanel == nil, panel == .agents { panel = .media }
+        recomputeState()
+    }
+
     #if DEBUG
     /// Debug probes only (2026-10-22): pins `panel` open for a screenshot,
     /// the way a click pins the now-playing card.
@@ -503,6 +545,7 @@ public final class NotchController {
         if media != nil { panels.append(.media) }
         if calendarMode != nil { panels.append(.calendar) }
         if githubPanel != nil { panels.append(.github) }
+        if agentPanel != nil { panels.append(.agents) }
         return panels
     }
 
@@ -531,10 +574,11 @@ public final class NotchController {
             recomputeState()
             return true
         }
-        // The empty peek (2026-10-22): a swipe opens the GitHub panel.
-        if state == .peek, githubPanel != nil {
+        // The empty peek (2026-10-22): a swipe opens the GitHub panel, or
+        // else the Agents card (2026-10-23).
+        if state == .peek, githubPanel != nil || agentPanel != nil {
             lastSwipe = direction
-            panel = .github
+            panel = githubPanel != nil ? .github : .agents
             recomputeState()
             return true
         }
@@ -772,14 +816,40 @@ public final class NotchController {
     }
 
     public func setHovered(_ hovered: Bool) {
+        setHovered(hovered, part: .island)
+    }
+
+    /// Which shape the pointer is over (2026-10-23): the island, or the tab
+    /// beside it.
+    public enum HoverPart: Sendable, Equatable {
+        case island, tab
+    }
+
+    public private(set) var hoveredPart: HoverPart?
+
+    public func setHovered(_ hovered: Bool, part: HoverPart) {
+        let wasHovered = isHovered
         isHovered = hovered
-        // A live activity's card is what its hover opens.
-        if hovered, hasCard, !isPinnedOpen { panel = .liveActivity }
-        // So does a GitHub item's, the way a Live Activity's card opens
-        // (2026-10-22).
-        if hovered, isAnyGitHubLeading, githubPanel != nil, !isPinnedOpen { panel = .github }
-        // And a call's (2026-10-22).
-        if hovered, isCallLeading, callPanel != nil, !isPinnedOpen { panel = .call }
+        hoveredPart = hovered ? part : nil
+        // Once the card is open a report only moves `hoveredPart`: the tab's
+        // card is wide enough to sit under the pointer, and a report of the
+        // island (once, or again) must not switch it to the lead's.
+        let cardIsOpen = wasHovered && state == .expanded
+        if hovered, !isPinnedOpen, !cardIsOpen {
+            if part == .tab {
+                if let tabPanel { panel = tabPanel }
+            } else {
+                // A live activity's card is what its hover opens.
+                if leadHasCard { panel = .liveActivity }
+                // So does a GitHub item's, the way a Live Activity's card opens
+                // (2026-10-22).
+                if isAnyGitHubLeading, githubPanel != nil { panel = .github }
+                // And an agent item's (2026-10-23).
+                if isAnyAgentLeading, agentPanel != nil { panel = .agents }
+                // And a call's (2026-10-22).
+                if isCallLeading, callPanel != nil { panel = .call }
+            }
+        }
         // Leaving puts the card back on now-playing for next time, unless
         // it is pinned where it is.
         if !hovered, !isPinnedOpen { panel = .media }
@@ -811,6 +881,32 @@ public final class NotchController {
         guard !isLocked, metrics.notchRect.width > 0, media != nil else { return }
         isPinnedOpen = true
         state = .expanded
+    }
+
+    /// The tab item's own card, when its data exists (2026-10-23). A timer
+    /// has none.
+    private var tabPanel: Panel? {
+        guard let tab else { return nil }
+        switch tab.id {
+        case Self.callActivityID: return callPanel != nil ? .call : nil
+        case Self.agentActivityID, Self.agentWaitingActivityID, Self.agentRunActivityID:
+            return agentPanel != nil ? .agents : nil
+        case Self.githubActivityID, Self.githubRunActivityID: return githubPanel != nil ? .github : nil
+        case Self.liveActivityID: return tab.score != nil || !tab.lines.isEmpty ? .liveActivity : nil
+        case Self.mediaActivityID: return media != nil ? .media : nil
+        default: return nil
+        }
+    }
+
+    /// A click on the tab does its item's click: the music card pins, any
+    /// other item opens its link. Locked, or with no tab showing: nothing.
+    public func tapTab() {
+        guard !isLocked, isTabShowing, let tab else { return }
+        if tab.id == Self.mediaActivityID {
+            click()
+        } else if let url = tab.url {
+            emit(.open(url))
+        }
     }
 
     /// A click on the island (as opposed to the menu bar's "Toggle Panel",
@@ -884,14 +980,31 @@ public final class NotchController {
         recomputeState()
     }
 
-    public func setActivities(_ activities: [ActivityDisplay], overflow: Int) {
+    public func setActivities(_ activities: [ActivityDisplay], overflow: Int, tab: ActivityDisplay? = nil) {
         let shapeBefore = parameters
         let blipBefore = leadingBlipKey
-        if activities.first?.score?.home.crest != self.activities.first?.score?.home.crest {
-            homeCrestImage = activities.first?.score?.home.crest.flatMap(NSImage.init(data:))
+        let liveBefore = liveActivityDisplay
+        let live: ActivityDisplay?
+        if let first = activities.first, first.id == Self.liveActivityID {
+            live = first
+        } else if let tab, tab.id == Self.liveActivityID {
+            live = tab
+        } else {
+            live = nil
         }
-        if activities.first?.score?.away.crest != self.activities.first?.score?.away.crest {
-            awayCrestImage = activities.first?.score?.away.crest.flatMap(NSImage.init(data:))
+        if live?.score?.home.crest != liveBefore?.score?.home.crest {
+            homeCrestImage = live?.score?.home.crest.flatMap(NSImage.init(data:))
+        }
+        if live?.score?.away.crest != liveBefore?.score?.away.crest {
+            awayCrestImage = live?.score?.away.crest.flatMap(NSImage.init(data:))
+        }
+        if tab?.artwork != tabArtworkData {
+            tabArtworkData = tab?.artwork
+            tabArtworkImage = tab?.artwork.flatMap(NSImage.init(data:))
+        }
+        if tab?.score?.home.crest != tabCrestData {
+            tabCrestData = tab?.score?.home.crest
+            tabCrestImage = tabCrestData.flatMap(NSImage.init(data:))
         }
         let avatar = activities.first.flatMap { $0.id == Self.githubActivityID ? $0.artwork : nil }
         if avatar != githubAvatarData {
@@ -903,10 +1016,11 @@ public final class NotchController {
             callIconData = callIcon
             callIconImage = callIcon.flatMap(NSImage.init(data:))
         }
-        if panel == .liveActivity, !(activities.first?.id == Self.liveActivityID && hasPanelContent) {
+        self.activities = activities
+        self.tab = tab
+        if panel == .liveActivity, !hasPanelContent {
             panel = .media
         }
-        self.activities = activities
         self.overflowCount = max(0, overflow)
         setActivityCount(activities.count + max(0, overflow))
         // A blip landing on an island that does not change shape — the
@@ -937,6 +1051,23 @@ public final class NotchController {
     /// its clock republishes the record every second.
     public private(set) var callIconImage: NSImage?
     private var callIconData: Data?
+
+    /// The second live item, in the tab beside the island (2026-10-23).
+    public private(set) var tab: ActivityDisplay?
+
+    /// The tab's artwork and crest, decoded once per change like the call's icon.
+    public private(set) var tabArtworkImage: NSImage?
+    public private(set) var tabCrestImage: NSImage?
+    private var tabArtworkData: Data?
+    private var tabCrestData: Data?
+
+    /// The tab shows at activity size only: hidden, peek, expanded and
+    /// tucked hide it.
+    public var isTabShowing: Bool { tab != nil && state == .activity && !isTucked }
+
+    public var tabParameters: NotchTabParameters {
+        isTabShowing ? metrics.tab : metrics.tabTucked
+    }
 
     /// Identity of the leading blip, if the leading activity is one.
     /// Title included so plug → unplug (same id, new title) pulses again.
@@ -1009,6 +1140,11 @@ public final class NotchController {
     private func recomputeState() {
         if isPinnedOpen {
             state = .expanded
+        } else if isHovered, hoveredPart == .tab, activityCount > 0, state != .expanded, panel != tabPanel {
+            // The pointer is on a tab whose item has no card (or no data for
+            // it): hover keeps the island at activity size, never expands.
+            // Only while there is an activity to be that size for.
+            state = .activity
         } else if isHovered, media != nil {
             state = .expanded
         } else if isHovered, panel == .calendar, calendarMode != nil {
@@ -1019,6 +1155,8 @@ public final class NotchController {
         } else if isHovered, panel == .github, githubPanel != nil {
             state = .expanded
         } else if isHovered, panel == .call, callPanel != nil {
+            state = .expanded
+        } else if isHovered, panel == .agents, agentPanel != nil {
             state = .expanded
         } else if activityCount > 0, !(isHovered && onlyChargingIsShowing && upcoming != nil) {
             state = .activity

@@ -36,6 +36,8 @@ Once a day Ledge asks GitHub whether a newer version is out, and says so once, o
 
 Connecting GitHub in Settings › GitHub adds one more kind of request: while connected, Ledge asks api.github.com about your own PRs and runs every minute, or every 20 seconds while something runs, and fetches the pictures of the people in them from GitHub's image server. Until you connect, it asks GitHub nothing about your work.
 
+Switching on Settings › Agents adds Ledge's hooks to `~/.claude/settings.json` (a copy of the original is kept as `settings.json.ledge-backup`); switching it off takes them out. Removing Ledge without switching Agents off leaves its hooks in `~/.claude/settings.json`, where they do nothing: each checks that the helper exists before running it.
+
 There is no licence: you may download and use Ledge and read its code, but not
 reuse or redistribute the code.
 
@@ -49,6 +51,7 @@ reuse or redistribute the code.
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
 | On a call in any app (the mic in use) | the app's icon left, the time right in green, the red crossed-out mic when muted; rest the cursor for a card with a mute button (Zoom's and Meet's own mute on those calls) and "Not a call"; a red hang-up and the length for 3 s when it ends; a calendar meeting shows its service, its title and the time left, with the next meeting and the camera on the card |
 | GitHub, once connected in Settings › GitHub | checks running on your PRs: a ring with a segment per check, and a clock; checks passed or failed, a review, a comment, a merge or close, a review request, or a run of yours finishing: a blip with who did it (their picture) or what happened, the PR's title under the hole; click to open it on GitHub. Hover for a card of what is running, with a bar of its checks, then your PRs and review requests. Never on the lock screen |
+| Claude Code sessions, once switched on in Settings › Agents | an orange asterisk: "Allow?", "Question" or "Plan" in amber when a session waits for you, with what it wants under the hole; "Done" and how long in green, "Failed" and why in red; while any wait or work, the count and the oldest turn's clock (working sits under music); hover for a card of every session; click to bring its window forward (VS Code, Ghostty). Never on the lock screen |
 | An iPhone Live Activity (paired iPhone, macOS 26+) | a match shows its crest and score in each ear, around the notch, keeping up by the second; hover and the pair drops into a card with names, period and a clock that counts; click for the system's own. Needs Screen Recording |
 | A Focus turns on or off | with Full Disk Access granted: the Focus's own symbol in its own colour left and its name right (the island stretches to fit), "Off" with the symbol uncoloured, 3 s; without it: the moon and On/Off |
 | An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
@@ -59,6 +62,11 @@ reuse or redistribute the code.
 
 Browsers and everything else that MediaRemote reports are ignored on purpose
 (`MediaSourcePolicy`). One blip owns the island at a time; the rest queue.
+
+Two live things show at once: the most important in the island, the next in a
+tab beside it (on a MacBook a second notch-height tab, on other screens a
+circle). Hover the tab for its item's card, click it for its action. The
+island's "+N" appears only from three.
 
 **The card** (rest the cursor on the island for a beat with music playing — passing through to the menu bar does nothing): artwork and titles — click them to
 bring the app forward — with a favourite star and the output button beside
@@ -121,7 +129,7 @@ calendar events, reminders; and whether the island shows on the lock screen, loo
 only), Media (which music apps the island follows),
 Calendar (how many minutes before an event, and which calendars and reminder
 lists to follow — every one the Mac has, grouped by account with its colour; a
-calendar added later is on until switched off), GitHub (connect with your gh login or a token, and which moments the island tells you about), Permissions (each grant, what it
+calendar added later is on until switched off), GitHub (connect with your gh login or a token, and which moments the island tells you about), Agents (the switch, its status, and which of the four moments the island tells you about), Permissions (each grant, what it
 unlocks, a button to the right pane), About. Everything is on by default, as
 the app behaved before it had settings; changes apply at once.
 

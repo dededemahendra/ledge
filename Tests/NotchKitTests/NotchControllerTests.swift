@@ -1229,3 +1229,297 @@ private func callDisplay(artwork: Data? = nil) -> NotchController.ActivityDispla
                            symbolName: "phone.down.fill")], overflow: 0)
     #expect(c.blipPulse == before + 1, "the ended moment")
 }
+
+// MARK: - Agents (2026-10-23)
+
+private let agentPanel = AgentPanelData(hero: nil, rows: [
+    .init(id: "s1", name: "Ledge", mark: .idle, url: URL(string: "ledge://agent/s1")!)
+])
+
+@MainActor
+@Test func hoveringAnAgentItemOpensTheAgentsCard() {
+    for id in [NotchController.agentActivityID, NotchController.agentWaitingActivityID,
+               NotchController.agentRunActivityID] {
+        let c = makeController()
+        c.setAgentPanel(agentPanel)
+        c.setActivities([.init(id: id, title: "Agent", compactText: "x")], overflow: 0)
+        c.setHovered(true)
+        #expect(c.state == .expanded && c.panel == .agents, "\(id)")
+    }
+}
+
+@MainActor
+@Test func theAgentsCardGoesWithItsData() {
+    let c = makeController()
+    c.setAgentPanel(agentPanel)
+    c.setActivities([.init(id: NotchController.agentWaitingActivityID, title: "Waiting", compactText: "x")], overflow: 0)
+    c.setHovered(true)
+    #expect(c.panel == .agents)
+    c.setAgentPanel(nil)
+    #expect(c.panel == .media && c.state == .activity)
+}
+
+@MainActor
+@Test func theAgentsCardComesAfterGitHub() {
+    let c = makeController()
+    c.setGitHubPanel(gitHubPanel)
+    c.setAgentPanel(agentPanel)
+    #expect(Array(c.availablePanels.suffix(2)) == [.github, .agents])
+}
+
+@MainActor
+@Test func anAgentBlipCarriesItsCaption() {
+    let c = makeController()
+    c.setActivities([.init(id: NotchController.agentActivityID, title: "Done", compactText: "x")], overflow: 0)
+    c.setCaption("ledge · 3m")
+    #expect(c.isAgentLeading && c.hasCaption && c.captionText == "ledge · 3m")
+}
+
+@MainActor
+@Test func theWaitingItemCarriesNoCaption() {
+    let c = makeController()
+    c.setActivities([.init(id: NotchController.agentWaitingActivityID, title: "Waiting", compactText: "x")], overflow: 0)
+    c.setCaption("ledge · 3m")
+    #expect(!c.isAgentLeading && !c.hasCaption)
+}
+
+@MainActor
+@Test func theEmptyPeeksSwipeFallsBackToAgents() {
+    let c = makeController()
+    c.setHovered(true)
+    #expect(c.state == .peek)
+    c.setAgentPanel(agentPanel)
+    #expect(c.swipe(.next))
+    #expect(c.state == .expanded && c.panel == .agents)
+}
+
+// MARK: - The island's tab (2026-10-23)
+
+@MainActor
+private func mediaDisplay() -> NotchController.ActivityDisplay {
+    .init(id: NotchController.mediaActivityID, title: "Song", compactText: "x")
+}
+
+@MainActor
+private func tabGitHubPanel() -> GitHubPanelData {
+    let hero = GitHubPanelData.Hero(id: "PR_5", kind: .running, tag: "Checks running", title: "Run",
+                                    detail: "d", segments: [.passed], since: Date(), avatar: nil,
+                                    url: URL(string: "https://github.com/dede/ledge/pull/5")!)
+    return GitHubPanelData(hero: hero, rows: [])
+}
+
+@MainActor
+@Test func theTabShowsOnlyAtActivitySize() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([mediaDisplay(), .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x")],
+                    overflow: 0, tab: .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x"))
+    #expect(c.state == .activity)
+    #expect(c.isTabShowing)
+    c.setHovered(true, part: .island)
+    #expect(c.state == .expanded)
+    #expect(!c.isTabShowing)
+    c.setHovered(false)
+    #expect(c.isTabShowing)
+    c.setTucked(true)
+    #expect(!c.isTabShowing)
+    let hidden = makeController()
+    #expect(!hidden.isTabShowing)
+}
+
+@MainActor
+@Test func theTabParametersFollowTheIslandsLiveShape() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([mediaDisplay()], overflow: 0,
+                    tab: .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x"))
+    #expect(c.tabParameters == c.metrics.tab)
+    c.setCaption("Song · Artist")
+    #expect(c.tabParameters == c.metrics.tab)
+    c.setTucked(true)
+    #expect(c.tabParameters == c.metrics.tabTucked)
+}
+
+@MainActor
+@Test func hoveringTheTabOpensItsItemsCard() {
+    let media = mediaDisplay()
+    let cases: [(String, NotchController.Panel)] = [
+        (NotchController.callActivityID, .call),
+        (NotchController.agentRunActivityID, .agents),
+        (NotchController.githubRunActivityID, .github),
+    ]
+    for (id, expected) in cases {
+        let c = makeController()
+        c.setMedia(someMedia())
+        c.setCallPanel(callPanel)
+        c.setAgentPanel(agentPanel)
+        c.setGitHubPanel(tabGitHubPanel())
+        c.setActivities([media], overflow: 0, tab: .init(id: id, title: "T", compactText: "x"))
+        c.setHovered(true, part: .tab)
+        #expect(c.panel == expected && c.state == .expanded, "\(id)")
+    }
+}
+
+@MainActor
+@Test func hoveringATimerTabOpensNothing() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([mediaDisplay()], overflow: 0,
+                    tab: .init(id: NotchController.timerActivityID, title: "Timer", compactText: "1:00"))
+    c.setHovered(true, part: .tab)
+    #expect(c.state == .activity && c.panel == .media && c.hoveredPart == .tab)
+    c.setHovered(false, part: .tab)
+    #expect(c.hoveredPart == nil)
+}
+
+@MainActor
+@Test func aTabWithoutItsDataOpensNothing() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    c.setActivities([mediaDisplay()], overflow: 0,
+                    tab: .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x"))
+    c.setHovered(true, part: .tab)
+    #expect(c.state == .activity)
+}
+
+@MainActor
+@Test func hoveringTheIslandStillOpensTheLeadsCard() {
+    let c = makeController()
+    c.setCallPanel(callPanel)
+    c.setAgentPanel(agentPanel)
+    c.setActivities([callDisplay()], overflow: 0,
+                    tab: .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x"))
+    c.setHovered(true, part: .island)
+    #expect(c.panel == .call && c.state == .expanded)
+}
+
+@MainActor
+@Test func onceOpenAPartChangeNeverSwitchesTheCard() {
+    let c = makeController()
+    c.setCallPanel(callPanel)
+    c.setAgentPanel(agentPanel)
+    c.setActivities([.init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x")], overflow: 0,
+                    tab: .init(id: NotchController.callActivityID, title: "Call", compactText: "1"))
+    c.setHovered(true, part: .tab)
+    #expect(c.panel == .call && c.state == .expanded)
+    c.setHovered(true, part: .island)
+    #expect(c.panel == .call && c.state == .expanded && c.hoveredPart == .island)
+    c.setHovered(true, part: .island)
+    #expect(c.panel == .call && c.state == .expanded)
+
+    let r = makeController()
+    r.setCallPanel(callPanel)
+    r.setAgentPanel(agentPanel)
+    r.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x"))
+    r.setHovered(true, part: .island)
+    #expect(r.panel == .call && r.state == .expanded)
+    r.setHovered(true, part: .tab)
+    #expect(r.panel == .call && r.hoveredPart == .tab)
+    r.setHovered(true, part: .tab)
+    #expect(r.panel == .call && r.state == .expanded)
+}
+
+@MainActor
+@Test func theTabsClickWithNothingToDoOrNoTabShowingDoesNothing() {
+    let c = makeController()
+    var intents: [NotchIntent] = []
+    c.onIntent = { intents.append($0) }
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.timerActivityID, title: "Timer", compactText: "1:00"))
+    c.tapTab()
+    #expect(intents.isEmpty && c.state == .activity && !c.isPinnedOpen)
+
+    let url = URL(string: "ledge://agent/s1")!
+    c.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.agentWaitingActivityID, title: "Agent", compactText: "x", url: url))
+    c.setTucked(true)
+    c.tapTab()
+    #expect(intents.isEmpty)
+    c.setTucked(false)
+    c.setHovered(true, part: .island)   // media: expanded, tab hidden
+    #expect(c.state == .expanded)
+    c.tapTab()
+    #expect(intents.isEmpty)
+}
+
+@MainActor
+@Test func clickingTheTabDoesItsItemsClick() {
+    let c = makeController()
+    var intents: [NotchIntent] = []
+    c.onIntent = { intents.append($0) }
+    let url = URL(string: "ledge://agent/s1")!
+    c.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.agentWaitingActivityID, title: "Agent", compactText: "x", url: url))
+    c.tapTab()
+    #expect(intents == [.open(url)])
+
+    let m = makeController()
+    m.setMedia(someMedia())
+    m.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0, tab: mediaDisplay())
+    m.tapTab()
+    #expect(m.isPinnedOpen && m.state == .expanded)
+}
+
+@MainActor
+@Test func whileLockedTheTabsClickDoesNothing() {
+    let c = makeController()
+    var intents: [NotchIntent] = []
+    c.onIntent = { intents.append($0) }
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.agentWaitingActivityID, title: "Agent", compactText: "x",
+                               url: URL(string: "ledge://agent/s1")))
+    c.setLocked(true)
+    c.tapTab()
+    #expect(intents.isEmpty && !c.isPinnedOpen)
+}
+
+@MainActor
+@Test func theTabsImagesAreDecodedOnce() {
+    let c = makeController()
+    let png = NSImage(size: NSSize(width: 4, height: 4), flipped: false) { _ in true }
+        .tiffRepresentation
+    let tab = NotchController.ActivityDisplay(id: NotchController.callActivityID, title: "Call", compactText: "1", artwork: png)
+    c.setActivities([mediaDisplay()], overflow: 0, tab: tab)
+    let first = c.tabArtworkImage
+    #expect(first != nil)
+    c.setActivities([mediaDisplay()], overflow: 0, tab: tab)
+    #expect(c.tabArtworkImage === first)
+    c.setActivities([mediaDisplay()], overflow: 0)
+    #expect(c.tabArtworkImage == nil)
+}
+
+@MainActor
+@Test func aLiveActivityInTheTabOpensItsCard() {
+    let c = makeController()
+    c.setMedia(someMedia())
+    let live = NotchController.ActivityDisplay(id: NotchController.liveActivityID, title: "Live", lines: ["A", "B"])
+    c.setActivities([mediaDisplay()], overflow: 0, tab: live)
+    #expect(c.liveActivityDisplay == live)
+    c.setHovered(true, part: .tab)
+    #expect(c.panel == .liveActivity && c.state == .expanded)
+    #expect(c.score == nil)
+}
+
+@MainActor
+@Test func atActivitySizeAPartChangeStillPicksTheNewPartsCard() {
+    let c = makeController()
+    c.setCallPanel(callPanel)
+    c.setActivities([.init(id: NotchController.chargingActivityID, title: "Charging", compactText: "80%")], overflow: 0,
+                    tab: .init(id: NotchController.callActivityID, title: "Call", compactText: "1"))
+    c.setHovered(true, part: .island)
+    #expect(c.state == .activity)
+    c.setHovered(true, part: .tab)
+    #expect(c.panel == .call && c.state == .expanded)
+}
+
+@MainActor
+@Test func aTabWithNoActivityBesideItNeverHoldsActivitySize() {
+    let c = makeController()
+    c.setActivities([], overflow: 0,
+                    tab: .init(id: NotchController.timerActivityID, title: "Timer", compactText: "1:00"))
+    c.setHovered(true, part: .tab)
+    #expect(c.state == .peek)
+}

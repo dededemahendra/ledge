@@ -1828,3 +1828,80 @@ Pending until the user reports them:
    Accessibility limit is now scoped to the call controls only).
 8. Meet in Safari: expected to fall back to the system mute; Safari's CPU
    stays calm during the call.
+
+## Coding agents on the island (2026-10-23)
+
+Headless renders checked:
+
+- The "Allow?" blip, the waiting item with a count of 2, the working item at
+  4:12 with a count of 3, "Done", "Failed", and the Agents card with one row
+  in each state.
+
+The real `~/.claude/settings.json` (50,073 bytes) parsed and was written back
+byte for byte. Install then remove gave the same bytes, and installing twice
+changed nothing. After the switch went on, the file held Ledge's 10 hooks and
+everything else matched `settings.json.ledge-backup`.
+
+Confirmed live on 2026-10-23 with the probe (`ledge://probe/agents`, sent to
+the dev build with `open -a dist/Ledge.app …`, since the installed copy in
+/Applications answers `ledge://` otherwise):
+
+- "Allow?" in amber with "alpha · Bash: make test".
+- "Done" in green with "alpha · 12s".
+- "Failed" in red with "beta · Rate limited".
+- The working item stayed under music.
+
+Confirmed by the user with a real VS Code session: the waiting item showed the
+asterisk and "ledge" in amber; the Agents card listed the sessions. Sessions
+already running picked up the hooks without a restart.
+
+Withdrawn from that check: "the blip skipped while the window was in front" and
+"a click brought that VS Code window forward". The host lookup returned nothing
+then, so neither could have worked; VS Code was most likely already in front.
+Both are pending again below.
+
+Pending until the user reports them:
+
+1. A Ghostty session: the "Allow?" blip on a Bash prompt, back to working on
+   Allow.
+2. Esc mid-turn and at a prompt: idle, no blip.
+3. A finished turn: "Done" and its length when the window isn't in front.
+4. A click raises the right Ghostty window.
+5. `/exit` or closing the window takes the session off.
+6. AskUserQuestion's "Question" and plan mode's "Plan" blips when the window
+   isn't in front.
+7. Switching Agents off leaves `~/.claude/settings.json` as before.
+8. The blip skips while the session's VS Code window is in front (the host
+   lookup was fixed after the first check).
+9. A click brings that VS Code window forward (the host lookup was fixed after
+   the first check).
+
+## Two at once: the tab (2026-10-23)
+
+Headless renders checked: on a notch (179 × 32), the timer ring and "4:12" in
+the island and the call's app icon with a green dot in a notch-height tab
+beside it, its fillets meeting the island's at the top edge; on a pill, the
+music disc in the pill and the orange asterisk with "2" in a circle beside it;
+a tab half-way through its bud; the Agents card opened from the tab with
+nothing above it.
+
+Confirmed live on 2026-10-23 on the external monitor (the pill), with
+`ledge://probe/tab` sent to the dev build (`open -a dist/Ledge.app
+"ledge://probe/tab"`): the timer ring and "4:12" in the pill, the turning
+orange asterisk with "2" in the circle beside it.
+
+Pending until the user reports them, on the MacBook's own screen with the lid
+open:
+
+1. The tab sits on the bezel line with the island and its fillets meet the top
+   edge cleanly.
+2. Status items around the island and tab stay clickable, and the 6 pt gap
+   passes clicks through.
+3. Hovering the tab opens its item's card (a call, the Agents card); a timer
+   tab opens nothing.
+4. Clicking the tab does its item's action.
+5. A timer ending during a call merges the tab and the call takes the island.
+6. A new item in the tab swaps its glyph with a blur, and a landing tab pulses
+   once while an island blip leaves the tab still.
+7. With Reduce Motion, the tab fades in and out in place.
+8. Clicking the island still pins the music card and opens a blip's link.

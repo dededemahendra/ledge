@@ -81,6 +81,14 @@ public enum NotchAnimation {
         reduceMotion ? reduced : textCrossfade
     }
 
+    /// The blip pulse's swell and settle (`NotchController.blipPulse`):
+    /// the island scales by it, and the tab steps aside by it in step.
+    @KeyframesBuilder<Double>
+    static func blipPulseKeyframes() -> some Keyframes<Double> {
+        SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
+        SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+    }
+
     /// Which spring a transition gets: the confident one when the island
     /// GROWS, the dull one when it shrinks. By area, not height: height
     /// alone called peek (179×38) -> activity (255×32) a collapse because
@@ -133,7 +141,7 @@ struct AnimatedIslandParameters: ViewModifier, Animatable {
 /// what makes a held key feel like a stream of presses rather than a
 /// number quietly ticking. Keyed on `trigger`; nothing happens at rest.
 /// Reduce Motion: no scaling at all.
-struct ValueBump<Trigger: Equatable>: ViewModifier {
+struct ValueBump<Trigger: Equatable & Sendable>: ViewModifier {
     let trigger: Trigger
     let enabled: Bool
 
@@ -152,7 +160,7 @@ struct ValueBump<Trigger: Equatable>: ViewModifier {
 /// The cover flips in edge-on when the track changes (the reference app's
 /// "artwork flip", 2026-09-29): a jump to -90° about the vertical axis,
 /// then a bouncy spring back to flat, keyed on the title. Nothing at rest.
-struct FlipOnChange<Trigger: Equatable>: ViewModifier {
+struct FlipOnChange<Trigger: Equatable & Sendable>: ViewModifier {
     let trigger: Trigger
     let enabled: Bool
 
@@ -319,6 +327,11 @@ public struct NotchRootView: View {
     /// the menu bar's "Toggle Panel".
     private let onTap: () -> Void
 
+    /// A click on the tab (2026-10-23). A no-op by default, like `onTap`;
+    /// `NotchPresenter` routes it to `NotchController.tapTab()` and resyncs
+    /// the window, as it does the island's.
+    private let onTabTap: () -> Void
+
     /// Mouse held down on a clickable island (`controller.linkURL`): the
     /// content dips like a button's, on press-down, not release.
     private var _pressed: State<Bool> = State(initialValue: false)
@@ -359,6 +372,28 @@ public struct NotchRootView: View {
         nonmutating set { _previousHeight.wrappedValue = newValue }
     }
 
+    /// The last tab item, held while Reduce Motion fades the tab out in place.
+    /// Seeded from the controller, so a tab already there at launch fades too.
+    private var _heldTab: State<NotchController.ActivityDisplay?>
+    private var heldTab: NotchController.ActivityDisplay? {
+        get { _heldTab.wrappedValue }
+        nonmutating set { _heldTab.wrappedValue = newValue }
+    }
+    /// The island at activity size when last seen there: under Reduce Motion
+    /// the hidden tab stays beside it (card open, tucked), so it fades out
+    /// and back in where it stood rather than sliding beside the card.
+    private var _tabIsland: State<NotchShapeParameters?>
+    private var tabIsland: NotchShapeParameters? {
+        get { _tabIsland.wrappedValue }
+        nonmutating set { _tabIsland.wrappedValue = newValue }
+    }
+    /// Counts tabs landing (nil to an item), the tab's own pulse trigger.
+    private var _tabLanded: State<Int> = State(initialValue: 0)
+    private var tabLanded: Int {
+        get { _tabLanded.wrappedValue }
+        nonmutating set { _tabLanded.wrappedValue = newValue }
+    }
+
     /// See `previousHeight` above — same reasoning, same toolchain
     /// workaround, kept in the view (not `NotchController`) per spec §4.
     private var _previousWidth: State<CGFloat>
@@ -393,11 +428,19 @@ public struct NotchRootView: View {
         #endif
     }
 
-    public init(controller: NotchController, onTap: @escaping () -> Void = {}) {
+    public init(controller: NotchController, onTap: @escaping () -> Void = {}, onTabTap: @escaping () -> Void = {}) {
         self.controller = controller
         self.onTap = onTap
+        self.onTabTap = onTabTap
         _previousHeight = State(initialValue: controller.parameters.height)
         _previousWidth = State(initialValue: controller.parameters.width)
+        _heldTab = State(initialValue: controller.tab)
+        _tabIsland = State(initialValue: Self.isAtActivitySize(controller) ? controller.parameters : nil)
+    }
+
+    /// The island is at activity size (not tucked), where the tab stands beside it.
+    private static func isAtActivitySize(_ controller: NotchController) -> Bool {
+        controller.state == .activity && !controller.isTucked
     }
 
     public var body: some View {
@@ -415,7 +458,7 @@ public struct NotchRootView: View {
         let expanded = controller.state == .expanded
         let showEffects = expanded && !visualEffectsSuppressed
 
-        ZStack(alignment: .top) {
+        let islandLayer = ZStack(alignment: .top) {
             shape
                 // Flat, fully opaque black in every state — the real Alcove
                 // card is a flat slab, and it has to be: the island sits
@@ -475,15 +518,28 @@ public struct NotchRootView: View {
                     )
                 }
         }
+        // The island's tap and press dip belong to its own area, never the
+        // tab's. The tap sits here, before the press drag (2026-10-23): on
+        // the canvas it lost to this zero-distance drag, and a click on the
+        // island did nothing.
+        .contentShape(shape)
+        .onTapGesture { onTap() }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in if !pressed { pressed = true } }
+                .onEnded { _ in pressed = false }
+        )
+        // The link pointer over a clickable island, the arrow elsewhere.
+        // The tab has its own (`tabLayer`).
+        .pointerStyle(controller.linkURL != nil ? .link : .default)
         // The blip pulse (`NotchController.blipPulse`): the whole island
         // swells ~5% from its top edge — the notch stays welded — and
         // springs back, for a blip that lands with no shape change to
         // announce it. Keyframed, so the resting frame is exactly 1.0.
-        .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { view, scale in
-            view.scaleEffect(controller.reduceMotion ? 1 : scale, anchor: .top)
+        .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { [reduceMotion = controller.reduceMotion] view, scale in
+            view.scaleEffect(reduceMotion ? 1 : scale, anchor: .top)
         } keyframes: { _ in
-            SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
-            SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+            NotchAnimation.blipPulseKeyframes()
         }
         // Flatten before shadowing so the island casts ONE silhouette shadow
         // rather than every layer casting its own.
@@ -492,30 +548,27 @@ public struct NotchRootView: View {
             color: .black.opacity(showEffects ? 0.5 : 0),
             radius: 16, y: 6
         )
+
+        // The tab sits outside the island's pulse, with its own shadow.
+        return ZStack(alignment: .top) {
+            islandLayer
+            tabLayer(island: parameters, showEffects: showEffects)
+                .compositingGroup()
+                .shadow(color: .black.opacity(showEffects ? 0.5 : 0), radius: 16, y: 6)
+        }
         .frame(
             width: NotchMetrics.canvasSize.width,
             height: NotchMetrics.canvasSize.height,
             alignment: .top
         )
-        // Spec §5: `hover ──▶ expanded`; a tap pins/unpins, and
-        // `.leftMouseDown`-outside/Escape (both in `NotchPresenter`) unpin.
-        // AppKit's own
-        // hit-testing (`NotchHostingView.hitTest`, driven by
-        // `interactivePath`) already restricts which points ever reach this
-        // view, so no extra region check is needed here.
-        .onTapGesture { onTap() }
-        // Press state for the dip above. Simultaneous, so the tap still
-        // fires; zero distance, so it flips on mouse-down.
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in if !pressed { pressed = true } }
-                .onEnded { _ in pressed = false }
-        )
-        // The link pointer over a clickable island, the arrow elsewhere.
-        .pointerStyle(controller.linkURL != nil ? .link : .default)
         .animation(
             NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
             value: parameters
+        )
+        // The tab buds and merges on the island's own springs.
+        .animation(
+            NotchAnimation.animation(expanding: expanding, fromHidden: fromHidden, reduceMotion: controller.reduceMotion),
+            value: controller.tabParameters
         )
         // Animated on the way OUT only (see `NotchAnimation.hideAnimation`):
         // this sits after the shape's `.animation(value: parameters)`, so
@@ -526,12 +579,81 @@ public struct NotchRootView: View {
         .allowsHitTesting(controller.isVisible)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ledge notch island")
+        .onChange(of: controller.tab) { _, newValue in
+            if let newValue { heldTab = newValue }
+        }
+        .onChange(of: controller.tab?.id) { old, new in
+            if old == nil, new != nil { tabLanded += 1 }
+        }
+        .task(id: controller.tab == nil) {
+            // Reduce Motion: drop the held item once its fade has played.
+            guard controller.tab == nil, heldTab != nil else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            if controller.tab == nil { heldTab = nil }
+        }
         .onChange(of: parameters) { _, newValue in
             // Recorded AFTER this transition's spring was already chosen
             // above, so it becomes the "before" height/width for whichever
             // transition comes next.
             previousHeight = newValue.height
             previousWidth = newValue.width
+            if Self.isAtActivitySize(controller) { tabIsland = newValue }
+        }
+    }
+
+    /// The tab beside the island (2026-10-23): a second shape in the same
+    /// material, its item's short form centred in it. Its tap is its own
+    /// (`onTabTap`) and never reaches the island's.
+    @ViewBuilder
+    private func tabLayer(island live: NotchShapeParameters, showEffects: Bool) -> some View {
+        let reduceMotion = controller.reduceMotion
+        // Reduce Motion: no bud. The shape stays at full size and fades in
+        // place: while hidden (card open, tucked) beside the island it last
+        // stood by, not the card, so it never slides as it fades.
+        let shownTab = controller.tab ?? (reduceMotion ? heldTab : nil)
+        let tab = reduceMotion && shownTab != nil ? controller.metrics.tab : controller.tabParameters
+        let island = reduceMotion && !controller.isTabShowing ? (tabIsland ?? live) : live
+        let tabShape = NotchTabShape(island: island, tab: tab)
+        let centerX = NotchMetrics.canvasSize.width / 2 + island.width / 2 + tab.gap + tab.width / 2
+        let centerY = tab.topInset + tab.height / 2
+        let pulseAnchor = UnitPoint(
+            x: centerX / NotchMetrics.canvasSize.width, y: tab.topInset / NotchMetrics.canvasSize.height
+        )
+        ZStack(alignment: .top) {
+            tabShape.fill(.black)
+            if let display = shownTab {
+                TabGlyph(
+                    display: display, controller: controller, contentColor: contentColor,
+                    tintColor: { tintColor(for: $0) }
+                )
+                .id(display.id)
+                .transition(.blurReplace)
+                .animation(NotchAnimation.textAnimation(reduceMotion: reduceMotion), value: display.id)
+                .frame(width: max(tab.width, 1), height: tab.height)
+                .position(x: centerX, y: centerY)
+                .clipShape(tabShape)
+            }
+            tabShape.stroke(Color.white.opacity(showEffects ? 0.09 : 0), lineWidth: 1)
+        }
+        .opacity(reduceMotion && !controller.isTabShowing ? 0 : 1)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : nil, value: controller.isTabShowing)
+        .contentShape(tabShape)
+        .allowsHitTesting(controller.isTabShowing)
+        .onTapGesture { onTabTap() }
+        // It has a click whatever the lead's link is, so its own pointer.
+        .pointerStyle(controller.isTabShowing ? .link : nil)
+        .keyframeAnimator(initialValue: 1.0, trigger: tabLanded) { view, scale in
+            view.scaleEffect(reduceMotion ? 1 : scale, anchor: pulseAnchor)
+        } keyframes: { _ in
+            SpringKeyframe(1.07, duration: 0.14, spring: .snappy)
+            SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+        }
+        // The island's blip pulse swells its right edge into the gap: the
+        // tab, unscaled, steps aside by as much, so the 6 pt gap holds.
+        .keyframeAnimator(initialValue: 1.0, trigger: controller.blipPulse) { view, scale in
+            view.offset(x: reduceMotion ? 0 : live.width / 2 * (scale - 1))
+        } keyframes: { _ in
+            NotchAnimation.blipPulseKeyframes()
         }
     }
 
@@ -658,14 +780,15 @@ public struct NotchRootView: View {
         let title = split.map { String(caption[..<$0.lowerBound]) } ?? caption
         let artist = split.map { String(caption[$0.upperBound...]) } ?? ""
         let overdue = controller.isPreviewingUpcoming && controller.upcoming?.isPastDue == true
+        let titleText = Text(title).font(.system(size: 11, weight: .semibold))
+        let separatorText = Text(artist.isEmpty ? "" : " · ")
+            .font(.system(size: 11, weight: .regular))
+            .foregroundStyle(contentColor.opacity(0.6))
+        let artistText = Text(artist)
+            .font(.system(size: 11, weight: .regular))
+            .foregroundStyle((overdue ? pastDueColor : nil) ?? contentColor.opacity(0.6))
         return HStack(spacing: 0) {
-            (Text(title).font(.system(size: 11, weight: .semibold))
-             + Text(artist.isEmpty ? "" : " · ")
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle(contentColor.opacity(0.6))
-             + Text(artist)
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle((overdue ? pastDueColor : nil) ?? contentColor.opacity(0.6)))
+            Text("\(titleText)\(separatorText)\(artistText)")
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
@@ -786,6 +909,20 @@ public struct NotchRootView: View {
                 .transition(.blurReplace)
                 .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: activity.title)
         } else if let activity = controller.activities.first,
+                  activity.id == NotchController.agentActivityID
+                    || activity.id == NotchController.agentWaitingActivityID
+                    || activity.id == NotchController.agentRunActivityID {
+            // An agent item (2026-10-23): Claude's orange asterisk, turning
+            // while one works, the count of sessions it stands for.
+            // The open Agents card says it all, so the ear gives way.
+            if controller.state == .expanded, controller.panel == .agents {
+                Color.clear
+            } else {
+                AgentGlyph(color: AgentColors.orange,
+                           turning: activity.id == NotchController.agentRunActivityID,
+                           count: activity.badge, reduceMotion: controller.reduceMotion)
+            }
+        } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
             // A product render (AirPods et al.) in place of the glyph. 24pt
             // tall in a 32pt ear, width from the render's own aspect (the
@@ -821,18 +958,8 @@ public struct NotchRootView: View {
             // from the top, the Dynamic Island's own timer glyph. Paused
             // and stopwatch records carry no `barFill` and fall through to
             // their symbols below.
-            ZStack {
-                Circle()
-                    .stroke((tintColor(for: activity.tint) ?? contentColor).opacity(0.25), lineWidth: 2)
-                Circle()
-                    .trim(from: 0, to: fill)
-                    .stroke(tintColor(for: activity.tint) ?? contentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    // Ticks arrive every quarter second; ease between them
-                    // so the ring drains, not steps.
-                    .animation(controller.reduceMotion ? nil : .linear(duration: 0.25), value: fill)
-            }
-            .frame(width: 14, height: 14)
+            TimerRing(fill: fill, color: tintColor(for: activity.tint) ?? contentColor,
+                      reduceMotion: controller.reduceMotion)
         } else if let activity = controller.activities.first, let symbol = activity.symbolName,
                   symbol.hasPrefix("battery."), let level = activity.barFill {
             // A battery the way the phone draws one (2026-10-06, user's
@@ -1195,6 +1322,12 @@ public struct NotchRootView: View {
                       controller.panel == .call {
                 // The call card's own clock is the one that shows (2026-10-22).
                 Color.clear
+            } else if (activity.id == NotchController.agentActivityID
+                        || activity.id == NotchController.agentWaitingActivityID
+                        || activity.id == NotchController.agentRunActivityID),
+                      controller.state == .expanded, controller.panel == .agents {
+                // The Agents card carries it (2026-10-23).
+                Color.clear
             } else if let compact = activity.compactText {
                 // A ticking clock must not bump every second; its digits
                 // still roll.
@@ -1205,11 +1338,15 @@ public struct NotchRootView: View {
                 let isTicking = activity.id == NotchController.timerActivityID
                     || activity.id == NotchController.githubRunActivityID
                     || activity.id == NotchController.callActivityID
+                    || activity.id == NotchController.agentRunActivityID
                 // …and a GitHub blip's word, in its event's colour (2026-10-22).
+                // …and an agent blip's or waiting item's word, in its record's tint (2026-10-23).
                 let isGitHub = activity.id == NotchController.githubActivityID
+                    || activity.id == NotchController.agentActivityID
+                    || activity.id == NotchController.agentWaitingActivityID
                 compactValue(compact, bump: !isTicking, color: (isTicking || isGitHub) ? tintColor(for: activity.tint) : nil)
             } else if activity.id == Self.mediaActivityID,
-                      let media = controller.media,
+                      controller.media != nil,
                       controller.state != .expanded {
                 // Compact now-playing: the current output's glyph, bright
                 // while playing and dim while paused (2026-09-29 — it
@@ -1278,7 +1415,7 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var detailRow: some View {
-        if controller.state == .expanded, controller.panel == .liveActivity, let score = controller.score {
+        if controller.state == .expanded, controller.panel == .liveActivity, let score = controller.liveActivityDisplay?.score {
             ScorePanelView(
                 score: score, homeCrest: controller.homeCrestImage, awayCrest: controller.awayCrestImage,
                 contentColor: contentColor, crestNamespace: artworkNamespace
@@ -1287,7 +1424,7 @@ public struct NotchRootView: View {
             .id("live-activity")
             .transition(panelTransition)
         } else if controller.state == .expanded, controller.panel == .liveActivity, controller.hasCard,
-                  let activity = controller.activities.first, !activity.lines.isEmpty {
+                  let activity = controller.liveActivityDisplay, !activity.lines.isEmpty {
             // Not a match: what the card says, line by line, the first
             // line carrying the weight (2026-10-01).
             VStack(alignment: .leading, spacing: 6) {
@@ -1320,6 +1457,15 @@ public struct NotchRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .id("github")
+            .transition(panelTransition)
+        } else if controller.state == .expanded, controller.panel == .agents, let data = controller.agentPanel {
+            // The Agents card (2026-10-23).
+            AgentPanelView(
+                data: data, contentColor: contentColor,
+                reduceMotion: controller.reduceMotion, emit: { controller.emit($0) }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .id("agents")
             .transition(panelTransition)
         } else if controller.state == .expanded, controller.panel == .call, let data = controller.callPanel {
             // The call card (2026-10-22).

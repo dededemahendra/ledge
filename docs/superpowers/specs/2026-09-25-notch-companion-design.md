@@ -388,7 +388,7 @@ growth itself becomes the signal that something happened.
 | 1 activity | ~255 × 32 pt | leading ear: artwork 20 pt; trailing ear: waveform |
 | Song change (media leading) | ~342 × 58 pt for 3 s | ears: artwork + bars; one "Title · Artist" line under the hole (2026-09-29, from the reference app). A two-finger horizontal swipe over the island skips a track, with the skip glyph in the leading ear for 0.7 s |
 | Volume/brightness HUD, power or device blip live (whatever is behind it) | ~255 × 32 pt | leading ear: glyph (or product render); trailing ear: percentage (device over music: artwork left, icon right) |
-| 2+ activities | ~255 × 32 pt | **retired 2026-09-29**: the leading activity owns the island alone; the rest wait in the queue (`+N` pip in the trailing ear when more than two are live) |
+| 2+ activities | ~255 × 32 pt | **retired 2026-09-29**: the leading activity owns the island alone; the rest wait in the queue (`+N` pip in the trailing ear when more than two are live). 2026-10-23: two at once returns as the tab beside the island, see `2026-10-23-island-tab-design.md` |
 | Expanded (hover with media, or pinned by click) | ~390 × 168 pt | full panel below the hole; ears keep glyphs |
 
 Ear width at one activity is ~38 pt per side; at two activities ~81 pt per side.
@@ -436,8 +436,11 @@ priority  kind           ttl        notes
     60    power          3 s        plug, unplug, 20/10/5% thresholds, full
     50    device         3 s        AirPods/Bluetooth connect, output change
     40    notification   5 s        mirrored system notifications
+    39    agent          blip       a coding agent waits, finishes or fails
     30    call           sticky     the mic held by an app (a call); 3 s ended moment
+    25    agentWaiting   sticky     a coding agent waits for you
     10    media          sticky     never expires; the resting state
+     8    agentRun       sticky     a coding agent works
 ```
 
 - **Coalescing:** a new event of the same `kind` replaces the existing activity

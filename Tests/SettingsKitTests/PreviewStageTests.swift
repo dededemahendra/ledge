@@ -143,3 +143,33 @@ private func island() -> NotchController {
     #expect(!PreviewScene.githubReviews.isOn(in: settings))
     #expect(PreviewScene.githubRunning.title == "Checks running")
 }
+
+@MainActor
+@Test func theAgentScenesShowTheirMoments() {
+    let c = island()
+    let waiting = PreviewStage.apply(.agentWaiting, content: PreviewContent(), to: c)
+    #expect(waiting.text == "Waiting for you · Sample: no session")
+    #expect(c.activities.first?.id == NotchController.agentActivityID)
+    #expect(c.activities.first?.compactText == "Allow?")
+    #expect(c.captionText == "Ledge · Bash: make test")
+    _ = PreviewStage.apply(.agentWorking, content: PreviewContent(), to: c)
+    #expect(c.activities.first?.id == NotchController.agentRunActivityID)
+    #expect(c.activities.first?.compactText == "4:12")
+    #expect(c.activities.first?.badge == nil)
+    _ = PreviewStage.apply(.agentFinished, content: PreviewContent(), to: c)
+    #expect(c.activities.first?.id == NotchController.agentActivityID)
+    #expect(c.activities.first?.compactText == "Done")
+    #expect(c.captionText == "Ledge · 3m 20s")
+    _ = PreviewStage.apply(.agentFailed, content: PreviewContent(), to: c)
+    #expect(c.activities.first?.compactText == "Failed")
+    #expect(c.captionText == "Ledge · Rate limited")
+}
+
+@MainActor
+@Test func theAgentScenesFollowTheirSwitches() {
+    let settings = AppSettings(defaults: UserDefaults(suiteName: "ledge.tests.\(UUID().uuidString)")!)
+    #expect(PreviewScene.agentWaiting.isOn(in: settings))
+    settings.agentWaiting = false
+    #expect(!PreviewScene.agentWaiting.isOn(in: settings))
+    #expect(PreviewScene.agentFinished.title == "Finished its turn")
+}

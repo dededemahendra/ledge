@@ -13,6 +13,8 @@ import LiveActivityService
 import SettingsKit
 import UpdateService
 import GitHubService
+import AgentService
+import AgentWire
 import CallService
 import LedgeSettings
 import OSLog
@@ -78,6 +80,9 @@ final class AppModel {
         note("Calendar", calendar.availability)
         note("Focus", focus.availability)
         if settings.showsCalls { note("Calls", call.availability) }
+        if settings.agentsEnabled || agents.hooksLeftBehind, case .problem(let text) = agents.status {
+            note("Agents", .unavailable(reason: text))
+        }
         if let login = LoginItem.issue {
             issues.append(Issue(text: login.text, fix: login.fix))
         }
@@ -178,6 +183,9 @@ final class AppModel {
             self?.handle(intent)
         }
 
+        agents.onMoment = { [weak self] in self?.showAgentMoment($0) }
+        agents.onChange = { [weak self] in self?.publishAgentPanel() }
+
         settings.onChange = { [weak self] in self?.applySettings() }
         applySettings()
 
@@ -196,6 +204,7 @@ final class AppModel {
                 self?.refreshLiveActivityOnHover()
                 self?.showPendingUpdate()
                 self?.refreshGitHub()
+                self?.refreshAgents()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -234,6 +243,7 @@ final class AppModel {
         githubConnecting?.cancel()
         githubConnecting = nil
         github.stop()
+        agents.suspend()
         call.stop()
         clearMediaTask?.cancel()
         clearMediaTask = nil
@@ -322,6 +332,257 @@ final class AppModel {
         showCaption(UpdateNotice.caption(version), for: ActivityKind.update.defaultTTL ?? NotchController.captionDuration)
         publish()
     }
+
+    // MARK: - Agents (2026-10-23)
+
+    private let agents = AgentMonitor()
+    var agentsStatus: AgentMonitor.Status { agents.status }
+    var agentsHooksLeftBehind: Bool { agents.hooksLeftBehind }
+    /// On, set everything up again; off, try again to take the hooks out.
+    func repairAgents() {
+        if settings.agentsEnabled { agents.enable() } else { agents.disable() }
+    }
+
+    /// What the sticky items and the card last drew, so they are republished
+    /// only on change (the `githubRunShown` pattern).
+    private var agentWaitingShown: ActivityRecord?
+    private var agentRunShown: ActivityRecord?
+    private var agentPanelShown: AgentPanelData?
+    /// The caption the last agent blip put up, so taking the blip away takes
+    /// its caption too, and nobody else's.
+    private var agentCaptionShown: String?
+    private var agentIcons: [String: Data] = [:]
+    private var agentIconsTried: Set<String> = []
+
+    private func agentURL(_ id: String) -> URL {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        return URL(string: "ledge://agent/\(encoded)") ?? URL(string: "ledge://agent")!
+    }
+
+    /// A session waits, finishes or fails: a blip, unless its switch is off,
+    /// the screen is locked, or the user is already looking at that session.
+    private func showAgentMoment(_ moment: AgentMoment) {
+        let session: AgentSession
+        switch moment {
+        case .waiting(let s):  guard settings.agentWaiting else { return }; session = s
+        case .finished(let s): guard settings.agentFinished else { return }; session = s
+        case .failed(let s):   guard settings.agentFailed else { return }; session = s
+        }
+        guard settings.agentsEnabled, !presenter.isLocked, !agents.isLooking(at: session) else { return }
+        let blip = AgentNotice.blip(for: moment)
+        queue.insert(ActivityRecord(
+            id: NotchController.agentActivityID, kind: .agent, insertedAt: Date(), ttl: blip.ttl,
+            title: blip.title, compactText: blip.word, symbolName: "asterisk",
+            tint: .system(blip.tintName), url: agentURL(blip.sessionID)
+        ))
+        publish()
+        agentCaptionShown = blip.caption
+        showCaption(blip.caption, for: blip.ttl)
+    }
+
+    /// Clears the caption only while it is still the agent blip's.
+    private func clearAgentCaption() {
+        defer { agentCaptionShown = nil }
+        guard let shown = agentCaptionShown, presenter.controller.caption == shown else { return }
+        presenter.setCaption(nil)
+    }
+
+    /// Every tick: the monitor's clock, then the waiting and working items
+    /// (none on the lock screen or with the switch off), and the card
+    /// following a lock.
+    private func refreshAgents() {
+        let now = Date()
+        agents.tick(now: now)
+        #if DEBUG
+        // The tab probe's records stand for their twenty seconds.
+        if probingTab { publishAgentPanel(); return }
+        #endif
+        let locked = presenter.isLocked
+        var changed = false
+        if locked || !settings.agentsEnabled {
+            if agentWaitingShown != nil || agentRunShown != nil {
+                agentWaitingShown = nil
+                agentRunShown = nil
+                queue.remove(kind: .agentWaiting)
+                queue.remove(kind: .agentRun)
+                changed = true
+            }
+        } else {
+            let sessions = agents.sessions.sessions
+            let waiting = settings.agentWaiting ? sessions.filter { if case .waiting = $0.state { true } else { false } } : []
+            if let longest = waiting.min(by: { $0.stateSince < $1.stateSince }) {
+                let record = ActivityRecord(
+                    id: NotchController.agentWaitingActivityID, kind: .agentWaiting,
+                    insertedAt: agentWaitingShown?.insertedAt ?? now, ttl: nil,
+                    title: waiting.count > 1 ? "\(waiting.count) waiting" : "Waiting · \(longest.name)",
+                    compactText: waiting.count > 1 ? "\(waiting.count) waiting" : longest.name,
+                    symbolName: "asterisk", tint: .system(AgentNotice.waitingTintName),
+                    url: agentURL(longest.id), badge: waiting.count > 1 ? waiting.count : nil
+                )
+                if record.compactText != agentWaitingShown?.compactText || record.badge != agentWaitingShown?.badge
+                    || record.url != agentWaitingShown?.url {
+                    agentWaitingShown = record
+                    queue.insert(record)
+                    changed = true
+                }
+            } else if agentWaitingShown != nil {
+                agentWaitingShown = nil
+                queue.remove(kind: .agentWaiting)
+                changed = true
+            }
+            let working = settings.agentWorking ? sessions.filter { $0.state == .working } : []
+            if let oldest = working.min(by: { ($0.turnStart ?? $0.stateSince) < ($1.turnStart ?? $1.stateSince) }) {
+                let since = oldest.turnStart ?? oldest.stateSince
+                let record = ActivityRecord(
+                    id: NotchController.agentRunActivityID, kind: .agentRun,
+                    insertedAt: agentRunShown?.insertedAt ?? now, ttl: nil,
+                    title: working.count > 1 ? "\(working.count) working" : "Working · \(oldest.name)",
+                    compactText: TimerText.format(seconds: now.timeIntervalSince(since).rounded(.down)),
+                    symbolName: "asterisk",
+                    tint: .color(red: AgentNotice.orange.red, green: AgentNotice.orange.green, blue: AgentNotice.orange.blue),
+                    url: agentURL(oldest.id), badge: working.count > 1 ? working.count : nil
+                )
+                if record.compactText != agentRunShown?.compactText || record.badge != agentRunShown?.badge
+                    || record.url != agentRunShown?.url {
+                    agentRunShown = record
+                    queue.insert(record)
+                    changed = true
+                }
+            } else if agentRunShown != nil {
+                agentRunShown = nil
+                queue.remove(kind: .agentRun)
+                changed = true
+            }
+        }
+        if changed { publish() }
+        publishAgentPanel()
+    }
+
+    /// The card, or none: off, locked, or no sessions. Called every tick so
+    /// the hero's ten-minute failed window can lapse; equal data republishes
+    /// nothing.
+    private func publishAgentPanel() {
+        var data: AgentPanelData?
+        let sessions = agents.sessions.sessions
+        if settings.agentsEnabled, !presenter.isLocked, !sessions.isEmpty {
+            let card = AgentPanelRows.card(sessions, now: Date())
+            data = AgentPanelData(
+                hero: card.hero.map { hero in
+                    AgentPanelData.Hero(
+                        id: hero.id, kind: Self.agentHeroKind(hero.kind), name: hero.name,
+                        icon: hero.host.flatMap(agentIcon(for:)), detail: hero.detail,
+                        isCommand: hero.isCommand, since: hero.since, url: agentURL(hero.id)
+                    )
+                },
+                rows: card.rows.map { row in
+                    AgentPanelData.Row(id: row.id, name: row.name, mark: Self.agentMark(row.mark), url: agentURL(row.id))
+                }
+            )
+        }
+        guard data != agentPanelShown else { return }
+        agentPanelShown = data
+        presenter.setAgentPanel(data)
+    }
+
+    private func agentIcon(for app: CallAppInfo) -> Data? {
+        if let cached = agentIcons[app.bundleID] { return cached }
+        // An app whose icon fails to encode is tried once, not every publish.
+        guard agentIconsTried.insert(app.bundleID).inserted else { return nil }
+        let png = Self.appIconPNG(app.bundleID)
+        agentIcons[app.bundleID] = png
+        return png
+    }
+
+    private static func agentHeroKind(_ kind: AgentHero.Kind) -> AgentPanelData.Hero.Kind {
+        switch kind {
+        case .needsYou: .needsYou
+        case .failed:   .failed
+        case .working:  .working
+        }
+    }
+
+    private static func agentMark(_ mark: AgentRow.Mark) -> AgentPanelData.Row.Mark {
+        switch mark {
+        case .waiting(let text, let since): .waiting(text, since: since)
+        case .working(let text, let since): .working(text, since: since)
+        case .done(let took, let at):       .done(took.map { "Done in \(AgentNotice.duration($0))" } ?? "Done", at: at)
+        case .failed(let text, let at):     .failed(text, at: at)
+        case .idle:                         .idle
+        }
+    }
+
+    #if DEBUG
+    /// `ledge://probe/agents`, debug builds only (2026-10-23): two made-up
+    /// sessions through a working turn, a permission ask, a finish and a
+    /// rate-limit failure, a step every three seconds; then thirty seconds
+    /// to hover the card, and both sessions end. Needs the switch on to show.
+    private func playAgentStory() {
+        let facts = AgentFacts(claudePID: nil, isHeadless: false, host: nil)
+        let alpha = "probe-alpha", beta = "probe-beta"
+        func message(_ event: String, _ session: String, _ project: String, _ stamp: Int64,
+                     tool: String? = nil, summary: String? = nil, reason: String? = nil, error: String? = nil) -> AgentMessage {
+            AgentMessage(event: event, session: session, stamp: stamp, project: project,
+                         tool: tool, summary: summary, error: error, reason: reason)
+        }
+        let steps: [AgentMessage] = [
+            message("UserPromptSubmit", alpha, "/tmp/alpha", 1),
+            message("UserPromptSubmit", beta, "/tmp/beta", 2),
+            message("PermissionRequest", alpha, "/tmp/alpha", 3, tool: "Bash", summary: "make test"),
+            message("PostToolUse", alpha, "/tmp/alpha", 4, tool: "Bash"),
+            message("Stop", alpha, "/tmp/alpha", 5),
+            message("StopFailure", beta, "/tmp/beta", 6, error: "rate_limit"),
+        ]
+        Task { @MainActor [weak self] in
+            for step in steps {
+                guard let self else { return }
+                self.agents.receive(step, facts: facts, now: Date())
+                try? await Task.sleep(for: .seconds(3))
+            }
+            try? await Task.sleep(for: .seconds(30))
+            self?.agents.receive(message("SessionEnd", alpha, "/tmp/alpha", 7), facts: facts, now: Date())
+            self?.agents.receive(message("SessionEnd", beta, "/tmp/beta", 8), facts: facts, now: Date())
+        }
+    }
+
+    /// `ledge://probe/agents-panel`, debug builds only (2026-10-23): four
+    /// made-up sessions, one in each mark, pinned open for twenty seconds.
+    private func openAgentPanelProbe() {
+        let facts = AgentFacts(claudePID: nil, isHeadless: false, host: nil)
+        let names = ["alpha", "beta", "gamma", "delta"]
+        let steps: [(event: String, tool: String?, summary: String?, error: String?)] = [
+            ("UserPromptSubmit", nil, nil, nil),
+            ("PermissionRequest", "Bash", "make test", nil),
+            ("Stop", nil, nil, nil),
+            ("StopFailure", nil, nil, "rate_limit"),
+        ]
+        var stamp: Int64 = 100
+        for (name, step) in zip(names, steps) {
+            let id = "probe-panel-\(name)"
+            if step.event != "UserPromptSubmit" {
+                stamp += 1
+                agents.receive(AgentMessage(event: "UserPromptSubmit", session: id, stamp: stamp, project: "/tmp/\(name)"), facts: facts, now: Date())
+            }
+            stamp += 1
+            agents.receive(AgentMessage(event: step.event, session: id, stamp: stamp, project: "/tmp/\(name)",
+                                        tool: step.tool, summary: step.summary, error: step.error), facts: facts, now: Date())
+        }
+        // The idle one: a session that has started and gone quiet.
+        stamp += 1
+        agents.receive(AgentMessage(event: "SessionStart", session: "probe-panel-idle", stamp: stamp, project: "/tmp/epsilon"), facts: facts, now: Date())
+        publishAgentPanel()
+        presenter.debugOpen(.agents)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            self?.presenter.controller.dismiss()
+            for id in ["alpha", "beta", "gamma", "delta"].map({ "probe-panel-\($0)" }) + ["probe-panel-idle"] {
+                stamp += 1
+                self?.agents.receive(AgentMessage(event: "SessionEnd", session: id, stamp: stamp), facts: facts, now: Date())
+            }
+        }
+    }
+    #endif
 
     // MARK: - GitHub (2026-10-22)
 
@@ -674,6 +935,41 @@ final class AppModel {
     }
 
     #if DEBUG
+    /// Set while `ledge://probe/tab` holds its two records; the timer and
+    /// agent refreshes leave their kinds alone until it passes.
+    private var probeTabUntil: Date?
+    private var probingTab: Bool { probeTabUntil.map { $0 > Date() } ?? false }
+
+    /// `ledge://probe/tab`, debug builds only (2026-10-23): a timer and a
+    /// working agent, both sticky, for twenty seconds, so the island shows
+    /// its tab. Removed afterwards only if they are still the probe's.
+    private func playTabProbe() {
+        let now = Date()
+        let until = now.addingTimeInterval(20)
+        probeTabUntil = until
+        queue.insert(ActivityRecord(
+            id: NotchController.timerActivityID, kind: .timer, insertedAt: now, ttl: nil,
+            title: "Timer", compactText: "4:12", symbolName: "stopwatch", barFill: 0.6,
+            tint: .system("orange"), url: URL(string: "clock-timer://")
+        ))
+        queue.insert(ActivityRecord(
+            id: NotchController.agentRunActivityID, kind: .agentRun, insertedAt: now, ttl: nil,
+            title: "2 working", compactText: "1:05", symbolName: "asterisk",
+            tint: .color(red: 0.851, green: 0.467, blue: 0.341), badge: 2
+        ))
+        publish()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            guard let self, self.probeTabUntil == until else { return }
+            self.probeTabUntil = nil
+            self.timerShown = nil
+            self.agentRunShown = nil
+            self.queue.remove(kind: .timer)
+            self.queue.remove(kind: .agentRun)
+            self.publish()
+        }
+    }
+
     /// `ledge://probe/github`, debug builds only (2026-10-22): plays
     /// `GitHubSample.story` through the island a step every three seconds,
     /// as real rounds would land, with no network; the last step stays half
@@ -825,6 +1121,23 @@ final class AppModel {
             stopGitHub()
         }
         publishGitHubPanel()
+        // Agents (2026-10-23): on, listen; off, undo Ledge's hooks and take
+        // everything it put on the island away. A `.problem` is not retried
+        // here: Repair does that. After hooks that would not come out,
+        // switching on again sets everything up as usual (2026-10-23).
+        if settings.agentsEnabled {
+            if agents.status == .off || agents.hooksLeftBehind { agents.enable() }
+        } else if agents.status != .off, !agents.hooksLeftBehind {
+            agents.disable()
+            agentRunShown = nil
+            agentWaitingShown = nil
+            queue.remove(kind: .agentWaiting)
+            queue.remove(kind: .agentRun)
+            queue.remove(kind: .agent)
+            clearAgentCaption()
+            publish()
+            publishAgentPanel()
+        }
     }
 
     /// The Calendar pane's list.
@@ -960,9 +1273,10 @@ final class AppModel {
         // favourite star follows the track the same way.
         if title != captionedTitle {
             captionedTitle = title
-            // A meeting or update blip owns the caption line for its
-            // lifetime (2026-10-22): a track change under it posts none.
-            if settings.showsSongCaption, !presenter.controller.isCalendarLeading, !presenter.controller.isUpdateLeading, !presenter.controller.isGitHubLeading {
+            // A meeting, update, GitHub or agent blip owns the caption line
+            // for its lifetime (2026-10-22): a track change under it posts none.
+            if settings.showsSongCaption, !presenter.controller.isCalendarLeading, !presenter.controller.isUpdateLeading,
+               !presenter.controller.isGitHubLeading, !presenter.controller.isAgentLeading {
                 showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
             }
             favorites.trackChanged(bundleIdentifier: payload.bundleIdentifier)
@@ -1197,6 +1511,12 @@ final class AppModel {
             liveActivities.press()
             return
         }
+        // A Claude Code session (2026-10-23): its window comes forward.
+        if url.scheme == "ledge", url.host() == "agent" {
+            let id = url.lastPathComponent
+            if !id.isEmpty, id != "/" { agents.focus(sessionID: id) }
+            return
+        }
         let appFor: [String: String] = [
             "ledge": url.host() == "reminders" ? "com.apple.reminders" : "com.apple.iCal",
             "ical": "com.apple.iCal",
@@ -1243,9 +1563,24 @@ final class AppModel {
             playGitHubStory()
             return
         }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/tab" {
+            Self.log.notice("probe: tab")
+            playTabProbe()
+            return
+        }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/github-panel" {
             Self.log.notice("probe: github panel")
             openGitHubPanelProbe()
+            return
+        }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/agents" {
+            Self.log.notice("probe: agents\(self.settings.agentsEnabled ? "" : " (switch on Settings › Agents to see it)")")
+            playAgentStory()
+            return
+        }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/agents-panel" {
+            Self.log.notice("probe: agents panel\(self.settings.agentsEnabled ? "" : " (switch on Settings › Agents to see it)")")
+            openAgentPanelProbe()
             return
         }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/settings" {
@@ -1403,6 +1738,9 @@ final class AppModel {
     private var clockOddities: [String] = []
 
     private func refreshTimer() {
+        #if DEBUG
+        if probingTab { return }
+        #endif
         let now = Date()
         let snapshot = clock.refresh(at: now)
         if snapshot.oddities != clockOddities {
@@ -1724,31 +2062,35 @@ final class AppModel {
         }
     }
 
+    /// One queue record as the island draws it, for the lead and the tab alike.
+    private static func activityDisplay(_ record: ActivityRecord) -> NotchController.ActivityDisplay {
+        NotchController.ActivityDisplay(
+            id: record.id,
+            title: record.title,
+            detail: record.detail,
+            compactText: record.compactText,
+            symbolName: record.symbolName,
+            barFill: record.barFill,
+            artwork: record.artwork,
+            tint: record.tint.map(Self.displayTint),
+            url: record.url,
+            parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
+            score: record.score.map {
+                .init(home: .init(name: $0.home.name, value: $0.home.value, crest: $0.home.crest),
+                      away: .init(name: $0.away.name, value: $0.away.value, crest: $0.away.crest),
+                      status: $0.status, clock: $0.clock, title: $0.title)
+            },
+            lines: record.lines,
+            badge: record.badge,
+            segments: record.segments?.map(Self.displaySegment)
+        )
+    }
+
     private func publish() {
-        let display = queue.visible.map { record in
-            NotchController.ActivityDisplay(
-                id: record.id,
-                title: record.title,
-                detail: record.detail,
-                compactText: record.compactText,
-                symbolName: record.symbolName,
-                barFill: record.barFill,
-                artwork: record.artwork,
-                tint: record.tint.map(Self.displayTint),
-                url: record.url,
-                parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
-                score: record.score.map {
-                    .init(home: .init(name: $0.home.name, value: $0.home.value, crest: $0.home.crest),
-                          away: .init(name: $0.away.name, value: $0.away.value, crest: $0.away.crest),
-                          status: $0.status, clock: $0.clock, title: $0.title)
-                },
-                lines: record.lines,
-                badge: record.badge,
-                segments: record.segments?.map(Self.displaySegment)
-            )
-        }
+        let display = queue.visible.map(Self.activityDisplay)
+        let tabDisplay = queue.tab.map(Self.activityDisplay)
         // `setActivities` sets the count itself — do not also call
         // `setActivityCount`, or overflow gets counted twice.
-        presenter.setActivities(display, overflow: queue.overflowCount)
+        presenter.setActivities(display, overflow: queue.overflowBeyondTab, tab: tabDisplay)
     }
 }

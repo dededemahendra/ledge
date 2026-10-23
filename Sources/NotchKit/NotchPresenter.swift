@@ -21,6 +21,11 @@ public final class NotchPresenter {
     /// deliberate stop still feels immediate.
     public static let hoverDwell: TimeInterval = 0.2
     private var hover = HoverIntentTracker(dwell: NotchPresenter.hoverDwell)
+    /// The part last reported to the controller while hovered.
+    private var reportedPart: NotchController.HoverPart?
+    /// Where the tab stood when its card opened, while the pointer stays on
+    /// that card or here (2026-10-23); see `hoverReading`.
+    private(set) var tabFootprint: Path?
 
     /// Settings (2026-09-30): a new dwell starts a fresh tracker; a hover
     /// in progress simply begins again.
@@ -274,8 +279,9 @@ public final class NotchPresenter {
     }
 
     /// Latest visible activities, rendered by `NotchRootView`.
-    public func setActivities(_ activities: [NotchController.ActivityDisplay], overflow: Int) {
-        controller.setActivities(activities, overflow: overflow)
+    public func setActivities(_ activities: [NotchController.ActivityDisplay], overflow: Int,
+                              tab: NotchController.ActivityDisplay? = nil) {
+        controller.setActivities(activities, overflow: overflow, tab: tab)
         // Was its own copy of `syncWindowToVisibility()`'s body; consolidated
         // so an activity expiring goes through the same hover re-evaluation
         // every other mutation does — see item 8 in the fix-wave report.
@@ -326,6 +332,8 @@ public final class NotchPresenter {
             // reappearing once the window comes back (still within its TTL)
             // is correct, not stale, and recomputeState still allows that.
             hover.reset()
+            reportedPart = nil
+            tabFootprint = nil
             dwellTimer?.invalidate()
             dwellTimer = nil
             controller.setHovered(false)
@@ -347,9 +355,11 @@ public final class NotchPresenter {
         } else {
             let created = NotchWindow(
                 screen: screen,
-                content: AnyView(NotchRootView(controller: controller, onTap: { [weak self] in
-                    self?.tapOnIsland()
-                }))
+                content: AnyView(NotchRootView(
+                    controller: controller,
+                    onTap: { [weak self] in self?.tapOnIsland() },
+                    onTabTap: { [weak self] in self?.tapOnTab() }
+                ))
             )
             window = created
             space?.adopt(created)
@@ -384,7 +394,7 @@ public final class NotchPresenter {
         // a screen change) keeps the flag honest. The RAW pointer fact,
         // not the dwell-promoted `controller.isHovered`: a click on a
         // visible island during the dwell must still land on it.
-        window.setAcceptsMouse(Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside))
+        window.setAcceptsMouse(acceptsMouse)
         // Locked, the island shows only from its space (2026-10-21); with
         // no space or the switch off, nothing shows while locked (2026-10-01:
         // macOS 27 covers every window level), and the window goes after the
@@ -424,6 +434,12 @@ public final class NotchPresenter {
         visible && hovered
     }
 
+    /// Whether the window takes mouse events right now (see
+    /// `syncWindowToVisibility`).
+    var acceptsMouse: Bool {
+        Self.shouldAcceptMouse(visible: controller.isVisible, hovered: hover.isPointerInside)
+    }
+
     /// Pure, pinned by `NotchPresenterTests`: the window is ordered in while
     /// the island has something to show, and while locked only when it may
     /// show on the lock screen (2026-10-21).
@@ -450,6 +466,13 @@ public final class NotchPresenter {
     public func setGitHubPanel(_ data: GitHubPanelData?) {
         guard data != controller.githubPanel else { return }
         controller.setGitHubPanel(data)
+        syncWindowToVisibility()
+    }
+
+    /// The Agents card (2026-10-23); can open or close the card.
+    public func setAgentPanel(_ data: AgentPanelData?) {
+        guard data != controller.agentPanel else { return }
+        controller.setAgentPanel(data)
         syncWindowToVisibility()
     }
 
@@ -507,6 +530,13 @@ public final class NotchPresenter {
         syncWindowToVisibility()
     }
 
+    /// A tap on the tab (`NotchRootView.onTabTap`), as `tapOnIsland` but for
+    /// `NotchController.tapTab()`: pinning the music card changes the shape.
+    private func tapOnTab() {
+        controller.tapTab()
+        syncWindowToVisibility()
+    }
+
     /// Keeps the claimed region in step with what is actually drawn.
     private func refreshInteractiveRegion() {
         guard let window else { return }
@@ -514,7 +544,19 @@ public final class NotchPresenter {
             window.interactivePath = nil     // Review Focus 4
             return
         }
-        window.setInteractiveShape(NotchShape(forgivingParameters()), in: Self.canvas)
+        window.setInteractiveShape(claimedRegion, in: Self.canvas)
+    }
+
+    /// What the window claims while visible: the island's forgiving shape,
+    /// the tab while it shows, and the tab's footprint while its card holds.
+    var claimedRegion: IslandRegionShape {
+        IslandRegionShape(island: forgivingParameters(), tab: currentTabParameters(), footprint: tabFootprint)
+    }
+
+    /// The tab's live parameters while it shows, else nil: a tucked or absent
+    /// tab claims nothing.
+    private func currentTabParameters() -> NotchTabParameters? {
+        controller.isTabShowing ? controller.tabParameters : nil
     }
 
     /// Claim/detect a little more than is actually drawn when collapsed or
@@ -596,14 +638,49 @@ public final class NotchPresenter {
     @discardableResult
     private func reevaluateHover() -> Bool {
         guard let screen = NSScreen.islandHost?.screen else { return false }
-        let point = Self.localPoint(NSEvent.mouseLocation, on: screen.frame)
-        let inside = Self.islandPath(for: forgivingParameters()).contains(point)
-        let change = hover.pointer(inside: inside, at: Date())
+        let changed = reevaluateHover(at: Self.localPoint(NSEvent.mouseLocation, on: screen.frame), now: Date())
         armDwellTimer()
-        switch change {
-        case .none:      return false
-        case .hovered:   controller.setHovered(true);  return true
-        case .unhovered: controller.setHovered(false); return true
+        return changed
+    }
+
+    /// `reevaluateHover()` for a canvas-local `point` at `now`: everything
+    /// but reading the pointer and arming the dwell timer, so a test can
+    /// replay the presenter's passes.
+    @discardableResult
+    func reevaluateHover(at point: CGPoint, now: Date) -> Bool {
+        let island = forgivingParameters()
+        let tab = currentTabParameters()
+        let reading = Self.hoverReading(
+            at: point, island: island, tab: tab, footprint: tabFootprint, expanded: controller.state == .expanded
+        )
+        tabFootprint = reading.footprint
+        switch hover.pointer(inside: reading.part != nil, at: now) {
+        case .none:
+            // Already hovered and the pointer crossed from one part to the
+            // other: report the new part, without restarting the dwell.
+            guard hover.isHovering, let part = reading.part, part != reportedPart else { return false }
+            report(part, island: island, tab: tab)
+            return true
+        case .hovered:
+            report(reading.part ?? .island, island: island, tab: tab)
+            return true
+        case .unhovered:
+            let left = reportedPart ?? .island
+            reportedPart = nil
+            controller.setHovered(false, part: left)
+            return true
+        }
+    }
+
+    /// Tells the controller the pointer is on `part`. A card opening from
+    /// the tab leaves the tab's footprint behind, from the activity-size
+    /// island it stood by (see `hoverReading`).
+    private func report(_ part: NotchController.HoverPart, island: NotchShapeParameters, tab: NotchTabParameters?) {
+        let wasExpanded = controller.state == .expanded
+        reportedPart = part
+        controller.setHovered(true, part: part)
+        if part == .tab, !wasExpanded, controller.state == .expanded, let tab {
+            tabFootprint = Self.tabZone(beside: island, tab: tab)
         }
     }
 
@@ -650,6 +727,56 @@ extension NotchPresenter {
         NotchShape(parameters).path(in: canvas)
     }
 
+    /// The tab's claimed zone: on a pill it reaches up over its inset to the
+    /// top edge, as the island's does (`hoverParameters`).
+    nonisolated static func tabHoverParameters(_ tab: NotchTabParameters) -> NotchTabParameters {
+        var tab = tab
+        tab.height += tab.topInset
+        tab.topInset = 0
+        return tab
+    }
+
+    /// The tab's claimed zone beside `island`, in the canvas.
+    nonisolated static func tabZone(beside island: NotchShapeParameters, tab: NotchTabParameters) -> Path {
+        NotchTabShape(island: island, tab: tabHoverParameters(tab)).path(in: canvas)
+    }
+
+    /// Which shape of the island ∪ tab the canvas-local `point` is on, nil
+    /// for neither (the 6 pt gap included). `island` is the island's claimed
+    /// parameters (`hoverParameters`); the hidden/peek forgiveness belongs to
+    /// it alone. Pure, so it is pinned without a window.
+    nonisolated static func hoverPart(
+        at point: CGPoint,
+        island: NotchShapeParameters,
+        tab: NotchTabParameters?
+    ) -> NotchController.HoverPart? {
+        if islandPath(for: island).contains(point) { return .island }
+        if let tab, tabZone(beside: island, tab: tab).contains(point) { return .tab }
+        return nil
+    }
+
+    /// What the pointer is on, holding the tab's card (2026-10-23). The card
+    /// is 356 pt wide and centred, so beside a wide island it does not cover
+    /// where the tab stood: opened from there, the next check found the
+    /// pointer outside it, closed it, and it reopened every other tick, with
+    /// clicks falling through to the menu bar meanwhile. So while the card is
+    /// open, the tab's `footprint` (recorded as it opened) counts as the
+    /// island: hovered, never re-picking the card, taking the mouse and
+    /// claimed. Leaving card and footprint both, or the card closing, drops
+    /// it. Pure, so it is pinned without a window.
+    nonisolated static func hoverReading(
+        at point: CGPoint,
+        island: NotchShapeParameters,
+        tab: NotchTabParameters?,
+        footprint: Path?,
+        expanded: Bool
+    ) -> (part: NotchController.HoverPart?, footprint: Path?) {
+        let footprint = expanded ? footprint : nil
+        if let part = hoverPart(at: point, island: island, tab: tab) { return (part, footprint) }
+        if let footprint, footprint.contains(point) { return (.island, footprint) }
+        return (nil, nil)
+    }
+
     /// Converts a point in AppKit global screen coordinates (e.g.
     /// `NSEvent.mouseLocation`) into the local space `islandPath(for:)` is
     /// defined in, given the screen the island's canvas is anchored to.
@@ -666,5 +793,23 @@ extension NotchPresenter {
             x: globalPoint.x - screenFrame.midX + canvas.width / 2,
             y: screenFrame.maxY - globalPoint.y
         )
+    }
+}
+
+/// The claimed region: the island's forgiving path plus, while it shows, the
+/// tab's, and while the tab's card holds, the tab's footprint (a path in
+/// `NotchPresenter.canvas`). Anything else passes through.
+struct IslandRegionShape: Shape {
+    var island: NotchShapeParameters
+    var tab: NotchTabParameters?
+    var footprint: Path?
+
+    func path(in rect: CGRect) -> Path {
+        var path = NotchShape(island).path(in: rect)
+        if let tab {
+            path.addPath(NotchTabShape(island: island, tab: NotchPresenter.tabHoverParameters(tab)).path(in: rect))
+        }
+        if let footprint { path.addPath(footprint) }
+        return path
     }
 }
