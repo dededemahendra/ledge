@@ -121,15 +121,11 @@ final class AgentWatchers {
         let buffer = watch.tail + data
         var lines: [Data] = []
         var start = buffer.startIndex
-        var i = start
-        while i < buffer.endIndex {
-            if buffer[i] == 0x0A {
-                lines.append(Data(buffer[start..<i]))
-                start = buffer.index(after: i)
-            }
-            i = buffer.index(after: i)
+        while let newline = buffer[start...].firstIndex(of: 0x0A) {
+            if newline > start { lines.append(buffer[start..<newline]) }
+            start = buffer.index(after: newline)
         }
         watch.tail = Data(buffer[start...])
-        for line in lines where !line.isEmpty { onLine(session, line) }
+        for line in lines { onLine(session, line) }
     }
 }

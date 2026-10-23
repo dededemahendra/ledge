@@ -37,7 +37,7 @@ public enum AgentProcess {
         var buffer = [CChar](repeating: 0, count: 256)
         let n = proc_name(pid, &buffer, UInt32(buffer.count))
         guard n > 0 else { return nil }
-        return String(cString: buffer)
+        return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     /// The process's argv from `sysctl(KERN_PROCARGS2)`; nil when unreadable.

@@ -149,7 +149,7 @@ public indirect enum OrderedJSON: Sendable, Equatable {
                 i += 1
                 switch c {
                 case UInt8(ascii: "\""):
-                    guard let s = String(validatingUTF8: out.map { CChar(bitPattern: $0) } + [0]) , !out.contains(0) else {
+                    guard !out.contains(0), let s = String(validating: out, as: UTF8.self) else {
                         throw fail("bad text in a string")
                     }
                     return s
