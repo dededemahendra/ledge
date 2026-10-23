@@ -13,7 +13,7 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
     let island = notch.oneActivity
     let tab = notch.tab
     let point = CGPoint(x: NotchPresenter.canvas.midX, y: 10)
-    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab, metrics: notch) == .island)
+    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab) == .island)
 }
 
 @Test func aPointOnTheTabIsTheTab() {
@@ -21,7 +21,7 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
     let tab = notch.tab
     let frame = tabFrame(island, tab)
     let point = CGPoint(x: frame.midX, y: 10)
-    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab, metrics: notch) == .tab)
+    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab) == .tab)
 }
 
 @Test func pointsInTheGapAndBesideTheTabPassThrough() {
@@ -31,16 +31,16 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
     let gap = CGPoint(x: NotchPresenter.canvas.midX + island.width / 2 + 3, y: 10)
     let right = CGPoint(x: frame.maxX + 4, y: 10)
     let below = CGPoint(x: frame.midX, y: frame.maxY + 4)
-    #expect(NotchPresenter.hoverPart(at: gap, island: island, tab: tab, metrics: notch) == nil)
-    #expect(NotchPresenter.hoverPart(at: right, island: island, tab: tab, metrics: notch) == nil)
-    #expect(NotchPresenter.hoverPart(at: below, island: island, tab: tab, metrics: notch) == nil)
+    #expect(NotchPresenter.hoverPart(at: gap, island: island, tab: tab) == nil)
+    #expect(NotchPresenter.hoverPart(at: right, island: island, tab: tab) == nil)
+    #expect(NotchPresenter.hoverPart(at: below, island: island, tab: tab) == nil)
 }
 
 @Test func withNoTabOnlyTheIslandCounts() {
     let island = notch.oneActivity
     let frame = tabFrame(island, notch.tab)
     let point = CGPoint(x: frame.midX, y: 10)
-    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: nil, metrics: notch) == nil)
+    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: nil) == nil)
 }
 
 @Test func aPillsTabReachesUpOverItsInsetToTheTopEdge() {
@@ -49,5 +49,5 @@ private func tabFrame(_ island: NotchShapeParameters, _ tab: NotchTabParameters)
     let tab = pill.tab
     let frame = tabFrame(island, tab)
     let point = CGPoint(x: frame.midX, y: 1)
-    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab, metrics: pill) == .tab)
+    #expect(NotchPresenter.hoverPart(at: point, island: island, tab: tab) == .tab)
 }
