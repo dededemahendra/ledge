@@ -18,6 +18,20 @@ public struct CommandMoment: Sendable, Equatable {
         self.seconds = seconds
         self.app = app
     }
+
+    /// "make test · 1m 20s", or "make test failed · 1m 20s".
+    public var caption: String {
+        "\(passed ? label : "\(label) failed") · \(Self.duration(seconds))"
+    }
+
+    /// The largest two units, a zero second unit left out: "45s", "1m 20s", "2h 3m".
+    static func duration(_ seconds: Double) -> String {
+        let whole = Int(max(0, seconds.rounded(.down)))
+        let (hours, minutes, secs) = (whole / 3600, whole % 3600 / 60, whole % 60)
+        if hours > 0 { return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h" }
+        if minutes > 0 { return secs > 0 ? "\(minutes)m \(secs)s" : "\(minutes)m" }
+        return "\(secs)s"
+    }
 }
 
 /// Long commands as Ledge hears them (2026-10-23): puts the zsh block in,

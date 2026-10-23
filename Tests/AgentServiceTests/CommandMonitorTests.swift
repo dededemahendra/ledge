@@ -43,3 +43,17 @@ private func message(status: Int32 = 0, seconds: Double = 83, pids: [Int32] = [9
     #expect(seenChain == [900, 901, 902])
     #expect(moments.first?.app == terminal)
 }
+
+/// The caption: what ran, whether it failed, and how long, in the
+/// largest two units (2026-10-23).
+@Test func theCaptionSaysWhatRanAndHowLong() {
+    func caption(_ passed: Bool, _ seconds: Double) -> String {
+        CommandMoment(label: "make test", passed: passed, seconds: seconds, app: nil).caption
+    }
+    #expect(caption(true, 45.9) == "make test · 45s")
+    #expect(caption(true, 80) == "make test · 1m 20s")
+    #expect(caption(false, 80) == "make test failed · 1m 20s")
+    #expect(caption(true, 7_380) == "make test · 2h 3m")
+    #expect(caption(true, 120) == "make test · 2m", "no zero seconds")
+    #expect(caption(true, 7_200) == "make test · 2h", "no zero minutes")
+}

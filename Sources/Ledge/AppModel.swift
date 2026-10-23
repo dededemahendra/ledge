@@ -184,6 +184,7 @@ final class AppModel {
         }
 
         agents.onMoment = { [weak self] in self?.showAgentMoment($0) }
+        commands.onMoment = { [weak self] in self?.showCommandMoment($0) }
         agents.onChange = { [weak self] in self?.publishAgentPanel() }
 
         settings.onChange = { [weak self] in self?.applySettings() }
@@ -244,6 +245,8 @@ final class AppModel {
         githubConnecting = nil
         github.stop()
         agents.suspend()
+        // The block stays in ~/.zshrc: it is the user's setting.
+        commands.suspend()
         call.stop()
         clearMediaTask?.cancel()
         clearMediaTask = nil
@@ -340,6 +343,33 @@ final class AppModel {
     var longCommandsProblem: String? {
         if case .problem(let text) = commands.status { return text }
         return nil
+    }
+    /// The terminal the last finished command ran in, for the blip's click.
+    private var commandApp: CallAppInfo?
+    private var commandCaptionShown: String?
+
+    /// A long command finished: a pass or fail blip with its time, and a
+    /// caption with what ran. None on the lock screen.
+    private func showCommandMoment(_ moment: CommandMoment) {
+        guard settings.showsLongCommands, !presenter.isLocked else { return }
+        let ttl = ActivityKind.command.defaultTTL ?? 5
+        queue.insert(ActivityRecord(
+            id: NotchController.commandActivityID, kind: .command, insertedAt: Date(), ttl: ttl,
+            title: moment.caption, compactText: TimerText.format(seconds: moment.seconds.rounded(.down)),
+            symbolName: moment.passed ? "checkmark.circle.fill" : "xmark.circle.fill",
+            tint: moment.passed ? .positive : .warning, url: URL(string: "ledge://command")
+        ))
+        commandApp = moment.app
+        publish()
+        commandCaptionShown = moment.caption
+        showCaption(moment.caption, for: ttl)
+    }
+
+    /// Clears the caption only while it is still the command blip's.
+    private func clearCommandCaption() {
+        defer { commandCaptionShown = nil }
+        guard let shown = commandCaptionShown, presenter.controller.caption == shown else { return }
+        presenter.setCaption(nil)
     }
 
     // MARK: - Agents (2026-10-23)
@@ -1147,6 +1177,16 @@ final class AppModel {
             publish()
             publishAgentPanel()
         }
+        // Long commands (2026-10-23): on, put the block in and listen, and
+        // try again after a problem; off, take the block and the blip out.
+        if settings.showsLongCommands {
+            if commands.status != .ready { commands.enable() }
+        } else if commands.status != .off {
+            commands.disable()
+            queue.remove(kind: .command)
+            clearCommandCaption()
+            publish()
+        }
     }
 
     /// The Calendar pane's list.
@@ -1518,6 +1558,11 @@ final class AppModel {
         }
         if url.scheme == "ledge", url.host() == "live-activity" {
             liveActivities.press()
+            return
+        }
+        // A finished command (2026-10-23): its terminal comes forward.
+        if url.scheme == "ledge", url.host() == "command" {
+            if let app = commandApp { activateApp(bundleID: app.bundleID, pid: app.pid) }
             return
         }
         // A Claude Code session (2026-10-23): its window comes forward.
