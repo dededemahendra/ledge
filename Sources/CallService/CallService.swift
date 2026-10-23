@@ -14,9 +14,12 @@ public struct CallUpdate: Sendable, Equatable {
     /// The call app's own mute, when Ledge can read it (Zoom, Meet;
     /// 2026-10-23). `isMuted` is true when this is, or Ledge's system mute.
     public let appMuted: Bool?
+    /// Muted in the app itself only, where Ledge can read but not press it
+    /// (Meet): the card says so, and a tap changes nothing.
+    public let mutedOnlyInApp: Bool
 
     public init(state: CallState, isMuted: Bool, canMute: Bool, micName: String?, meeting: CallMeeting? = nil,
-                isCameraOn: Bool = false, appMuted: Bool? = nil) {
+                isCameraOn: Bool = false, appMuted: Bool? = nil, mutedOnlyInApp: Bool = false) {
         self.state = state
         self.isMuted = isMuted
         self.canMute = canMute
@@ -24,6 +27,7 @@ public struct CallUpdate: Sendable, Equatable {
         self.meeting = meeting
         self.isCameraOn = isCameraOn
         self.appMuted = appMuted
+        self.mutedOnlyInApp = mutedOnlyInApp
     }
 }
 
@@ -183,9 +187,11 @@ public final class CallService {
             }
             if plan.changes != changes { changes = plan.changes }
         }
-        return CallUpdate(state: state, isMuted: appMuted == true || InputMutePlan.isMuted(states, changes: changes),
-                          canMute: appMuted != nil || InputMutePlan.canMute(states), micName: InputMutePlan.micName(states),
-                          meeting: matched, isCameraOn: camera.isCameraOn, appMuted: appMuted)
+        let systemMuted = InputMutePlan.isMuted(states, changes: changes)
+        return CallUpdate(state: state, isMuted: appMuted == true || systemMuted,
+                          canMute: (appMuted != nil && appMute.canPress) || InputMutePlan.canMute(states),
+                          micName: InputMutePlan.micName(states), meeting: matched, isCameraOn: camera.isCameraOn,
+                          appMuted: appMuted, mutedOnlyInApp: appMuted == true && !appMute.canPress && !systemMuted)
     }
 
     /// Keeps the live call's meeting (2026-10-22): matched afresh for a new
@@ -234,7 +240,7 @@ public final class CallService {
         // Zoom's or Meet's own mute when Ledge can reach it (2026-10-23):
         // Ledge's system mute is undone first, so the two never stack, and
         // the app's control is pressed only if it isn't already as wanted.
-        if let appMuted = appMute.muted {
+        if let appMuted = appMute.muted, appMute.canPress {
             let all = devices.states()
             let held = InputMutePlan.stillHeld(all, changes: changes)
             let states = micStates(all)
@@ -252,6 +258,14 @@ public final class CallService {
             }
             _ = appMute.setMuted(target)
             return
+        }
+        // An app Ledge can read but not press (Meet): a tap works the Mac's
+        // mute; muted in the app alone, it changes nothing rather than stack
+        // a second mute — the card says "Muted in Meet".
+        if appMute.muted == true, !appMute.canPress {
+            let all = devices.states()
+            let held = InputMutePlan.stillHeld(all, changes: changes)
+            guard InputMutePlan.isMuted(micStates(all), changes: held) else { return }
         }
         // Plan against what still stands: a mute undone elsewhere is no
         // longer Ledge's to skip.

@@ -10,6 +10,8 @@ import os
 public protocol AppMuteSource: AnyObject {
     func update(for app: CallAppInfo?)
     var muted: Bool? { get }
+    /// Whether the control can be pressed, or only read (Meet).
+    var canPress: Bool { get }
     /// Brings the app's own mute to `target`, pressing its control only if
     /// it isn't already; whether there was a control.
     func setMuted(_ target: Bool) -> Bool
@@ -68,6 +70,10 @@ struct LiveAXNode: AXNode {
 /// (`MuteReadGate`). Nothing is brought to the front and no keys are sent.
 @MainActor
 public final class AXAppMuteControls: AppMuteSource {
+    /// Logs a control's own wording and press results only — never a
+    /// window title or a meeting's name.
+    nonisolated static let log = Logger(subsystem: "com.dedemahendra.ledge", category: "call")
+
     private struct State: Sendable {
         var bundleID: String?
         var element: AXElementRef?
@@ -81,6 +87,10 @@ public final class AXAppMuteControls: AppMuteSource {
     private var current: CallAppInfo?
 
     public init() {}
+
+    public var canPress: Bool {
+        current.flatMap { MeetingMute.kind(for: $0.bundleID) }?.canPress ?? false
+    }
 
     public var muted: Bool? {
         let bundleID = current?.bundleID
@@ -111,6 +121,7 @@ public final class AXAppMuteControls: AppMuteSource {
     }
 
     public func setMuted(_ target: Bool) -> Bool {
+        guard canPress else { return false }
         let bundleID = current?.bundleID
         let now = Date()
         let found = state.withLock { state -> (element: AXElementRef?, known: Bool) in
@@ -126,7 +137,10 @@ public final class AXAppMuteControls: AppMuteSource {
             // Decided against a fresh read: never pressed the wrong way.
             let title = LiveAXNode(element: element.element).title
             if MeetingMute.isMuted(kind, title: title) != target {
-                _ = AXUIElementPerformAction(element.element, kAXPressAction as CFString)
+                let result = AXUIElementPerformAction(element.element, kAXPressAction as CFString)
+                Self.log.notice("mute press \(String(describing: kind), privacy: .public): before=\(title ?? "nil", privacy: .public) target=\(target, privacy: .public) result=\(result.rawValue, privacy: .public)")
+            } else {
+                Self.log.notice("mute press skipped: already \(title ?? "nil", privacy: .public)")
             }
         }
         return true
@@ -144,6 +158,7 @@ public final class AXAppMuteControls: AppMuteSource {
             let found = find(kind: kind, pid: pid)
             (element, muted) = (found.map { AXElementRef(element: $0.element) },
                                 found.flatMap { MeetingMute.isMuted(kind, title: $0.title) })
+            log.notice("mute search \(String(describing: kind), privacy: .public): cached=\(cached != nil, privacy: .public) found=\(found?.title ?? "nil", privacy: .public)")
         }
         let now = Date()
         state.withLock { state in

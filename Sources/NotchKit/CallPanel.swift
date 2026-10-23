@@ -20,9 +20,13 @@ public struct CallPanelData: Sendable, Equatable {
     public let isCameraOn: Bool
     /// The next meeting within ten minutes, as "1:1 at 15:00".
     public let nextMeeting: String?
+    /// Muted in Meet itself, which Ledge reads but can't press (2026-10-23):
+    /// the card says where, since a tap can't undo it.
+    public let mutedInMeet: Bool
 
     public init(appName: String, icon: Data?, since: Date, isMuted: Bool, canMute: Bool, micName: String?,
-                meetingTitle: String? = nil, meetingEnd: Date? = nil, isCameraOn: Bool = false, nextMeeting: String? = nil) {
+                meetingTitle: String? = nil, meetingEnd: Date? = nil, isCameraOn: Bool = false, nextMeeting: String? = nil,
+                mutedInMeet: Bool = false) {
         self.appName = appName
         self.icon = icon
         self.since = since
@@ -33,5 +37,6 @@ public struct CallPanelData: Sendable, Equatable {
         self.meetingEnd = meetingEnd
         self.isCameraOn = isCameraOn
         self.nextMeeting = nextMeeting
+        self.mutedInMeet = mutedInMeet
     }
 }

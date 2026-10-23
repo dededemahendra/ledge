@@ -1813,7 +1813,10 @@ Pending until the user reports them:
 
 1. Zoom: muting from the card mutes in Zoom itself (its toolbar shows muted),
    and muting in Zoom turns the island red within a second.
-2. Meet in Dia: the same, both ways.
+2. Meet in Dia: Meet ignores presses through Accessibility (logged
+   2026-10-23: press result 0, title unchanged after 1.5 s), so a tap mutes
+   the Mac's mic. Muting in Meet itself turns the island red and the card
+   reads "Muted in Meet".
 3. Meet with another tab in front: the card falls back to the system-wide
    mute.
 4. FaceTime, WhatsApp and other apps: unchanged, system-wide mute.

@@ -1318,7 +1318,7 @@ final class AppModel {
             presenter.setCallPanel(CallPanelData(
                 appName: app.name, icon: icon, since: since, isMuted: update.isMuted, canMute: update.canMute,
                 micName: update.micName, meetingTitle: update.meeting?.title, meetingEnd: update.meeting?.end,
-                isCameraOn: update.isCameraOn, nextMeeting: next
+                isCameraOn: update.isCameraOn, nextMeeting: next, mutedInMeet: update.mutedOnlyInApp
             ))
             let record = ActivityRecord(
                 id: NotchController.callActivityID, kind: .call, insertedAt: callShown?.insertedAt ?? now, ttl: nil,

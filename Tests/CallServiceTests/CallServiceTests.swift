@@ -18,6 +18,7 @@ private final class FakeCamera: CameraSource {
 @MainActor
 private final class FakeAppMute: AppMuteSource {
     var muted: Bool?
+    var canPress = true
     private(set) var updatedFor: [String?] = []
     private(set) var presses = 0
     func update(for app: CallAppInfo?) { updatedFor.append(app?.bundleID) }
@@ -582,4 +583,41 @@ private final class Rig {
     let update = rig.refresh(from: 2.25, to: 2.5)
     #expect(rig.devices.device("b").isMuted)
     #expect(update.isMuted)
+}
+
+// MARK: - Meet: read, not pressed (2026-10-23)
+
+/// Meet ignores Accessibility presses, so a Meet call's tap mutes the Mac.
+@MainActor @Test func aMeetCallIsMutedOnTheMac() {
+    let rig = Rig()
+    rig.appMute.muted = false
+    rig.appMute.canPress = false
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    #expect(rig.devices.device("a").isMuted)
+    #expect(rig.appMute.presses == 0)
+    #expect(rig.refresh(from: 2.25, to: 2.25).isMuted)
+}
+
+/// Muted in Meet itself: shown, and a tap stacks no second mute.
+@MainActor @Test func mutedInMeetAloneATapChangesNothing() {
+    let rig = Rig()
+    rig.appMute.muted = true
+    rig.appMute.canPress = false
+    let update = rig.refresh(to: 2)
+    #expect(update.isMuted && update.mutedOnlyInApp)
+    rig.service.toggleMute()
+    #expect(!rig.devices.device("a").isMuted)
+    #expect(rig.appMute.presses == 0)
+}
+
+@MainActor @Test func aMacMuteOnAMeetCallIsUndoneByATap() {
+    let rig = Rig()
+    rig.appMute.muted = false
+    rig.appMute.canPress = false
+    rig.refresh(to: 2)
+    rig.service.toggleMute()
+    rig.service.toggleMute()
+    #expect(!rig.devices.device("a").isMuted)
+    #expect(!rig.refresh(from: 2.25, to: 2.25).isMuted)
 }

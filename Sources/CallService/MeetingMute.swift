@@ -34,6 +34,11 @@ public struct AXSnapshot: AXNode, Sendable, Equatable {
 public enum MeetingMute: Sendable, Equatable {
     case zoom, meet
 
+    /// Whether pressing the control works. Meet's page ignores presses that
+    /// come through Accessibility — the press reports success and nothing
+    /// changes (found live, 2026-10-23) — so Meet is read, never pressed.
+    public var canPress: Bool { self == .zoom }
+
     static let maxDepth = 40
     static let maxNodes = 3000
 

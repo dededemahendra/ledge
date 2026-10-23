@@ -67,3 +67,10 @@ private func window(_ title: String, button: String = "Turn off microphone") -> 
     #expect(MeetingMute.needsPageTree(windowTitles: ["Personal: Meet - abc-defg-hij", "Personal: Home"]))
     #expect(!MeetingMute.needsPageTree(windowTitles: ["Discord", "Personal: Home"]))
 }
+
+/// Meet ignores Accessibility presses (found live, 2026-10-23): it is read,
+/// never pressed. Zoom is both.
+@Test func onlyZoomCanBePressed() {
+    #expect(MeetingMute.zoom.canPress)
+    #expect(!MeetingMute.meet.canPress)
+}

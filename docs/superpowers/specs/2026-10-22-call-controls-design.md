@@ -30,6 +30,18 @@ and are kept below for then.
   found only while the Meet tab is the window's front tab, since background
   tabs expose no page.
 
+**Meet can't be pressed (found live, 2026-10-23).** Meet's page ignores
+presses made through Accessibility: the press reports success, and the
+button still reads "Turn off microphone" a second and a half later. The
+user chose to read Meet without pressing it:
+
+- The island still turns red when they mute in Meet itself.
+- A tap on a Meet call works the Mac's mic mute instead.
+- Muted only in Meet, a tap changes nothing, since stacking a second mute
+  would be wrong, and the card reads "Muted in Meet".
+
+Zoom accepts the press, so it keeps the app's own mute both ways.
+
 **Cost** *(my call)*:
 
 - The control is found once per call by walking the tree, off the main

@@ -104,13 +104,13 @@ struct CallPanelView: View {
             TimelineView(.periodic(from: data.since, by: 1)) { context in
                 let left = CallMeetingText.timeLeft(end: end, now: context.date)
                 HStack(spacing: 0) {
-                    if data.isMuted { Text("Muted · ").foregroundStyle(red) }
+                    if data.isMuted { Text(data.mutedInMeet ? "Muted in Meet · " : "Muted · ").foregroundStyle(red) }
                     Text(left.text).foregroundStyle(left.isOver ? red : quiet)
                 }
                 .lineLimit(1)
             }
         } else {
-            Text(data.isMuted ? "Muted" : "On a call")
+            Text(data.isMuted ? (data.mutedInMeet ? "Muted in Meet" : "Muted") : "On a call")
                 .foregroundStyle(data.isMuted ? red : quiet)
         }
     }
