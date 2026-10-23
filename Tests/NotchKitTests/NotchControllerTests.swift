@@ -1404,6 +1404,44 @@ private func tabGitHubPanel() -> GitHubPanelData {
     #expect(c.panel == .call && c.state == .expanded)
     c.setHovered(true, part: .island)
     #expect(c.panel == .call && c.state == .expanded && c.hoveredPart == .island)
+    c.setHovered(true, part: .island)
+    #expect(c.panel == .call && c.state == .expanded)
+
+    let r = makeController()
+    r.setCallPanel(callPanel)
+    r.setAgentPanel(agentPanel)
+    r.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.agentRunActivityID, title: "Agent", compactText: "x"))
+    r.setHovered(true, part: .island)
+    #expect(r.panel == .call && r.state == .expanded)
+    r.setHovered(true, part: .tab)
+    #expect(r.panel == .call && r.hoveredPart == .tab)
+    r.setHovered(true, part: .tab)
+    #expect(r.panel == .call && r.state == .expanded)
+}
+
+@MainActor
+@Test func theTabsClickWithNothingToDoOrNoTabShowingDoesNothing() {
+    let c = makeController()
+    var intents: [NotchIntent] = []
+    c.onIntent = { intents.append($0) }
+    c.setMedia(someMedia())
+    c.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.timerActivityID, title: "Timer", compactText: "1:00"))
+    c.tapTab()
+    #expect(intents.isEmpty && c.state == .activity && !c.isPinnedOpen)
+
+    let url = URL(string: "ledge://agent/s1")!
+    c.setActivities([.init(id: NotchController.callActivityID, title: "Call", compactText: "1")], overflow: 0,
+                    tab: .init(id: NotchController.agentWaitingActivityID, title: "Agent", compactText: "x", url: url))
+    c.setTucked(true)
+    c.tapTab()
+    #expect(intents.isEmpty)
+    c.setTucked(false)
+    c.setHovered(true, part: .island)   // media: expanded, tab hidden
+    #expect(c.state == .expanded)
+    c.tapTab()
+    #expect(intents.isEmpty)
 }
 
 @MainActor

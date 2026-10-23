@@ -828,15 +828,14 @@ public final class NotchController {
     public private(set) var hoveredPart: HoverPart?
 
     public func setHovered(_ hovered: Bool, part: HoverPart) {
-        let before = hoveredPart
         let wasHovered = isHovered
         isHovered = hovered
         hoveredPart = hovered ? part : nil
-        // Once the card is open a part change only moves `hoveredPart`: the
-        // tab's card is wide enough to sit under the pointer, and the next
-        // report of the island must not switch it to the lead's.
-        let partChangedWhileOpen = wasHovered && state == .expanded && before != part
-        if hovered, !isPinnedOpen, !partChangedWhileOpen {
+        // Once the card is open a report only moves `hoveredPart`: the tab's
+        // card is wide enough to sit under the pointer, and a report of the
+        // island (once, or again) must not switch it to the lead's.
+        let cardIsOpen = wasHovered && state == .expanded
+        if hovered, !isPinnedOpen, !cardIsOpen {
             if part == .tab {
                 if let tabPanel { panel = tabPanel }
             } else {
