@@ -338,9 +338,10 @@ public final class NotchController {
     /// (2026-09-29) carries its own — "Title · 10:00". An update notice
     /// (2026-10-22) carries its own too. Any other blip
     /// pre-empting the island takes it whole.
-    /// A GitHub blip (2026-10-22) carries its own as well.
+    /// A GitHub blip (2026-10-22) carries its own as well, and so does an
+    /// agent blip (2026-10-23); the waiting and working items don't.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading || isGitHubLeading)
+        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading || isGitHubLeading || isAgentLeading)
     }
 
     public var isLiveActivityLeading: Bool {
@@ -396,6 +397,23 @@ public final class NotchController {
         isGitHubLeading || activities.first?.id == Self.githubRunActivityID
     }
 
+    /// `AppModel` inserts an agent blip with this id, the waiting item with
+    /// `agentWaitingActivityID` and the working item with
+    /// `agentRunActivityID` (2026-10-23).
+    public static let agentActivityID = "agent"
+    public static let agentWaitingActivityID = "agent-waiting"
+    public static let agentRunActivityID = "agent-run"
+
+    public var isAgentLeading: Bool {
+        activities.first?.id == Self.agentActivityID
+    }
+
+    /// Any agent item leads: hover opens the card.
+    private var isAnyAgentLeading: Bool {
+        guard let id = activities.first?.id else { return false }
+        return id == Self.agentActivityID || id == Self.agentWaitingActivityID || id == Self.agentRunActivityID
+    }
+
     /// `AppModel` inserts the iPhone Live Activity with this id
     /// (2026-10-01): a match's crests and figures, or the phone glyph.
     public static let liveActivityID = "live-activity"
@@ -445,6 +463,8 @@ public final class NotchController {
         case github
         /// The call on the mic, with its mute button (2026-10-22).
         case call
+        /// The Claude Code sessions, a row each (2026-10-23).
+        case agents
     }
 
     public private(set) var panel: Panel = .media
@@ -484,6 +504,17 @@ public final class NotchController {
         recomputeState()
     }
 
+    /// What the Agents card lists; `nil` means no card: agents off, no
+    /// sessions, or the screen is locked (2026-10-23).
+    public private(set) var agentPanel: AgentPanelData?
+
+    public func setAgentPanel(_ data: AgentPanelData?) {
+        guard data != agentPanel else { return }
+        agentPanel = data
+        if agentPanel == nil, panel == .agents { panel = .media }
+        recomputeState()
+    }
+
     #if DEBUG
     /// Debug probes only (2026-10-22): pins `panel` open for a screenshot,
     /// the way a click pins the now-playing card.
@@ -503,6 +534,7 @@ public final class NotchController {
         if media != nil { panels.append(.media) }
         if calendarMode != nil { panels.append(.calendar) }
         if githubPanel != nil { panels.append(.github) }
+        if agentPanel != nil { panels.append(.agents) }
         return panels
     }
 
@@ -531,10 +563,11 @@ public final class NotchController {
             recomputeState()
             return true
         }
-        // The empty peek (2026-10-22): a swipe opens the GitHub panel.
-        if state == .peek, githubPanel != nil {
+        // The empty peek (2026-10-22): a swipe opens the GitHub panel, or
+        // else the Agents card (2026-10-23).
+        if state == .peek, githubPanel != nil || agentPanel != nil {
             lastSwipe = direction
-            panel = .github
+            panel = githubPanel != nil ? .github : .agents
             recomputeState()
             return true
         }
@@ -778,6 +811,8 @@ public final class NotchController {
         // So does a GitHub item's, the way a Live Activity's card opens
         // (2026-10-22).
         if hovered, isAnyGitHubLeading, githubPanel != nil, !isPinnedOpen { panel = .github }
+        // And an agent item's (2026-10-23).
+        if hovered, isAnyAgentLeading, agentPanel != nil, !isPinnedOpen { panel = .agents }
         // And a call's (2026-10-22).
         if hovered, isCallLeading, callPanel != nil, !isPinnedOpen { panel = .call }
         // Leaving puts the card back on now-playing for next time, unless
@@ -1019,6 +1054,8 @@ public final class NotchController {
         } else if isHovered, panel == .github, githubPanel != nil {
             state = .expanded
         } else if isHovered, panel == .call, callPanel != nil {
+            state = .expanded
+        } else if isHovered, panel == .agents, agentPanel != nil {
             state = .expanded
         } else if activityCount > 0, !(isHovered && onlyChargingIsShowing && upcoming != nil) {
             state = .activity
