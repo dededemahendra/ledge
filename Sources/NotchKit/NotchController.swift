@@ -339,9 +339,18 @@ public final class NotchController {
     /// (2026-10-22) carries its own too. Any other blip
     /// pre-empting the island takes it whole.
     /// A GitHub blip (2026-10-22) carries its own as well, and so does an
-    /// agent blip (2026-10-23); the waiting and working items don't.
+    /// agent blip (2026-10-23); the waiting and working items don't. A
+    /// finished command (2026-10-23) carries its label and time.
     public var hasCaption: Bool {
-        state == .activity && caption != nil && (isMediaLeading || isCalendarLeading || isUpdateLeading || isGitHubLeading || isAgentLeading)
+        state == .activity && caption != nil
+            && (isMediaLeading || isCalendarLeading || isUpdateLeading || isGitHubLeading || isAgentLeading || isCommandLeading)
+    }
+
+    /// `AppModel` inserts a finished command's blip with this id (2026-10-23).
+    public static let commandActivityID = "command"
+
+    public var isCommandLeading: Bool {
+        activities.first?.id == Self.commandActivityID
     }
 
     public var isLiveActivityLeading: Bool {

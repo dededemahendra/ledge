@@ -264,3 +264,12 @@ private func queue(_ kinds: ActivityKind...) -> ActivityQueue {
     #expect(q.ordered.first?.kind == .hud)
     #expect(q.tab == nil)
 }
+
+/// A long command that finished (2026-10-23): a five second blip, under a
+/// GitHub blip (someone else's doing) and over the update notice.
+@Test func aFinishedCommandIsABlipBetweenGitHubAndTheUpdate() {
+    #expect(ActivityKind.command.priority == 36)
+    #expect(ActivityKind.command.defaultTTL == 5)
+    #expect(ActivityKind.command < .github && ActivityKind.command > .update)
+    #expect(!ActivityKind.command.canSitInTab)
+}

@@ -22,6 +22,10 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
     /// merge, a review request. Under a notification, over the update
     /// notice.
     case github
+    /// A long terminal command that finished (2026-10-23): five seconds,
+    /// under a GitHub blip (someone else's doing) and over the update
+    /// notice, which waits for nothing.
+    case command
     /// A newer Ledge on GitHub (2026-10-22): once per version, under every
     /// other blip (it waits for nothing) and over a Clock timer.
     case update
@@ -67,6 +71,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .notification: return 40
         case .agent:        return 39
         case .github:       return 38
+        case .command:      return 36
         case .update:       return 35
         case .call:         return 30
         case .agentWaiting: return 25
@@ -90,6 +95,7 @@ public enum ActivityKind: String, Sendable, CaseIterable, Comparable {
         case .notification: return 5
         case .agent:        return 8       // a word and a line to read
         case .github:       return 8       // a word and a line to read
+        case .command:      return 5       // a label and a time
         case .update:       return 8       // a version and a line to read
         case .call:         return nil
         case .agentWaiting: return nil

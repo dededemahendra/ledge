@@ -1541,3 +1541,14 @@ private func tabGitHubPanel() -> GitHubPanelData {
     c.setActivities([lead], overflow: 0, tab: working)
     #expect(c.tabAttention == before + 1, "back to working")
 }
+
+/// A finished command carries its own caption: what ran and how long (2026-10-23).
+@MainActor
+@Test func aFinishedCommandShowsItsCaption() {
+    let c = makeController()
+    let command = NotchController.ActivityDisplay(id: NotchController.commandActivityID, title: "make test",
+                                                  compactText: "1:20", symbolName: "checkmark.circle.fill")
+    c.setActivities([command], overflow: 0)
+    c.setCaption("make test · 1m 20s")
+    #expect(c.captionText == "make test · 1m 20s")
+}
