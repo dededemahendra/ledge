@@ -6,23 +6,24 @@ import SwiftUI
 private let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
 private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, height: 32))
 
-@Test func onANotchTheTabIsAFortyPointTabBesideTheIsland() {
+/// A round bubble beside the island, as the iPhone's second island is
+/// (2026-10-23, user's call): as tall as the notch, 6 pt to its right, its
+/// top against the screen's edge like the island's.
+@Test func onANotchTheTabIsACircleBesideTheIsland() {
     let island = notch.oneActivity
     let tab = notch.tab
     #expect(tab.gap == 6)
-    #expect(tab.width == 40)
+    #expect(tab.width == 32)
     #expect(tab.height == 32)
-    #expect(tab.bottomRadius == 12)
-    #expect(tab.outerFillet == 6)
+    #expect(tab.bottomRadius == 16)
+    #expect(tab.topRadius == 16)
+    #expect(tab.outerFillet == 0)
     #expect(tab.topInset == 0)
-    #expect(tab.topRadius == 0)
 
-    // `width` is the body between the sides, as the island's is: the two
-    // concave fillets reach `outerFillet` beyond it on each side.
     let bounds = NotchTabShape(island: island, tab: tab).path(in: canvas).boundingRect
-    let bodyLeft = canvas.midX + island.width / 2 + 6
-    #expect(abs(bounds.minX - (bodyLeft - 6)) < 0.001)
-    #expect(abs(bounds.maxX - (bodyLeft + 40 + 6)) < 0.001)
+    let left = canvas.midX + island.width / 2 + 6
+    #expect(abs(bounds.minX - left) < 0.001)
+    #expect(abs(bounds.width - 32) < 0.001)
     #expect(abs(bounds.minY) < 0.001)
     #expect(abs(bounds.height - 32) < 0.001)
 }
@@ -80,10 +81,11 @@ private let notch = NotchMetrics(notchRect: CGRect(x: 0, y: 0, width: 179, heigh
     #expect(abs(pb.minX - (canvas.midX + big.width / 2 + 6)) < 0.001)
 }
 
-@Test func theFilletGrowsWithTheBud() {
+/// Budding out, the round tab stays within its width: no flares beside it.
+@Test func aBuddingTabHasNoFlares() {
     let island = notch.oneActivity
     var tab = notch.tab
     tab.width = 20
     let bounds = NotchTabShape(island: island, tab: tab).path(in: canvas).boundingRect
-    #expect(abs(bounds.width - (20 + 2 * 3)) < 0.001)
+    #expect(abs(bounds.width - 20) < 0.001)
 }

@@ -45,7 +45,13 @@ behind music or a timer any more, and the island never grows a third shape.
 
 ## Shape
 
-**On a notch** (designed against the measured 179 × 32 pt notch, MacBook Air
+**Round, since 2026-10-23 (user's call).** On a notch the tab is now a circle
+as tall as the notch (32 pt on the measured notch), 6 pt right of the island,
+its top against the screen's edge like the island's, with no fillets: a
+round bubble beside the island, as the iPhone's second island is. The
+welded 40 pt tab below is how it first shipped. The pill keeps its circle.
+
+**On a notch** (as first shipped) (designed against the measured 179 × 32 pt notch, MacBook Air
 13″):
 
 | Property | Value |

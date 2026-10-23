@@ -25,7 +25,9 @@ private func onTheTab(beside island: NotchShapeParameters, dx: CGFloat, y: CGFlo
     let island = m.oneActivity(earWidth: NotchMetrics.activityEarMaximum)
     let footprint = NotchPresenter.tabZone(beside: island, tab: m.tab)
     let card = NotchPresenter.hoverParameters(state: .expanded, drawn: m.expanded, metrics: m)
-    let point = onTheTab(beside: island, dx: 35)
+    // The round tab's outer edge (32 pt across since 2026-10-23), still
+    // beyond the card.
+    let point = onTheTab(beside: island, dx: 31)
     // The card alone does not reach the tab's outer part.
     #expect(NotchPresenter.hoverPart(at: point, island: card, tab: nil) == nil)
 
