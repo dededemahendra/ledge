@@ -395,6 +395,10 @@ final class AppModel {
     private func refreshAgents() {
         let now = Date()
         agents.tick(now: now)
+        #if DEBUG
+        // The tab probe's records stand for their twenty seconds.
+        if probingTab { publishAgentPanel(); return }
+        #endif
         let locked = presenter.isLocked
         var changed = false
         if locked || !settings.agentsEnabled {
@@ -931,6 +935,41 @@ final class AppModel {
     }
 
     #if DEBUG
+    /// Set while `ledge://probe/tab` holds its two records; the timer and
+    /// agent refreshes leave their kinds alone until it passes.
+    private var probeTabUntil: Date?
+    private var probingTab: Bool { probeTabUntil.map { $0 > Date() } ?? false }
+
+    /// `ledge://probe/tab`, debug builds only (2026-10-23): a timer and a
+    /// working agent, both sticky, for twenty seconds, so the island shows
+    /// its tab. Removed afterwards only if they are still the probe's.
+    private func playTabProbe() {
+        let now = Date()
+        let until = now.addingTimeInterval(20)
+        probeTabUntil = until
+        queue.insert(ActivityRecord(
+            id: NotchController.timerActivityID, kind: .timer, insertedAt: now, ttl: nil,
+            title: "Timer", compactText: "4:12", symbolName: "stopwatch", barFill: 0.6,
+            tint: .system("orange"), url: URL(string: "clock-timer://")
+        ))
+        queue.insert(ActivityRecord(
+            id: NotchController.agentRunActivityID, kind: .agentRun, insertedAt: now, ttl: nil,
+            title: "2 working", compactText: "1:05", symbolName: "asterisk",
+            tint: .color(red: 0.851, green: 0.467, blue: 0.341), badge: 2
+        ))
+        publish()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            guard let self, self.probeTabUntil == until else { return }
+            self.probeTabUntil = nil
+            self.timerShown = nil
+            self.agentRunShown = nil
+            self.queue.remove(kind: .timer)
+            self.queue.remove(kind: .agentRun)
+            self.publish()
+        }
+    }
+
     /// `ledge://probe/github`, debug builds only (2026-10-22): plays
     /// `GitHubSample.story` through the island a step every three seconds,
     /// as real rounds would land, with no network; the last step stays half
@@ -1524,6 +1563,11 @@ final class AppModel {
             playGitHubStory()
             return
         }
+        if url.scheme == "ledge", url.host() == "probe", url.path() == "/tab" {
+            Self.log.notice("probe: tab")
+            playTabProbe()
+            return
+        }
         if url.scheme == "ledge", url.host() == "probe", url.path() == "/github-panel" {
             Self.log.notice("probe: github panel")
             openGitHubPanelProbe()
@@ -1686,6 +1730,9 @@ final class AppModel {
     private var clockOddities: [String] = []
 
     private func refreshTimer() {
+        #if DEBUG
+        if probingTab { return }
+        #endif
         let now = Date()
         let snapshot = clock.refresh(at: now)
         if snapshot.oddities != clockOddities {
@@ -2007,31 +2054,35 @@ final class AppModel {
         }
     }
 
+    /// One queue record as the island draws it, for the lead and the tab alike.
+    private static func activityDisplay(_ record: ActivityRecord) -> NotchController.ActivityDisplay {
+        NotchController.ActivityDisplay(
+            id: record.id,
+            title: record.title,
+            detail: record.detail,
+            compactText: record.compactText,
+            symbolName: record.symbolName,
+            barFill: record.barFill,
+            artwork: record.artwork,
+            tint: record.tint.map(Self.displayTint),
+            url: record.url,
+            parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
+            score: record.score.map {
+                .init(home: .init(name: $0.home.name, value: $0.home.value, crest: $0.home.crest),
+                      away: .init(name: $0.away.name, value: $0.away.value, crest: $0.away.crest),
+                      status: $0.status, clock: $0.clock, title: $0.title)
+            },
+            lines: record.lines,
+            badge: record.badge,
+            segments: record.segments?.map(Self.displaySegment)
+        )
+    }
+
     private func publish() {
-        let display = queue.visible.map { record in
-            NotchController.ActivityDisplay(
-                id: record.id,
-                title: record.title,
-                detail: record.detail,
-                compactText: record.compactText,
-                symbolName: record.symbolName,
-                barFill: record.barFill,
-                artwork: record.artwork,
-                tint: record.tint.map(Self.displayTint),
-                url: record.url,
-                parts: record.parts?.map { .init(symbolName: $0.symbolName, text: $0.text) },
-                score: record.score.map {
-                    .init(home: .init(name: $0.home.name, value: $0.home.value, crest: $0.home.crest),
-                          away: .init(name: $0.away.name, value: $0.away.value, crest: $0.away.crest),
-                          status: $0.status, clock: $0.clock, title: $0.title)
-                },
-                lines: record.lines,
-                badge: record.badge,
-                segments: record.segments?.map(Self.displaySegment)
-            )
-        }
+        let display = queue.visible.map(Self.activityDisplay)
+        let tabDisplay = queue.tab.map(Self.activityDisplay)
         // `setActivities` sets the count itself — do not also call
         // `setActivityCount`, or overflow gets counted twice.
-        presenter.setActivities(display, overflow: queue.overflowCount)
+        presenter.setActivities(display, overflow: queue.overflowBeyondTab, tab: tabDisplay)
     }
 }
