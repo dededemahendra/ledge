@@ -186,3 +186,12 @@ private func record(
     #expect(ActivityKind.call < .update && ActivityKind.call > .timer)
     #expect(ActivityKind.call > .media && ActivityKind.call > .liveActivity && ActivityKind.call > .githubRun)
 }
+
+@Test func agentsSitWhereTheSpecPutsThem() {
+    #expect(ActivityKind.agent.priority == 39 && ActivityKind.agent.defaultTTL == 8)
+    #expect(ActivityKind.agent > .github && ActivityKind.agent < .notification)
+    #expect(ActivityKind.agentWaiting.priority == 25 && ActivityKind.agentWaiting.defaultTTL == nil)
+    #expect(ActivityKind.agentWaiting < .call && ActivityKind.agentWaiting > .timer && ActivityKind.agentWaiting > .media)
+    #expect(ActivityKind.agentRun.priority == 8 && ActivityKind.agentRun.defaultTTL == nil)
+    #expect(ActivityKind.agentRun < .media && ActivityKind.agentRun > .charging)
+}
