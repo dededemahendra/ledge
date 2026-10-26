@@ -56,7 +56,10 @@ welded 40 pt tab below is how it first shipped. The pill keeps its circle.
 as its agent starts waiting for the user. A ring around its edge was tried
 (an arc turning while working, a solid ring while waiting) and removed at
 the user's request: the asterisk's own turn and colour say it. The gap is
-8 pt and the agent glyph 15 pt in the bubble.
+8 pt and the agent glyph 15 pt in the bubble. **Changed 2026-10-26 (user's
+call):** the glyph is Claude's mark and holds still ("dont rotate the claude
+logo"), so its colour alone tells working (orange) from waiting (amber), with
+the pulse as before.
 
 **On a notch** (as first shipped) (designed against the measured 179 × 32 pt notch, MacBook Air
 13″):
@@ -105,12 +108,12 @@ already uses, so an item reads the same when it moves.
 | Kind | In the tab |
 | --- | --- |
 | Call | the app's icon (or the meeting service's tile), a small green dot at its corner; muted: the red crossed-out mic |
-| Agent waiting | the asterisk in amber, a count from 2 |
+| Agent waiting | Claude's mark in amber, a count from 2 |
 | Clock timer | the draining ring; the stopwatch glyph; the pause glyph when paused |
 | GitHub running | the check ring with its segments (`CheckRing`), else `GitHubRunRing`, a count from 2 |
 | iPhone Live Activity | a match's home crest; otherwise the phone glyph |
 | Music | the artwork as a small spinning disc (`SpinningArtwork`), still when paused |
-| Agents working | the turning orange asterisk (`AgentGlyph`), a count from 2 |
+| Agents working | Claude's mark in orange, still (`AgentGlyph`), a count from 2 |
 
 ## Interaction
 

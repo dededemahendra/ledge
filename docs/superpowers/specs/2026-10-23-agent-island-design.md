@@ -184,7 +184,11 @@ hooks went in join on their next tool call.
 
 **The glyph.** SF Symbol `asterisk` in Claude orange (`#D97757`), not
 Anthropic's logo *(my call)*. While anything works it turns once every 2.4 s;
-with Reduce Motion it stays still.
+with Reduce Motion it stays still. **Changed 2026-10-26 (user's call: "claude
+real logo"):** Claude's own mark (`ClaudeMark`, the path from the Claude app's
+bundled asset) replaces the asterisk wherever it stood for Claude, colours
+unchanged; and it no longer turns ("dont rotate the claude logo"), the clock
+alone saying a session works.
 
 **Blips** — a new `agent` kind, priority 39 (over a GitHub blip, under a
 notification):

@@ -1083,6 +1083,33 @@ red over the grid — weekday letters bold with the weekend dimmed, busy days in
 red instead of dotted, today on a white disc. `CalendarModeData` gained the
 weekday title, day number, short month and weekend columns.
 
+**Two days, after the reference app (2026-10-26, user's screenshot).** The
+grid gives way to the next day. Left: the weekday spelled out in red, the
+day number large, then today's all-day events as chips and its remaining
+items as rows, or "No events today" (or "No more events today" once all
+are over) over "Your day is clear". Right: the first day after today, within
+`Agenda.days` (7), with anything on, named "TOMORROW" or "WEDNESDAY, 28 OCT"
+by the locale, its chips and rows the same way; with the week clear, the
+month grid as before. A chip is the calendar's colour at a low tint with the
+glyph and title in the colour pulled toward white: `star.circle.fill` for a
+subscribed calendar (Calendar's holidays arrive that way), `gift.circle.fill`
+for Birthdays, `calendar.circle.fill` otherwise. A column holds 3 lines under
+the date and 4 under the next day's name; when more is on, the last line
+counts the rest ("2 more events", "2 more all-day"), the timed items keeping
+their rows ahead of the chips (`CalendarLine.lines`). `CalendarService.agenda`
+holds today from midnight through the week, all-day events included, though
+`events` (blips) still leaves them out; a new day reloads.
+
+**Hover opens the calendar (2026-10-26, user's call: "redundant
+information").** The hover preview of the next item only repeated the
+card's first row, so it is retired: with nothing playing and nothing in the
+ears, or only the charging state, hover opens the calendar card itself, as
+the reference app opens its idle island (`setHovered` picks `.calendar`).
+Without calendar access, hover is the plain peek. `NotchController.upcoming`,
+`isPreviewingUpcoming` and the presenter's `setUpcoming` are gone; the
+Settings previews take the next event and reminder from
+`CalendarService.nextEvent` instead.
+
 ## iPhone Live Activity mirror (2026-10-01)
 
 **What.** A paired iPhone's Live Activity, as the Mac's menu bar shows it,

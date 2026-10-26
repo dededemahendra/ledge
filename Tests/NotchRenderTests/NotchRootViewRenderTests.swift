@@ -680,23 +680,6 @@ private func renderAndClassify(_ controller: NotchController) -> RenderCheck {
             "\(result.contentOutsideIslandCount) content pixel(s) outside the island bounds \(result.islandBounds)")
 }
 
-/// The hover preview of the next event (2026-09-29): the peek at
-/// `captioned` size with the calendar glyph, the countdown and the caption
-/// line — all inside the island, none of it in the notch.
-@MainActor
-@Test func upcomingPreviewRendersInsideTheIslandAndClearOfTheNotch() {
-    let controller = makeController()
-    controller.setUpcoming(UpcomingEvent(title: "Design review", compactText: "42m", caption: "Design review · 14:00", url: nil))
-    controller.setHovered(true)
-    #expect(controller.state == .peek)
-    #expect(controller.parameters.height == controller.metrics.captioned.height && controller.parameters.width >= NotchMetrics.captionedMinimumWidth)
-
-    let result = renderAndClassify(controller)
-    #expect(result.hasContentInsideIsland, "no content pixel inside \(result.islandBounds) — the preview did not render")
-    #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
-    #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
-}
-
 /// A Focus blip with a long name (2026-09-30): the island stretched to
 /// fit the trailing text — everything still inside it, nothing in the
 /// notch, the text not spilling past the ear.
@@ -945,9 +928,8 @@ private func earContentBounds(_ controller: NotchController) -> (leading: CGRect
     for (name, metrics) in reminderScreens {
         let c = NotchController(metrics: metrics, reduceMotion: true)
         c.setCalendarMode(CalendarModeData(now: Date(), calendar: .current, markedDays: [], items: items))
-        c.setUpcoming(items[0])
         c.setHovered(true)
-        #expect(c.swipe(.next) && c.panel == .calendar)
+        #expect(c.state == .expanded && c.panel == .calendar, "nothing playing: hover opens the calendar")
         let island = NotchShape(c.parameters).path(in: CGRect(origin: .zero, size: NotchMetrics.canvasSize)).boundingRect
         var bounds = CGRect.null
         var count = 0
@@ -981,4 +963,57 @@ private func earContentBounds(_ controller: NotchController) -> (leading: CGRect
         #expect(abs(got.trailing - want.trailing) < 0.75, "\(figure) ends \(got.trailing) pt in, the measured notch's \(want.trailing)")
         #expect(abs(got.leading - want.leading) < 0.75, "the glyph starts \(got.leading) pt in, the measured notch's \(want.leading)")
     }
+}
+
+// MARK: - The calendar's days (2026-10-26)
+
+/// The next day's all-day event as the reference app draws it: a chip in
+/// its calendar's colour, as wide as its title rather than a row's bar, in
+/// the card's right half and inside the island, on every screen.
+@MainActor
+@Test func theNextDaysAllDayChipSitsInTheRightHalfInItsColour() {
+    let blue = UpcomingEvent.Tint(red: 0, green: 0, blue: 1)
+    let holiday = UpcomingEvent(title: "Hari Sumpah Pemuda", symbolName: "star.circle.fill", compactText: "",
+                                caption: "", url: nil, tint: blue)
+    for (name, metrics) in reminderScreens {
+        let c = NotchController(metrics: metrics, reduceMotion: true)
+        c.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+        c.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+        c.setCalendarMode(CalendarModeData(now: Date(), calendar: .current, markedDays: [], items: [],
+                                           next: CalendarDay(title: "WEDNESDAY, 28 OCT", allDay: [holiday])))
+        c.setHovered(true)
+        #expect(c.swipe(.next) && c.panel == .calendar)
+        let island = NotchShape(c.parameters).path(in: CGRect(origin: .zero, size: NotchMetrics.canvasSize)).boundingRect
+        var bounds = CGRect.null
+        var count = 0
+        RenderedImage(c).forEachBluePixel { point in
+            count += 1
+            bounds = bounds.union(CGRect(origin: point, size: CGSize(width: 0.5, height: 0.5)))
+        }
+        #expect(count > 200, "\(name): the chip did not render in its calendar's colour")
+        #expect(bounds.width > 60, "\(name): the colour spans \(bounds.width) pt, not a chip's width")
+        #expect(bounds.minX > island.midX && island.insetBy(dx: 8, dy: 0).contains(bounds),
+                "\(name): the chip sits at \(bounds), not in the right half of \(island)")
+    }
+}
+
+/// A clear day: "No events today" under the date, the next day beside it,
+/// all inside the island and clear of the notch.
+@MainActor
+@Test func aClearDayRendersInsideTheIslandAndClearOfTheNotch() {
+    let controller = makeController()
+    controller.setMedia(MediaPresentation(title: "Song", artist: "Artist", artwork: nil, isPlaying: true, elapsed: 10, duration: 200))
+    controller.setActivities([.init(id: "media", title: "Song", detail: "Artist")], overflow: 0)
+    controller.setCalendarMode(CalendarModeData(
+        now: Date(), calendar: Calendar.current, markedDays: [], items: [],
+        next: CalendarDay(title: "TOMORROW", items: (1...5).map {
+            UpcomingEvent(title: "Item \($0)", compactText: "", caption: "", time: "1\($0):00", url: nil)
+        })
+    ))
+    controller.setHovered(true)
+    #expect(controller.swipe(.next) && controller.panel == .calendar)
+    let result = renderAndClassify(controller)
+    #expect(result.hasContentInsideIsland)
+    #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
+    #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
 }

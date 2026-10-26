@@ -43,11 +43,9 @@ struct TabGlyph: View {
         case NotchController.callActivityID:
             call
         case NotchController.agentWaitingActivityID:
-            AgentGlyph(color: AgentColors.waiting, turning: false, count: display.badge,
-                       reduceMotion: controller.reduceMotion, size: 15)
+            AgentGlyph(color: AgentColors.waiting, count: display.badge, size: 15)
         case NotchController.agentRunActivityID, NotchController.agentActivityID:
-            AgentGlyph(color: AgentColors.orange, turning: display.id == NotchController.agentRunActivityID,
-                       count: display.badge, reduceMotion: controller.reduceMotion, size: 15)
+            AgentGlyph(color: AgentColors.orange, count: display.badge, size: 15)
         case NotchController.timerActivityID:
             if let fill = display.barFill {
                 TimerRing(fill: fill, color: tintColor(display.tint) ?? contentColor,

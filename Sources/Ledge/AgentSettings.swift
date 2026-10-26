@@ -53,7 +53,7 @@ struct AgentSettings: View {
             Section {
                 moment("Waiting for you", "Permission prompts, questions and plans to approve.",
                        symbol: "hand.raised.fill", color: .systemYellow, \.agentWaiting, .agentWaiting)
-                moment("Working", "A turning asterisk and a clock while a session works. Under music.",
+                moment("Working", "Claude's mark and a clock while a session works. Under music.",
                        symbol: "asterisk", color: nil, \.agentWorking, .agentWorking)
                 moment("Finished its turn", "Done, and how long it took.",
                        symbol: "checkmark.circle.fill", color: .systemGreen, \.agentFinished, .agentFinished)

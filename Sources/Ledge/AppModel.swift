@@ -198,7 +198,7 @@ final class AppModel {
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.prune()
-                self?.refreshUpcoming()
+                self?.refreshCalendarMode()
                 self?.refreshTimer()
                 self?.refreshCall()
                 self?.refreshCharging()
@@ -1059,13 +1059,17 @@ final class AppModel {
     /// already shows or has seen. A nil field becomes a labelled sample.
     func previewContent() -> PreviewContent {
         let controller = presenter.controller
-        let items = (controller.upcoming.map { [$0] } ?? []) + (controller.calendarMode?.items ?? [])
+        let now = Date()
+        func next(_ kind: MeetingEvent.Kind) -> UpcomingEvent? {
+            guard calendar.availability.isAvailable, allowedCalendarKinds.contains(kind) else { return nil }
+            return calendar.nextEvent(at: now, allowing: [kind]).map { cardItem($0, now: now, day: Calendar.current.startOfDay(for: now)) }
+        }
         let output = controller.outputs.first(where: \.isCurrent)?.name
         return PreviewContent(
             media: controller.media,
             mediaSource: controller.media == nil ? nil : mediaPayload.bundleIdentifier,
-            nextEvent: items.first { $0.kind == .event },
-            nextReminder: items.first { $0.kind == .reminder },
+            nextEvent: next(.event),
+            nextReminder: next(.reminder),
             batteryPercent: power.availability.isAvailable ? power.latest?.percent : nil,
             headphones: lastHeadphones.flatMap { $0.name == output ? $0 : nil },
             focus: lastFocus,
@@ -1488,62 +1492,67 @@ final class AppModel {
         return kinds
     }
 
-    /// The next event for the hover preview (`NotchController.upcoming`),
-    /// refreshed on the 250 ms tick so the countdown stays honest while the
-    /// cursor rests. The caption's time formatting is cached per event.
-    private var upcomingCaption: (id: String, day: Date, text: String)?
+    /// The calendar card's items, refreshed on the 250 ms tick so "Now" and
+    /// an overdue reminder's red stay honest while the card is open. Time
+    /// formatting is cached per item and day.
     private var agendaTexts: [String: (day: Date, caption: String, time: String)] = [:]
 
-    private func refreshUpcoming() {
+    private func refreshCalendarMode() {
         let now = Date()
         let day = Calendar.current.startOfDay(for: now)
-        // The card's calendar mode (2026-09-30): this month's grid with its
-        // marks, and today's remaining items, texts cached per item and day.
+        // The card's calendar mode (2026-10-26, after the reference app):
+        // today's all-day chips and remaining items, and the next day with
+        // something on; this month's grid with its marks when the week
+        // ahead is clear. Texts cached per item and day.
         if calendar.availability.isAvailable {
-            let today = calendar.upcoming(at: now, limit: 8, allowing: allowedCalendarKinds)
-                .filter { Calendar.current.isDate($0.start, inSameDayAs: now) }
-                .prefix(3)
-                .map { event -> UpcomingEvent in
-                    if agendaTexts[event.id]?.day != day {
-                        agendaTexts[event.id] = (day, event.captionText(at: now), event.startTimeText())
-                    }
-                    let texts = agendaTexts[event.id]!
-                    return UpcomingEvent(
-                        title: event.title, symbolName: event.symbolName, compactText: event.countdownText(at: now),
-                        caption: texts.caption, time: event.isUnderWay(at: now) ? "Now" : texts.time,
-                        url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind),
-                        tint: Self.itemTint(for: event),
-                        kind: event.kind == .reminder ? .reminder : .event,
-                        isPastDue: event.isPastDue(at: now)
-                    )
-                }
+            let kinds = allowedCalendarKinds
+            let agenda = calendar.agenda.filter { kinds.contains($0.kind) }
+            let today = Agenda.items(on: now, in: agenda, calendar: .current)
+            let timed = today.filter { !$0.isAllDay }
+            let remaining = timed.filter { $0.end > now }
+            let next = Agenda.nextDay(after: now, in: agenda, calendar: .current).map { next in
+                CalendarDay(
+                    date: next.day, now: now, calendar: .current,
+                    allDay: next.items.filter(\.isAllDay).map { cardItem($0, now: now, day: day) },
+                    items: next.items.filter { !$0.isAllDay }.map { cardItem($0, now: now, day: day) }
+                )
+            }
             var marks: Set<Int> = []
             if settings.showsCalendarEvents { marks.formUnion(calendar.markedEventDays) }
             if settings.showsReminders { marks.formUnion(calendar.markedReminderDays) }
-            presenter.setCalendarMode(CalendarModeData(now: now, calendar: Calendar.current, markedDays: marks, items: Array(today)))
+            presenter.setCalendarMode(CalendarModeData(
+                now: now, calendar: .current, markedDays: marks,
+                items: remaining.map { cardItem($0, now: now, day: day) },
+                allDay: today.filter(\.isAllDay).map { cardItem($0, now: now, day: day) },
+                isDayDone: !timed.isEmpty && remaining.isEmpty,
+                next: next
+            ))
         } else {
             presenter.setCalendarMode(nil)
         }
         if agendaTexts.count > 64 { agendaTexts = [:] }
+    }
 
-        guard let event = calendar.nextEvent(at: now, allowing: allowedCalendarKinds) else {
-            presenter.setUpcoming(nil)
-            return
+    /// One of the card's items. An all-day event is a chip: its glyph,
+    /// no time. A timed one keeps its texts per item and day.
+    private func cardItem(_ event: MeetingEvent, now: Date, day: Date) -> UpcomingEvent {
+        let url = event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind)
+        guard !event.isAllDay else {
+            return UpcomingEvent(title: event.title, symbolName: event.allDaySymbolName, compactText: "",
+                                 caption: event.title, url: url, tint: Self.itemTint(for: event))
         }
-        // Keyed on the day too: "Tomorrow at 06:15" becomes "06:15" at midnight.
-        if upcomingCaption?.id != event.id || upcomingCaption?.day != day {
-            upcomingCaption = (event.id, day, event.captionText(at: now))
+        if agendaTexts[event.id]?.day != day {
+            agendaTexts[event.id] = (day, event.captionText(at: now), event.startTimeText())
         }
-        presenter.setUpcoming(UpcomingEvent(
-            title: event.title,
-            symbolName: event.symbolName,
-            compactText: event.countdownText(at: now),
-            caption: upcomingCaption?.text ?? event.title,
-            url: event.joinURL ?? event.detailURL ?? Self.openAppURL(for: event.kind),
+        let texts = agendaTexts[event.id]!
+        return UpcomingEvent(
+            title: event.title, symbolName: event.symbolName, compactText: event.countdownText(at: now),
+            caption: texts.caption, time: event.isUnderWay(at: now) ? "Now" : texts.time,
+            url: url,
             tint: Self.itemTint(for: event),
             kind: event.kind == .reminder ? .reminder : .event,
             isPastDue: event.isPastDue(at: now)
-        ))
+        )
     }
 
     /// A click on a calendar item: the join link, else the item's own deep
@@ -2081,10 +2090,7 @@ final class AppModel {
         if !power.availability.isAvailable { queue.remove(kind: .power) }
         if !hud.availability.isAvailable { queue.remove(kind: .hud) }
         if !device.availability.isAvailable { queue.remove(kind: .device) }
-        if !calendar.availability.isAvailable {
-            queue.remove(kind: .calendar)
-            presenter.setUpcoming(nil)
-        }
+        if !calendar.availability.isAvailable { queue.remove(kind: .calendar) }
         if !focus.availability.isAvailable { queue.remove(kind: .focus) }
         if !liveActivities.availability.isAvailable { queue.remove(kind: .liveActivity) }
         if !call.availability.isAvailable {
