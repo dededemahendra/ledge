@@ -47,12 +47,12 @@ reuse or redistribute the code.
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
-| Nothing playing, cursor resting on the island | the next event or timed reminder: calendar glyph, or a reminder's ring in its list's colour, left, countdown right ("42m", "2h 10m", "Now"), "Title · 21:00 to 22:00" under the hole; click to join, or to open that item in Calendar or Reminders |
+| Nothing playing, cursor resting on the island | the calendar card (below): today and the next day with something on; click an item to join, or to open it in Calendar or Reminders |
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
 | On a call in any app (the mic in use) | the app's icon left, the time right in green, the red crossed-out mic when muted; rest the cursor for a card with a mute button (Zoom's and Meet's own mute on those calls) and "Not a call"; a red hang-up and the length for 3 s when it ends; a calendar meeting shows its service, its title and the time left, with the next meeting and the camera on the card |
 | GitHub, once connected in Settings › GitHub | checks running on your PRs: a ring with a segment per check, and a clock; checks passed or failed, a review, a comment, a merge or close, a review request, or a run of yours finishing: a blip with who did it (their picture) or what happened, the PR's title under the hole; click to open it on GitHub. Hover for a card of what is running, with a bar of its checks, then your PRs and review requests. Never on the lock screen |
 | A zsh command that ran 10 s or more, once Settings › Island › Long commands is on | a green check or red cross left, its time right, "make test · 1m 20s" under the hole for 5 s; click to bring its terminal back. Quiet while that terminal is in front. Adds a marked block to ~/.zshrc |
-| Claude Code sessions, once switched on in Settings › Agents | an orange asterisk: "Allow?", "Question" or "Plan" in amber when a session waits for you, with what it wants under the hole; "Done" and how long in green, "Failed" and why in red; while any wait or work, the count and the oldest turn's clock (working sits under music); hover for a card of every session; click to bring its window forward (VS Code, Ghostty). Never on the lock screen |
+| Claude Code sessions, once switched on in Settings › Agents | Claude's mark in orange: "Allow?", "Question" or "Plan" in amber when a session waits for you, with what it wants under the hole; "Done" and how long in green, "Failed" and why in red; while any wait or work, the count and the oldest turn's clock (working sits under music); hover for a card of every session; click to bring its window forward (VS Code, Ghostty). Never on the lock screen |
 | An iPhone Live Activity (paired iPhone, macOS 26+) | a match shows its crest and score in each ear, around the notch, keeping up by the second; hover and the pair drops into a card with names, period and a clock that counts; click for the system's own. Needs Screen Recording |
 | A Focus turns on or off | with Full Disk Access granted: the Focus's own symbol in its own colour left and its name right (the island stretches to fit), "Off" with the symbol uncoloured, 3 s; without it: the moon and On/Off |
 | An event or timed reminder 5 min away, and again as it starts | its glyph left, "5m" then "Now" right, "Title · 10:00" under the hole for 8 s; click the blip to join the call (Zoom, Meet, Teams, Webex, FaceTime…) or, with no link, to open that item in Calendar or Reminders |
@@ -76,9 +76,11 @@ previous · play/pause · next · repeat. The star works for Apple Music only
 (Spotify has no local way to like a track); the first tap makes macOS ask once
 to let Ledge control Music, and until that tap Ledge never talks to Music. The output button opens a list of every audio
 output below the controls (the card grows to fit); pick one to switch. A two-finger swipe on the open card slides
-to its other mode, **Calendar**: the weekday and a big date with today's remaining items as chips in their
-calendars' colours, and this month as a grid — weekends dimmed, busy days in red, today on a disc; a chip opens its
-item. Two dots at the foot say which mode you are in. With nothing playing, a swipe on the next-item preview opens the calendar directly. Click the island to pin the card open; click
+to its other mode, **Calendar**: the weekday and a big date with today's remaining items under it (or "No events
+today", "Your day is clear"), and beside them the next day with something on in the coming week, under its name
+("TOMORROW", "WEDNESDAY, 28 OCT"). All-day events are chips in their calendars' colours, a star for a holiday and a
+gift for a birthday; a column that runs out of room ends on "2 more events". With the week ahead clear, this month
+shows as a grid instead — weekends dimmed, busy days in red, today on a disc. Each item opens on click. Two dots at the foot say which mode you are in. With nothing playing, resting the cursor on the island opens the calendar directly. Click the island to pin the card open; click
 elsewhere, or Escape, to unpin. A click on a blip with nothing playing does nothing. Two-finger swipe left or right over the island
 to skip tracks.
 

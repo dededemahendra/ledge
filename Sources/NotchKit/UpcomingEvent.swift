@@ -1,10 +1,9 @@
 import Foundation
 
-/// The next calendar event, for the hover preview (2026-09-29): with
-/// nothing playing and no blip live, resting the cursor on the island
-/// shows it in the meeting blip's own layout — calendar glyph and
-/// countdown in the ears, "Title · 14:00" under the hole — and a click
-/// joins. `AppModel` keeps it fresh from `CalendarService`.
+/// A calendar event or timed reminder: a row or an all-day chip in the
+/// calendar card, and the Settings previews' meeting and reminder blips
+/// (2026-10-26; it began as the hover preview, retired then). `AppModel`
+/// builds these from `CalendarService`.
 public struct UpcomingEvent: Sendable, Equatable {
     public struct Tint: Sendable, Equatable {
         public let red: Double, green: Double, blue: Double
@@ -26,11 +25,12 @@ public struct UpcomingEvent: Sendable, Equatable {
     public let kind: Kind
     /// The calendar's or list's colour; `nil` draws a neutral grey.
     public let tint: Tint?
-    /// Leading ear: "calendar" for an event, "circle" for a reminder.
+    /// A blip's leading ear: "calendar" for an event, "circle" for a
+    /// reminder; an all-day chip's glyph: "star.circle.fill" and the like.
     public let symbolName: String
-    /// Trailing ear: "42m", "2h 10m", "Now".
+    /// A blip's trailing ear: "42m", "2h 10m", "Now".
     public let compactText: String
-    /// The caption line: "Title · 14:00".
+    /// A blip's caption line: "Title · 14:00".
     public let caption: String
     /// A card row's time: the start, "14:00", or "Now" for an event under
     /// way.

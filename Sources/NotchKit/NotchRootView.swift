@@ -706,8 +706,7 @@ public struct NotchRootView: View {
             // simply sliced by the moving clip mask on the way out.
             if let caption = controller.captionText {
                 // Song-change or meeting caption (see `NotchController.
-                // caption`), or the previewed next event on hover
-                // (`NotchController.upcoming`): one line under the hole,
+                // caption`): one line under the hole,
                 // fading in over the island's spring and out again when it
                 // goes. Keyed on the text so a second change inside the
                 // window crossfades in place.
@@ -758,27 +757,9 @@ public struct NotchRootView: View {
         }
     }
 
-    /// A reminder's ring in its list's colour, grey for a list without one
-    /// (2026-10-21); `nil`, white, for an event's calendar glyph and under
-    /// the render test hook.
-    private func ringColor(for upcoming: UpcomingEvent) -> Color? {
-        guard upcoming.kind == .reminder else { return nil }
-        return tintColor(for: upcoming.tint.map { .color(red: $0.red, green: $0.green, blue: $0.blue) } ?? .system("gray"))
-    }
-
-    /// An overdue reminder's time, in the calendar card's red, as Reminders
-    /// marks one (2026-10-21). Never under the render test hook.
-    private var pastDueColor: Color? {
-        #if DEBUG
-        if NotchRenderTestHook.contentColor != nil { return nil }
-        #endif
-        return .calendarRed
-    }
-
     /// "Title · Artist": the title carries the weight, the artist sits back.
     /// Left-aligned like the reference, under the artwork's ear. One line,
-    /// tail-truncated; the caption row is 26pt, the text 11pt. A previewed
-    /// reminder that is overdue has its time in red. Split at the LAST
+    /// tail-truncated; the caption row is 26pt, the text 11pt. Split at the LAST
     /// separator, so a title with " · " in it stays whole (2026-10-21); a
     /// GitHub blip's caption splits at the FIRST (2026-10-22).
     private func captionRow(_ caption: String) -> some View {
@@ -786,14 +767,13 @@ public struct NotchRootView: View {
         let split = controller.isGitHubLeading ? caption.range(of: " · ") : caption.range(of: " · ", options: .backwards)
         let title = split.map { String(caption[..<$0.lowerBound]) } ?? caption
         let artist = split.map { String(caption[$0.upperBound...]) } ?? ""
-        let overdue = controller.isPreviewingUpcoming && controller.upcoming?.isPastDue == true
         let titleText = Text(title).font(.system(size: 11, weight: .semibold))
         let separatorText = Text(artist.isEmpty ? "" : " · ")
             .font(.system(size: 11, weight: .regular))
             .foregroundStyle(contentColor.opacity(0.6))
         let artistText = Text(artist)
             .font(.system(size: 11, weight: .regular))
-            .foregroundStyle((overdue ? pastDueColor : nil) ?? contentColor.opacity(0.6))
+            .foregroundStyle(contentColor.opacity(0.6))
         return HStack(spacing: 0) {
             Text("\(titleText)\(separatorText)\(artistText)")
                 .lineLimit(1)
@@ -815,7 +795,7 @@ public struct NotchRootView: View {
     private var earContentKey: String {
         let first = controller.activities.first
         let hint = controller.skipHint.map { $0 == .next ? "n" : "p" } ?? "-"
-        return "\(NotchController.earSlot(forActivity: first?.id))|\(controller.media == nil ? 0 : 1)|\(hint)|\(controller.isPreviewingUpcoming ? "u" : "-")"
+        return "\(NotchController.earSlot(forActivity: first?.id))|\(controller.media == nil ? 0 : 1)|\(hint)"
     }
 
     /// Spec §6/§10: content must stay inside the island's own rect and clear
@@ -860,14 +840,7 @@ public struct NotchRootView: View {
     }
 
     @ViewBuilder private var leadingEar: some View {
-        if controller.isPreviewingUpcoming, let upcoming = controller.upcoming {
-            // The next event or reminder on hover (`NotchController.
-            // upcoming`): its glyph, same size and weight as a blip's, a
-            // reminder's ring in its list's colour.
-            Image(systemName: upcoming.symbolName)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(ringColor(for: upcoming) ?? contentColor)
-        } else if let hint = controller.skipHint, controller.media != nil, controller.state != .expanded {
+        if let hint = controller.skipHint, controller.media != nil, controller.state != .expanded {
             // Swipe-to-skip feedback (`NotchController.skipHint`): the skip
             // glyph takes the artwork's place for a beat. The ear key
             // includes it, so this is a crossfade in and back out.
@@ -919,15 +892,13 @@ public struct NotchRootView: View {
                   activity.id == NotchController.agentActivityID
                     || activity.id == NotchController.agentWaitingActivityID
                     || activity.id == NotchController.agentRunActivityID {
-            // An agent item (2026-10-23): Claude's orange asterisk, turning
+            // An agent item (2026-10-23): Claude's mark in its orange,
             // while one works, the count of sessions it stands for.
             // The open Agents card says it all, so the ear gives way.
             if controller.state == .expanded, controller.panel == .agents {
                 Color.clear
             } else {
-                AgentGlyph(color: AgentColors.orange,
-                           turning: activity.id == NotchController.agentRunActivityID,
-                           count: activity.badge, reduceMotion: controller.reduceMotion)
+                AgentGlyph(color: AgentColors.orange, count: activity.badge)
             }
         } else if let activity = controller.activities.first,
            let data = activity.artwork, let image = NSImage(data: data) {
@@ -1293,11 +1264,7 @@ public struct NotchRootView: View {
     /// three digits at a glance, so volume/brightness now show glyph + bar;
     /// battery keeps glyph + `87%`, having no `barFill` to prefer.
     @ViewBuilder private var trailingEar: some View {
-        if controller.isPreviewingUpcoming, let upcoming = controller.upcoming {
-            // The next event's countdown — "42m", "2h 10m", "Now" — red
-            // once a reminder is overdue.
-            compactValue(upcoming.compactText, color: upcoming.isPastDue ? pastDueColor : nil)
-        } else if controller.isDeviceLeading, controller.media != nil, controller.state != .expanded,
+        if controller.isDeviceLeading, controller.media != nil, controller.state != .expanded,
            let activity = controller.activities.first {
             // The device's icon in place of the visualizer bars
             // for the blip's lifetime — see `leadingEar`'s first branch.

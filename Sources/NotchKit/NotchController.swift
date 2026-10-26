@@ -386,7 +386,7 @@ public final class NotchController {
     public static let focusActivityID = "focus"
 
     /// `AppModel` inserts the live charging state with this id. It is
-    /// background: alone, it yields to the hover preview.
+    /// background: alone, it yields to the calendar card on hover.
     public static let chargingActivityID = "charging"
 
     private var onlyChargingIsShowing: Bool {
@@ -454,21 +454,6 @@ public final class NotchController {
 
     public var isCalendarLeading: Bool {
         activities.first?.id == Self.calendarActivityID
-    }
-
-    /// The next calendar event, shown on hover when there is nothing else
-    /// to show — see `UpcomingEvent` and `isPreviewingUpcoming`.
-    public private(set) var upcoming: UpcomingEvent?
-
-    public func setUpcoming(_ upcoming: UpcomingEvent?) {
-        guard upcoming != self.upcoming else { return }   // set every tick; only a change should re-render
-        self.upcoming = upcoming
-    }
-
-    /// Hovered, nothing playing, no blip live, and an event coming up: the
-    /// peek becomes the meeting blip's layout with that event in it.
-    public var isPreviewingUpcoming: Bool {
-        state == .peek && upcoming != nil
     }
 
     // MARK: - Modes of the open card (2026-09-30)
@@ -558,9 +543,9 @@ public final class NotchController {
         return panels
     }
 
-    /// A two-finger swipe. On the open card, the next or previous mode; on
-    /// the next-item preview, the calendar mode. Returns whether the
-    /// swipe was taken — otherwise the presenter treats it as a track skip.
+    /// A two-finger swipe. On the open card, the next or previous mode.
+    /// Returns whether the swipe was taken — otherwise the presenter treats
+    /// it as a track skip.
     /// At the last mode a swipe is taken and nothing moves: a swipe on the
     /// card never skips a track by accident.
     public func swipe(_ direction: SwipeToSkipTracker.Direction) -> Bool {
@@ -577,12 +562,6 @@ public final class NotchController {
             }
             return true
         }
-        if isPreviewingUpcoming, calendarMode != nil {
-            lastSwipe = direction
-            panel = .calendar
-            recomputeState()
-            return true
-        }
         // The empty peek (2026-10-22): a swipe opens the GitHub panel, or
         // else the Agents card (2026-10-23).
         if state == .peek, githubPanel != nil || agentPanel != nil {
@@ -595,10 +574,9 @@ public final class NotchController {
     }
 
     /// What the caption line under the hole says right now, if anything:
-    /// the song/meeting caption at activity size, or the previewed event.
+    /// the song/meeting caption at activity size.
     public var captionText: String? {
-        if isPreviewingUpcoming { return upcoming?.caption }
-        return hasCaption ? caption : nil
+        hasCaption ? caption : nil
     }
 
     /// Feedback for a swipe-to-skip: the skip glyph takes the leading ear
@@ -705,8 +683,7 @@ public final class NotchController {
     /// keeps its own, unless the trailing text needs more ("Approved",
     /// "Comment", "2h 10m"). The island's width already makes room for it.
     public var captionedEarSlot: CGFloat {
-        max(NotchMetrics.activityEarWidth,
-            isPreviewingUpcoming ? earWidth(forText: upcoming?.compactText) : leadingEarWidth)
+        max(NotchMetrics.activityEarWidth, leadingEarWidth)
     }
 
     /// `AppModel` inserts every volume/brightness record with this id
@@ -800,11 +777,7 @@ public final class NotchController {
         case .hidden:
             return metrics.retracted
         case .peek:
-            // Wide enough for the line AND for the countdown in the trailing
-            // ear (2026-10-01: "2h 20m" was cut at the 255 pt floor).
-            return upcoming != nil
-                ? metrics.captioned(fitting: max(captionWidth(upcoming?.caption), metrics.notchRect.width + 2 * earWidth(forText: upcoming?.compactText)))
-                : metrics.peek
+            return metrics.peek
         case .activity:
             // One size for every activity, however many are queued
             // (2026-09-29): the "grow down when crowded" two-slot layout
@@ -937,10 +910,9 @@ public final class NotchController {
             if isPinnedOpen { dismiss() }
             return
         }
-        // The previewed event (hover, nothing playing) and a blip that
-        // carries a link — a meeting reminder's join URL — are buttons for
-        // as long as they show (2026-09-29): the click opens the link, and
-        // wins over pinning the card behind it.
+        // A blip that carries a link — a meeting reminder's join URL — is
+        // a button for as long as it shows (2026-09-29): the click opens
+        // the link, and wins over pinning the card behind it.
         if let url = linkURL {
             emit(.open(url))
             return
@@ -949,14 +921,13 @@ public final class NotchController {
         click()
     }
 
-    /// The link a tap would open right now: the previewed event's, or the
-    /// leading blip's while it shows; `nil` at `.expanded` (the panel's
+    /// The link a tap would open right now: the leading blip's while it
+    /// shows; `nil` at `.expanded` (the panel's
     /// own buttons take clicks there). The view reads this to dip the
     /// content on press and show the link pointer — the island only
     /// looks like a button when it is one.
     public var linkURL: URL? {
         guard state != .expanded, !isLocked else { return nil }
-        if isPreviewingUpcoming { return upcoming?.url }
         return activities.first?.url
     }
 
@@ -1163,7 +1134,8 @@ public final class NotchController {
         } else if isHovered, media != nil {
             state = .expanded
         } else if isHovered, panel == .calendar, calendarMode != nil {
-            // The calendar mode, swiped open from the preview.
+            // The calendar mode: what hover opens with nothing else to
+            // show, or swiped to from another card.
             state = .expanded
         } else if isHovered, panel == .liveActivity, hasCard {
             state = .expanded
@@ -1173,7 +1145,17 @@ public final class NotchController {
             state = .expanded
         } else if isHovered, panel == .agents, agentPanel != nil {
             state = .expanded
-        } else if activityCount > 0, !(isHovered && onlyChargingIsShowing && upcoming != nil) {
+        } else if isHovered, hoveredPart != .tab, panel == .media, media == nil,
+                  activityCount == 0 || onlyChargingIsShowing, calendarMode != nil {
+            // Nothing playing and nothing in the ears, or only the charging
+            // state: the calendar card, the way the reference app opens its
+            // idle island (2026-10-26, user's call: the next-item preview
+            // only repeated the card's first row). Here rather than on hover
+            // entry, so music stopping or a blip ending under the pointer
+            // lands on it too.
+            panel = .calendar
+            state = .expanded
+        } else if activityCount > 0 {
             state = .activity
         } else if isHovered {
             state = .peek

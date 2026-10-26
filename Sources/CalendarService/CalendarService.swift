@@ -32,7 +32,14 @@ public final class CalendarService {
     /// is a mark) though they never blip.
     public private(set) var markedEventDays: Set<Int> = []
     public private(set) var markedReminderDays: Set<Int> = []
-    private var markedMonth: DateComponents?
+    /// The card's days (2026-10-26): from the start of today through
+    /// `Agenda.days` more, all-day events included (a holiday is a chip
+    /// there, though it never blips), with the timed reminders. See
+    /// `Agenda` for the grouping.
+    public private(set) var agenda: [MeetingEvent] = []
+    /// The day the last reload ran on: a new day reloads, so the next
+    /// day's events, the card's days and a new month's marks follow.
+    private var loadedDay: Date?
     private var reloadTask: Task<Void, Never>?
     private var continuation: AsyncStream<MeetingReminder>.Continuation?
     private var accessTask: Task<Void, Never>?
@@ -168,13 +175,13 @@ public final class CalendarService {
         return calendars.isEmpty ? nil : calendars
     }
 
-    /// The event under way or next up, for the hover preview
-    /// (`NotchController.upcoming`). `nil` with nothing in the next day.
+    /// The event under way or next up, for the Settings window's previews.
+    /// `nil` with nothing in the next day.
     public func nextEvent(at now: Date, allowing kinds: Set<MeetingEvent.Kind> = [.event, .reminder]) -> MeetingEvent? {
         events.first { $0.end > now && kinds.contains($0.kind) }
     }
 
-    /// The next few, for the card's calendar mode.
+    /// The next few under way or to come, for the call card's meetings.
     public func upcoming(at now: Date, limit: Int, allowing kinds: Set<MeetingEvent.Kind> = [.event, .reminder]) -> [MeetingEvent] {
         Array(events.lazy.filter { $0.end > now && kinds.contains($0.kind) }.prefix(limit))
     }
@@ -202,7 +209,7 @@ public final class CalendarService {
             if hasEvents, let calendars = enabledCalendars(for: .event) {
                 let all = store.events(matching: store.predicateForEvents(withStart: from, end: to, calendars: calendars))
                 eventCount = all.count
-                items += all.compactMap(MeetingEvent.init(ekEvent:))
+                items += all.compactMap { MeetingEvent(ekEvent: $0) }
             }
             var reminderCount = 0
             if hasReminders, let lists = enabledCalendars(for: .reminder) {
@@ -210,8 +217,20 @@ public final class CalendarService {
                 reminderCount = reminders.count
                 items += reminders
             }
-            // The month grid's marks.
+            // The card's days, from the start of today.
             let calendar = Calendar.current
+            let today = calendar.startOfDay(for: now)
+            var days: [MeetingEvent] = []
+            if let daysEnd = calendar.date(byAdding: .day, value: Agenda.days + 1, to: today) {
+                if hasEvents, let calendars = enabledCalendars(for: .event) {
+                    days += store.events(matching: store.predicateForEvents(withStart: today, end: daysEnd, calendars: calendars))
+                        .compactMap { MeetingEvent(ekEvent: $0, allowingAllDay: true) }
+                }
+                if hasReminders, let lists = enabledCalendars(for: .reminder) {
+                    days += await fetchTimedReminders(from: today, to: daysEnd, lists: lists)
+                }
+            }
+            // The month grid's marks.
             if let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
                let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) {
                 var eventDays: Set<Int> = [], reminderDays: Set<Int> = []
@@ -229,10 +248,11 @@ public final class CalendarService {
                 guard !Task.isCancelled else { return }
                 markedEventDays = eventDays
                 markedReminderDays = reminderDays
-                markedMonth = calendar.dateComponents([.year, .month], from: now)
             }
             guard !Task.isCancelled else { return }
             events = items.filter { $0.end > now }.sorted { $0.start < $1.start }
+            agenda = days.sorted { $0.start < $1.start }
+            loadedDay = today
             Self.log.notice("calendar reload: \(eventCount, privacy: .public) event(s) and \(reminderCount, privacy: .public) timed reminder(s) in the next day, \(self.events.count, privacy: .public) upcoming; next: \(self.events.first?.title ?? "none", privacy: .private)")
             evaluate()
         }
@@ -260,9 +280,10 @@ public final class CalendarService {
 
     private func evaluate() {
         let now = Date()
-        // A new month: the grid's marks are for the old one.
-        if let markedMonth, markedMonth != Calendar.current.dateComponents([.year, .month], from: now) {
-            self.markedMonth = nil
+        // A new day: the window, the card's days and (on the 1st) the
+        // grid's marks are for the old one.
+        if let loadedDay, !Calendar.current.isDate(loadedDay, inSameDayAs: now) {
+            self.loadedDay = nil
             reload()
             return
         }
@@ -288,10 +309,10 @@ public final class CalendarService {
 
 extension MeetingEvent {
     /// `nil` for what is not a meeting to be reminded about: all-day
-    /// events, cancelled ones, invitations the user declined, untitled
-    /// entries.
-    init?(ekEvent event: EKEvent) {
-        guard !event.isAllDay, event.status != .canceled,
+    /// events (unless `allowingAllDay`, for the card's days), cancelled
+    /// ones, invitations the user declined, untitled entries.
+    init?(ekEvent event: EKEvent, allowingAllDay: Bool = false) {
+        guard allowingAllDay || !event.isAllDay, event.status != .canceled,
               let start = event.startDate, let end = event.endDate,
               let title = event.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty
         else { return nil }
@@ -305,8 +326,20 @@ extension MeetingEvent {
             end: end,
             joinURL: MeetingLinkDetector.joinURL(url: event.url, location: event.location, notes: event.notes),
             detailURL: event.eventIdentifier.flatMap { Self.detailURL(scheme: "ical://ekevent/", identifier: $0) },
-            color: Self.rgb(of: event.calendar)
+            color: Self.rgb(of: event.calendar),
+            isAllDay: event.isAllDay,
+            occasion: Self.occasion(of: event.calendar)
         )
+    }
+
+    /// The system's Birthdays calendar, and a subscribed one (which is how
+    /// Calendar's holiday calendars arrive) as holidays.
+    static func occasion(of calendar: EKCalendar?) -> Occasion? {
+        switch calendar?.type {
+        case .birthday: .birthday
+        case .subscription: .holiday
+        default: nil
+        }
     }
 
     static func rgb(of calendar: EKCalendar?) -> CalendarInfo.RGB? {

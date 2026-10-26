@@ -32,11 +32,20 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
     /// The calendar's or list's colour: a row's bar or ring in the card,
     /// and a reminder's ring in the ear.
     public let color: CalendarInfo.RGB?
+    /// An all-day event (2026-10-26): only the card's days carry these, as
+    /// chips; they never blip and never preview.
+    public let isAllDay: Bool
+    /// What a holiday or birthday calendar's day is, for its chip's glyph.
+    public let occasion: Occasion?
+
+    public enum Occasion: Sendable, Equatable {
+        case holiday, birthday
+    }
 
     /// How long a due reminder stays "Now" (it has no duration of its own).
     public static let reminderWindow: TimeInterval = 15 * 60
 
-    public init(id: String, kind: Kind = .event, title: String, start: Date, end: Date, joinURL: URL?, detailURL: URL? = nil, color: CalendarInfo.RGB? = nil) {
+    public init(id: String, kind: Kind = .event, title: String, start: Date, end: Date, joinURL: URL?, detailURL: URL? = nil, color: CalendarInfo.RGB? = nil, isAllDay: Bool = false, occasion: Occasion? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -45,6 +54,8 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
         self.joinURL = joinURL
         self.detailURL = detailURL
         self.color = color
+        self.isAllDay = isAllDay
+        self.occasion = occasion
     }
 
     /// The leading ear's glyph: the calendar for an event, and for a
@@ -53,6 +64,17 @@ public struct MeetingEvent: Sendable, Equatable, Identifiable {
     /// generic list icon).
     public var symbolName: String {
         kind == .event ? "calendar" : "circle"
+    }
+
+    /// An all-day chip's glyph, as the reference app draws them
+    /// (2026-10-26): a star for a holiday, a gift for a birthday, the
+    /// calendar otherwise.
+    public var allDaySymbolName: String {
+        switch occasion {
+        case .holiday: "star.circle.fill"
+        case .birthday: "gift.circle.fill"
+        case nil: "calendar.circle.fill"
+        }
     }
 
     /// An event between its start and its end: a row says "Now" for it.

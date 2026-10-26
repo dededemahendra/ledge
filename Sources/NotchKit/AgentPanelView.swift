@@ -8,45 +8,31 @@ enum AgentColors {
     static var failed: Color { Color(nsColor: .systemRed) }
 }
 
-/// The agents' leading glyph (2026-10-23): an asterisk, turning once every
-/// 2.4 s while one works (still under Reduce Motion), and the count of
-/// sessions it stands for when more than one, at its bottom trailing corner.
+/// The agents' leading glyph (2026-10-23): Claude's mark (an asterisk until
+/// 2026-10-26, user's call: "claude real logo"), held still (the asterisk
+/// turned while one worked; the user's call the same day: "dont rotate the
+/// claude logo"), and the count of sessions it stands for when more than
+/// one, at its bottom trailing corner.
 struct AgentGlyph: View {
     let color: Color
-    let turning: Bool
     let count: Int?
-    let reduceMotion: Bool
     /// 13 pt in the ears; the round tab draws it a touch larger (2026-10-23).
     var size: CGFloat = 13
 
     var body: some View {
-        ZStack {
-            if turning, !reduceMotion {
-                TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                    let turn = context.date.timeIntervalSinceReferenceDate
-                        .truncatingRemainder(dividingBy: 2.4) / 2.4
-                    asterisk.rotationEffect(.degrees(turn * 360))
+        ClaudeMark()
+            .fill(color)
+            .frame(width: size, height: size)
+            .frame(width: size + 1, height: size + 1)
+            .overlay(alignment: .bottomTrailing) {
+                if let count, count > 1 {
+                    Text("\(count)")
+                        .font(.system(size: 8, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(color)
+                        .offset(x: 3, y: 3)
                 }
-            } else {
-                asterisk
             }
-        }
-        .frame(width: size + 1, height: size + 1)
-        .overlay(alignment: .bottomTrailing) {
-            if let count, count > 1 {
-                Text("\(count)")
-                    .font(.system(size: 8, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(color)
-                    .offset(x: 3, y: 3)
-            }
-        }
-    }
-
-    private var asterisk: some View {
-        Image(systemName: "asterisk")
-            .font(.system(size: size, weight: .semibold))
-            .foregroundStyle(color)
     }
 }
 
@@ -204,7 +190,7 @@ struct AgentPanelView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(AgentColors.failed)
         case .working:
-            AgentGlyph(color: AgentColors.orange, turning: true, count: nil, reduceMotion: reduceMotion)
+            AgentGlyph(color: AgentColors.orange, count: nil)
         }
     }
 
@@ -264,7 +250,7 @@ struct AgentPanelView: View {
             case .waiting:
                 Image(systemName: "hand.raised.fill").foregroundStyle(AgentColors.waiting)
             case .working:
-                Image(systemName: "asterisk").foregroundStyle(AgentColors.orange)
+                ClaudeMark().fill(AgentColors.orange).frame(width: 10, height: 10)
             case .done:
                 Image(systemName: "checkmark").foregroundStyle(AgentColors.done)
             case .failed:

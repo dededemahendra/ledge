@@ -1928,3 +1928,43 @@ waiting, and check the pulse plays once.
 5. Run `sleep 12` and stay in the terminal: nothing.
 6. Run `vim` or `ssh` for longer than 10 s: nothing.
 7. Switch the setting off: the block is gone, the rest of `~/.zshrc` as it was.
+
+## Calendar card: two days, after the reference app (2026-10-26)
+
+User: "update calendar ui to be like this", with the reference app's card
+(MONDAY 26, "No events today / Your day is clear", WEDNESDAY, 28 OCT with a
+holiday chip). Rendered headlessly on a notch and a pill: a clear day with a
+holiday two days on matches the screenshot; a busy day shows three rows under
+the date and TOMORROW's three rows and "2 more events"; a clear week falls
+back to the month grid. Judge live:
+
+1. The holiday on Wednesday shows as a magenta chip with a star under
+   "WEDNESDAY, 28 OCT", and Tuesday, being clear, is skipped.
+2. A birthday shows a gift; another all-day event the calendar glyph.
+3. A chip or row click opens the item in Calendar or Reminders.
+4. After the last of today's events, the left reads "No more events today".
+5. Past midnight the columns move on a day within a minute.
+6. All-day events never blip.
+
+User, on the live card and the hover preview side by side: "its redundant
+information". The preview is retired; with nothing playing, hover opens the
+calendar card. Judge live:
+
+7. Nothing playing: resting the cursor on the island opens the calendar card,
+   on the notch and on the pill.
+8. A battery or volume blip still keeps the island at its size on hover; the
+   charging state alone gives way to the card.
+9. With music playing, hover still opens the music card, and a swipe reaches
+   the calendar.
+
+## Claude's mark for the agents' glyph (2026-10-26)
+
+User: "can you swap using claude real logo when it running?" The asterisk
+that stood for Claude is now Claude's own mark, its path taken from the
+Claude app's bundled asset (`ClaudeMark`), in the island's ear, the tab, the
+Agents card's hero and its working rows, colours as before. Then: "dont
+rotate the claude logo", so it holds still; the clock says it works.
+Rendered headlessly on a pill: the mark reads at 13 pt beside "1:05".
+Judge live: the mark sits still and level with the clock while a session
+works; a waiting session's tab shows it in amber.
+

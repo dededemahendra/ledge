@@ -564,36 +564,42 @@ private func someMedia() -> MediaPresentation {
     #expect(c.isPinnedOpen, "…so the tap pins the card as usual")
 }
 
-/// With nothing playing and no blip live, hover previews the next event
-/// in the meeting blip's own layout (2026-09-29); a tap joins.
+/// With nothing playing and no blip live, hover opens the calendar card
+/// (2026-10-26, after the reference app: the next-item preview it
+/// replaces only repeated the card's first row). A live blip still keeps
+/// the island, music opens its own card, and without calendar access
+/// hover is the plain peek.
 @MainActor
-@Test func hoverWithNothingPlayingPreviewsTheNextEvent() {
+@Test func hoverWithNothingPlayingOpensTheCalendarCard() {
     let c = makeController()
-    var opened: [NotchIntent] = []
-    c.onIntent = { opened.append($0) }
-    let url = URL(string: "https://zoom.us/j/1")!
-    c.setUpcoming(UpcomingEvent(title: "Design review", compactText: "42m", caption: "Design review · 14:00", url: url))
+    c.setCalendarMode(CalendarModeData(monthTitle: "October 2026", weekdaySymbols: ["S", "M", "T", "W", "T", "F", "S"],
+                                       weeks: [[nil, nil, nil, 1, 2, 3, 4]], today: 1, markedDays: [], items: []))
     c.setHovered(true)
-    #expect(c.state == .peek && c.isPreviewingUpcoming)
-    #expect(c.parameters.height == c.metrics.captioned.height && c.parameters.width >= NotchMetrics.captionedMinimumWidth, "ears plus the caption line, like the reminder blip")
-    #expect(c.captionText == "Design review · 14:00")
-    #expect(c.linkURL == url, "the island is a button now — the view dips it on press")
-    c.tap()
-    #expect(opened == [.open(url)])
-    #expect(c.state == .peek && !c.isPinnedOpen, "a tap joins; it never pins")
+    #expect(c.state == .expanded && c.panel == .calendar)
+    #expect(c.parameters == c.metrics.expanded)
+    #expect(c.linkURL == nil, "the card's own rows take clicks")
     c.setHovered(false)
-    #expect(c.state == .hidden && !c.isPreviewingUpcoming)
+    #expect(c.state == .hidden && c.panel == .media)
 
     c.setActivityCount(1)
     c.setHovered(true)
-    #expect(c.state == .activity && !c.isPreviewingUpcoming, "a live blip wins")
+    #expect(c.state == .activity, "a live blip wins")
+    c.setHovered(false)
     c.setActivityCount(0)
     c.setMedia(someMedia())
-    #expect(c.state == .expanded && !c.isPreviewingUpcoming, "the card wins")
-    #expect(c.linkURL == nil, "the panel's own buttons take clicks at .expanded")
+    c.setHovered(true)
+    #expect(c.state == .expanded && c.panel == .media, "music opens its own card")
     c.setMedia(nil)
-    c.setUpcoming(nil)
-    #expect(c.state == .peek && c.parameters == c.metrics.peek, "nothing coming up: the plain peek")
+    #expect(c.state == .expanded && c.panel == .calendar, "music stopping under the pointer lands on the calendar")
+    c.setHovered(false)
+    c.setActivityCount(1)
+    c.setHovered(true)
+    c.setActivityCount(0)
+    #expect(c.state == .expanded && c.panel == .calendar, "so does a blip ending under it")
+    c.setHovered(false)
+    c.setCalendarMode(nil)
+    c.setHovered(true)
+    #expect(c.state == .peek && c.parameters == c.metrics.peek, "no calendar: the plain peek")
 }
 
 /// A meeting blip carries its own caption; any other blip pre-empting the
@@ -656,13 +662,11 @@ private func someMedia() -> MediaPresentation {
     c.setHovered(false)
     #expect(c.panel == .media, "leaving resets to now-playing")
 
-    // Nothing playing: the preview swipes open into the calendar mode.
+    // Nothing playing: hover opens the calendar mode itself.
     let d = makeController()
-    d.setUpcoming(item)
     d.setCalendarMode(month)
     d.setHovered(true)
-    #expect(d.state == .peek && d.isPreviewingUpcoming)
-    #expect(d.swipe(.next) && d.state == .expanded && d.panel == .calendar)
+    #expect(d.state == .expanded && d.panel == .calendar)
     #expect(d.parameters == d.metrics.expanded)
     d.setHovered(false)
     #expect(d.state == .hidden && d.panel == .media)
@@ -720,32 +724,18 @@ private func someMedia() -> MediaPresentation {
     #expect(c.parameters == c.metrics.oneActivity)
 }
 
-/// The captioned island must also fit its ears (2026-10-01: a "2h 20m"
-/// countdown was cut at the 255 pt floor): a short line with a long
-/// trailing text widens for the text.
-@MainActor
-@Test func theCaptionIslandAlsoFitsItsTrailingText() {
-    let c = makeController()
-    c.setUpcoming(UpcomingEvent(title: "Report", compactText: "2h 20m", caption: "Report · 20:00", url: nil))
-    c.setHovered(true)
-    #expect(c.isPreviewingUpcoming)
-    let needed = c.metrics.notchRect.width + 2 * c.earWidth(forText: "2h 20m")
-    #expect(c.parameters.width >= needed)
-    #expect(c.parameters.width > NotchMetrics.captionedMinimumWidth)
-    c.setUpcoming(UpcomingEvent(title: "Report", compactText: "42m", caption: "Report · 20:00", url: nil))
-    #expect(c.parameters.width == NotchMetrics.captionedMinimumWidth, "a short countdown fits the default ear")
-}
-
 /// The live charging state is background (2026-10-01): alone on the
-/// island it yields to the hover preview, and a blip over it still wins.
+/// island it yields to the calendar card on hover, and a blip over it
+/// still wins.
 @MainActor
-@Test func theChargingStateAloneYieldsToTheHoverPreview() {
+@Test func theChargingStateAloneYieldsToTheCalendarCard() {
     let c = makeController()
     c.setActivities([.init(id: "charging", title: "Charging", compactText: "37%", symbolName: "battery.100percent.bolt")], overflow: 0)
     #expect(c.state == .activity)
-    c.setUpcoming(UpcomingEvent(title: "Standup", compactText: "42m", caption: "Standup · 10:00", url: nil))
+    c.setCalendarMode(CalendarModeData(monthTitle: "October 2026", weekdaySymbols: ["S", "M", "T", "W", "T", "F", "S"],
+                                       weeks: [[nil, nil, nil, 1, 2, 3, 4]], today: 1, markedDays: [], items: []))
     c.setHovered(true)
-    #expect(c.state == .peek && c.isPreviewingUpcoming, "the preview, not the charger")
+    #expect(c.state == .expanded && c.panel == .calendar, "the calendar, not the charger")
     c.setHovered(false)
     #expect(c.state == .activity)
     c.setActivities([.init(id: "hud", title: "Sound", compactText: "62%", symbolName: "speaker.wave.2.fill"), .init(id: "charging", title: "Charging", compactText: "37%", symbolName: "battery.100percent.bolt")], overflow: 0)

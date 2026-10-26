@@ -447,14 +447,6 @@ public final class NotchPresenter {
         visible && (!locked || showsOnLockScreen)
     }
 
-    /// The previewed next event (`NotchController.upcoming`) changes the
-    /// peek's shape, so it goes through the presenter for the window resync.
-    public func setUpcoming(_ upcoming: UpcomingEvent?) {
-        guard upcoming != controller.upcoming else { return }
-        controller.setUpcoming(upcoming)
-        syncWindowToVisibility()
-    }
-
     /// The card's calendar mode; can change the card's shape.
     public func setCalendarMode(_ data: CalendarModeData?) {
         guard data != controller.calendarMode else { return }
@@ -502,9 +494,8 @@ public final class NotchPresenter {
         // Look only on the lock screen (2026-10-21): no mode change, no skip.
         guard controller.isVisible, !controller.isLocked else { return }
         guard let direction = swipe.track(deltaX: deltaX, phase: phase, invertedFromDevice: invertedFromDevice) else { return }
-        // Modes first (2026-09-30): on the open card the swipe changes mode;
-        // on the preview it opens the calendar. Only the compact island
-        // with music still skips a track.
+        // Modes first (2026-09-30): on the open card the swipe changes mode.
+        // Only the compact island with music still skips a track.
         if controller.swipe(direction) {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
             syncWindowToVisibility()

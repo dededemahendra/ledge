@@ -47,7 +47,6 @@ public enum PreviewStage {
         c.setHovered(false)
         c.dismiss()
         c.setCaption(nil)
-        c.setUpcoming(nil)
         c.setCalendarMode(nil)
         c.setMedia(nil)
         c.setActivities([], overflow: 0)
