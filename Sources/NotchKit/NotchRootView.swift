@@ -1084,50 +1084,56 @@ public struct NotchRootView: View {
         .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: symbol)
     }
 
-    /// The charging battery: the cell filled to its level, the rim held
-    /// back, and the bolt laid over it in the island's own white. Sized
-    /// from the ear's glyph size so it sits with the other blips.
-    /// Where the cell's inside begins and how far it runs, as fractions
-    /// of the symbol's width. Measured off the rendered symbol rather
-    /// than guessed: `battery.100percent` ignores a variable value and
-    /// always draws itself full, so the fill is clipped here instead
-    /// (checked 2026-10-06, green from 0.156 to 0.733).
-    private static let batteryCellStart: CGFloat = 0.156
-    private static let batteryCellSpan: CGFloat = 0.578
-    /// Bigger than the ear's other glyphs (2026-10-06, user's call): a
-    /// battery is wide and low, so at the 13 pt the rest use it sat well
-    /// under the figure beside it. At 16 its cell stands as tall as the
-    /// digits do. The bolt follows the same size.
-    private static let batterySize: CGFloat = 16
-    private static let batteryBoltRatio: CGFloat = 0.46
+    /// The battery: the cell filled to its level, the rim held back, and
+    /// the bolt laid over it in the island's own white. Drawn from shapes,
+    /// not from `battery.100percent`, because that symbol's layers are the
+    /// system's to change: macOS 27 made it one solid layer, so the dim rim
+    /// painted nothing and the fill became a stump of the whole body
+    /// (2026-11-07).
+    ///
+    /// Sized to the symbol it replaces (2026-10-06, user's call): a battery
+    /// is wide and low, so at the ear's usual 13 pt it sat well under the
+    /// figure beside it. At this height its cell stands as tall as the
+    /// digits do.
+    private static let batteryBody = CGSize(width: 22, height: 11)
+    private static let batteryCorner: CGFloat = 3.5
+    private static let batteryRim: CGFloat = 1
+    /// The dark line between the rim and the fill, as the phone draws it.
+    private static let batteryGap: CGFloat = 1
+    private static let batteryTip = CGSize(width: 1.5, height: 4)
+    private static let batteryBoltSize: CGFloat = 7.5
 
     private func batteryGlyph(level: Double, fill: Color, bolt: Bool) -> some View {
         let level = min(1, max(0, level))
-        let glyph = Font.system(size: Self.batterySize, weight: .medium)
-        return Image(systemName: "battery.100percent")
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(.clear, contentColor.opacity(0.45))
-            .font(glyph)
-            .overlay {
-                GeometryReader { proxy in
-                    Image(systemName: "battery.100percent")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(fill, .clear)
-                        .font(glyph)
-                        .mask(alignment: .leading) {
-                            Rectangle()
-                                .frame(width: proxy.size.width * (Self.batteryCellStart + Self.batteryCellSpan * level))
-                        }
+        let rim = contentColor.opacity(0.45)
+        let inset = Self.batteryRim + Self.batteryGap
+        let cell = CGSize(width: Self.batteryBody.width - inset * 2, height: Self.batteryBody.height - inset * 2)
+        return HStack(spacing: 1) {
+            RoundedRectangle(cornerRadius: Self.batteryCorner, style: .continuous)
+                .strokeBorder(rim, lineWidth: Self.batteryRim)
+                .frame(width: Self.batteryBody.width, height: Self.batteryBody.height)
+                .overlay {
+                    // The cell's own corners clip the fill, so an empty
+                    // battery has nothing in it and a full one meets the rim
+                    // evenly all the way round.
+                    Rectangle()
+                        .fill(fill)
+                        .frame(width: cell.width * level)
+                        .frame(width: cell.width, height: cell.height, alignment: .leading)
+                        .clipShape(RoundedRectangle(cornerRadius: Self.batteryCorner - inset, style: .continuous))
                 }
-            }
-            .overlay {
-                if bolt {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: Self.batterySize * Self.batteryBoltRatio, weight: .black))
-                        .foregroundStyle(contentColor)
+                .overlay {
+                    if bolt {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: Self.batteryBoltSize, weight: .black))
+                            .foregroundStyle(contentColor)
+                    }
                 }
-            }
-            .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: level)
+            UnevenRoundedRectangle(bottomTrailingRadius: 1, topTrailingRadius: 1, style: .continuous)
+                .fill(rim)
+                .frame(width: Self.batteryTip.width, height: Self.batteryTip.height)
+        }
+        .animation(NotchAnimation.textAnimation(reduceMotion: controller.reduceMotion), value: level)
     }
 
     /// One side of a scoreline in an ear (2026-10-01): the crest outward,

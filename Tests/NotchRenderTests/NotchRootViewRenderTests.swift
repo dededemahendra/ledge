@@ -113,6 +113,20 @@ private struct RenderedImage {
         }
     }
 
+    /// Visits every content pixel with how strong its red is once the
+    /// island's black is behind it: full for the content colour itself,
+    /// lower for anything drawn at a reduced opacity.
+    func forEachBrightness(_ body: (_ point: CGPoint, _ red: UInt8) -> Void) {
+        for py in 0..<height {
+            for px in 0..<width {
+                let p = pixel(atPixelX: px, pixelY: py)
+                if isContent(p) {
+                    body(CGPoint(x: CGFloat(px) / scale, y: CGFloat(py) / scale), p.r)
+                }
+            }
+        }
+    }
+
     /// Visits every pixel in canvas-point coordinates (i.e. with `scale`
     /// divided back out). Always exhaustive — every assertion in this file
     /// needs the full scan, not just the first hit.
@@ -1016,4 +1030,51 @@ private func earContentBounds(_ controller: NotchController) -> (leading: CGRect
     #expect(result.hasContentInsideIsland)
     #expect(result.contentInsideNotchCount == 0, "\(result.contentInsideNotchCount) content pixel(s) inside the notch rect")
     #expect(result.contentOutsideIslandCount == 0, "\(result.contentOutsideIslandCount) content pixel(s) outside the island")
+}
+
+// MARK: - The battery glyph
+
+/// The battery as it sits in the leading ear, measured in points: how far
+/// anything is drawn, and how far the full-strength fill reaches. The rim
+/// is held back to a dim red under the test colour, so a bright pixel can
+/// only be the fill.
+@MainActor
+private func batteryExtents(level: Double) -> (drawn: CGFloat, fill: CGFloat, left: CGFloat) {
+    let controller = makeController()
+    controller.setActivities(
+        [.init(id: "power", title: "Battery", compactText: "33%", symbolName: "battery.100percent", barFill: level)],
+        overflow: 0
+    )
+    let image = RenderedImage(controller)
+    let canvas = CGRect(origin: .zero, size: NotchMetrics.canvasSize)
+    let ear = CGRect(x: canvas.midX - testNotchRect.width / 2 - 100, y: 0, width: 100, height: 60)
+    var left = CGFloat.infinity, drawn = -CGFloat.infinity, fill = -CGFloat.infinity
+    image.forEachBrightness { point, red in
+        guard ear.contains(point) else { return }
+        left = min(left, point.x)
+        drawn = max(drawn, point.x)
+        if red > 230 { fill = max(fill, point.x) }
+    }
+    return (drawn, fill, left)
+}
+
+/// macOS 27 redrew `battery.100percent` as one solid layer, which took the
+/// rim away and left a stump of green with the bolt floating beside it. The
+/// outline has to stand at its full length whatever the charge, with the
+/// fill reaching only as far as the charge does.
+@MainActor
+@Test func theBatteryKeepsItsRimAndFillsOnlyToItsCharge() {
+    let low = batteryExtents(level: 0.33)
+    let width = low.drawn - low.left
+    #expect(width > 20 && width < 30, "the whole battery is drawn, measured \(width) pt")
+    #expect(low.fill < low.left + width * 0.5, "a third of a charge stops well short of the middle")
+    #expect(low.fill > low.left + width * 0.2, "a third of a charge is visibly in there")
+
+    let full = batteryExtents(level: 1)
+    #expect(full.fill > full.left + width * 0.8, "a full battery fills its cell")
+    #expect(abs((full.drawn - full.left) - width) < 0.6, "the outline does not change with the charge")
+
+    let empty = batteryExtents(level: 0)
+    #expect(empty.fill < empty.left + width * 0.1, "an empty battery has no fill, only its rim")
+    #expect(abs((empty.drawn - empty.left) - width) < 0.6, "an empty battery still has its whole rim")
 }
