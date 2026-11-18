@@ -481,9 +481,9 @@ final class AppModel {
                     compactText: TimerText.format(seconds: now.timeIntervalSince(since).rounded(.down)),
                     symbolName: "asterisk",
                     tint: .color(red: AgentNotice.orange.red, green: AgentNotice.orange.green, blue: AgentNotice.orange.blue),
-                    url: agentURL(oldest.id), badge: working.count > 1 ? working.count : nil
+                    url: agentURL(oldest.id)       // no count on the glyph (2026-11-18, user's call): the title says it
                 )
-                if record.compactText != agentRunShown?.compactText || record.badge != agentRunShown?.badge
+                if record.compactText != agentRunShown?.compactText || record.title != agentRunShown?.title
                     || record.url != agentRunShown?.url {
                     agentRunShown = record
                     queue.insert(record)
@@ -994,7 +994,7 @@ final class AppModel {
         queue.insert(ActivityRecord(
             id: NotchController.agentRunActivityID, kind: .agentRun, insertedAt: now, ttl: nil,
             title: "2 working", compactText: "1:05", symbolName: "asterisk",
-            tint: .color(red: 0.851, green: 0.467, blue: 0.341), badge: 2
+            tint: .color(red: 0.851, green: 0.467, blue: 0.341)
         ))
         publish()
         Task { @MainActor [weak self] in

@@ -1515,21 +1515,48 @@ private func tabGitHubPanel() -> GitHubPanelData {
 }
 
 /// The bubble asks for a look once when its agent starts waiting for the
-/// user (2026-10-23): a pulse, not for every refresh of the same state.
+/// user (2026-10-23), and (2026-11-18, user's call) when it starts running
+/// too: a pulse, not for every refresh of the same state.
 @MainActor
-@Test func theTabCallsForAttentionWhenItsAgentStartsWaiting() {
+@Test func theTabCallsForAttentionWhenItsAgentStartsWaitingOrRunning() {
     let c = makeController()
     let lead = NotchController.ActivityDisplay(id: NotchController.callActivityID, title: "On a call", compactText: "1:00")
     let working = NotchController.ActivityDisplay(id: NotchController.agentRunActivityID, title: "1 working", compactText: "1")
+    let ticking = NotchController.ActivityDisplay(id: NotchController.agentRunActivityID, title: "1 working", compactText: "2")
     let waiting = NotchController.ActivityDisplay(id: NotchController.agentWaitingActivityID, title: "Needs you", compactText: "1")
-    c.setActivities([lead], overflow: 0, tab: working)
+    c.setActivities([lead], overflow: 0, tab: nil)
     let before = c.tabAttention
-    c.setActivities([lead], overflow: 0, tab: waiting)
-    #expect(c.tabAttention == before + 1)
-    c.setActivities([lead], overflow: 0, tab: waiting)
-    #expect(c.tabAttention == before + 1, "the same waiting state again")
     c.setActivities([lead], overflow: 0, tab: working)
-    #expect(c.tabAttention == before + 1, "back to working")
+    #expect(c.tabAttention == before + 1, "it starts running")
+    c.setActivities([lead], overflow: 0, tab: ticking)
+    #expect(c.tabAttention == before + 1, "its clock ticking is the same state")
+    c.setActivities([lead], overflow: 0, tab: waiting)
+    #expect(c.tabAttention == before + 2, "it starts waiting")
+    c.setActivities([lead], overflow: 0, tab: waiting)
+    #expect(c.tabAttention == before + 2, "the same waiting state again")
+    c.setActivities([lead], overflow: 0, tab: working)
+    #expect(c.tabAttention == before + 3, "back to running")
+}
+
+/// A running agent that leads the island pulses it once, like a plug-in
+/// does (2026-11-18, user's call), and not again while its clock ticks.
+@MainActor
+@Test func aRunningAgentLeadingTheIslandPulsesItOnceAtAnUnchangedSize() {
+    let c = makeController()
+    let media = NotchController.ActivityDisplay(id: "media", title: "Song", detail: "Artist")
+    c.setMedia(someMedia())
+    c.setActivities([media], overflow: 0)
+    let before = c.blipPulse
+    let run = NotchController.ActivityDisplay(id: NotchController.agentRunActivityID, title: "Working · A session", compactText: "0:01")
+    c.setActivities([run, media], overflow: 0)
+    #expect(c.blipPulse == before + 1, "it starts running over music: same size, so pulse")
+    let tick = NotchController.ActivityDisplay(id: NotchController.agentRunActivityID, title: "Working · A session", compactText: "0:02")
+    c.setActivities([tick, media], overflow: 0)
+    #expect(c.blipPulse == before + 1, "the clock ticking is not a new arrival")
+    c.setActivities([media], overflow: 0)
+    #expect(c.blipPulse == before + 1, "it stops")
+    c.setActivities([run, media], overflow: 0)
+    #expect(c.blipPulse == before + 2, "it starts again")
 }
 
 /// A finished command carries its own caption: what ran and how long (2026-10-23).

@@ -998,7 +998,9 @@ public final class NotchController {
             callIconImage = callIcon.flatMap(NSImage.init(data:))
         }
         self.activities = activities
-        if tab?.id == Self.agentWaitingActivityID, self.tab?.id != Self.agentWaitingActivityID {
+        // Waiting since 2026-10-23, running too since 2026-11-18 (user's call):
+        // each time the tab's agent changes into either, not on a refresh.
+        if let id = tab?.id, id != self.tab?.id, id == Self.agentWaitingActivityID || id == Self.agentRunActivityID {
             tabAttention += 1
         }
         self.tab = tab
@@ -1059,11 +1061,14 @@ public final class NotchController {
     /// Identity of the leading blip, if the leading activity is one.
     /// Title included so plug → unplug (same id, new title) pulses again.
     /// Of a call, only its ended moment is a blip (2026-10-22): the call
-    /// itself, a hand-over or its return after a blip never pulse.
+    /// itself, a hand-over or its return after a blip never pulse. A running
+    /// agent is one too (2026-11-18, user's call): its title holds the name
+    /// or count, not the clock, so only a new run or a changed count pulses.
     private var leadingBlipKey: String? {
         guard let first = activities.first else { return nil }
         let isCallEnding = first.id == Self.callActivityID && first.symbolName == "phone.down.fill"
-        guard isCallEnding || [Self.hudActivityID, Self.powerActivityID, Self.deviceActivityID].contains(first.id)
+        guard isCallEnding
+                || [Self.hudActivityID, Self.powerActivityID, Self.deviceActivityID, Self.agentRunActivityID].contains(first.id)
         else { return nil }
         return "\(first.id)|\(first.title)"
     }
