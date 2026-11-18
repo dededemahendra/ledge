@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import LedgeSettings
+import MediaService
 
 @MainActor
 private func fresh() -> (AppSettings, UserDefaults) {
@@ -145,4 +146,13 @@ private func fresh() -> (AppSettings, UserDefaults) {
     let again = AppSettings(defaults: defaults)
     #expect(!again.isMediaSourceEnabled("com.google.chrome"))
     #expect(again.isMediaSourceEnabled("com.apple.safari"))
+}
+
+@MainActor
+@Test func everyBrowserTheSettingsOfferIsOneThePolicyKnows() {
+    // A switch for a browser the policy ignores would do nothing.
+    for browser in AppSettings.knownBrowserSources {
+        #expect(MediaSourcePolicy.isBrowser(bundleIdentifier: browser.id), "\(browser.name)")
+    }
+    #expect(AppSettings.knownBrowserSources.contains { $0.id == "company.thebrowser.dia" })
 }

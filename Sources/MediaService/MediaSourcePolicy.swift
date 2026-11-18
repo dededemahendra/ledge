@@ -27,6 +27,7 @@ public enum MediaSourcePolicy {
         "com.apple.safari",
         "com.google.chrome",
         "company.thebrowser.browser",       // Arc
+        "company.thebrowser.dia",           // Dia
         "org.mozilla.firefox",
         "com.microsoft.edgemac",
         "com.brave.browser",

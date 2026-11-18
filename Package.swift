@@ -35,7 +35,7 @@ let package = Package(
         .testTarget(name: "TimerServiceTests", dependencies: ["TimerService"]),
         .testTarget(name: "FocusServiceTests", dependencies: ["FocusService"]),
         .testTarget(name: "LiveActivityServiceTests", dependencies: ["LiveActivityService"]),
-        .testTarget(name: "LedgeSettingsTests", dependencies: ["LedgeSettings"]),
+        .testTarget(name: "LedgeSettingsTests", dependencies: ["LedgeSettings", "MediaService"]),
         .testTarget(name: "SettingsKitTests", dependencies: ["SettingsKit", "NotchKit", "LedgeSettings", "HUDService", "GitHubService", "AgentService"]),
         .testTarget(name: "UpdateServiceTests", dependencies: ["UpdateService"]),
         .testTarget(name: "GitHubServiceTests", dependencies: ["GitHubService"]),

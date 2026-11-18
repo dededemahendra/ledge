@@ -61,6 +61,7 @@ public final class AppSettings {
         ("com.apple.safari", "Safari"),
         ("com.google.chrome", "Chrome"),
         ("company.thebrowser.browser", "Arc"),
+        ("company.thebrowser.dia", "Dia"),
         ("org.mozilla.firefox", "Firefox"),
         ("com.microsoft.edgemac", "Edge"),
         ("com.brave.browser", "Brave"),

@@ -18,6 +18,7 @@ import Testing
 @Test func browsersAreKnownAsBrowsers() {
     #expect(MediaSourcePolicy.isBrowser(bundleIdentifier: "com.google.Chrome"))
     #expect(MediaSourcePolicy.isBrowser(bundleIdentifier: "COM.APPLE.SAFARI"))
+    #expect(MediaSourcePolicy.isBrowser(bundleIdentifier: "company.thebrowser.dia"), "Dia")
     #expect(!MediaSourcePolicy.isBrowser(bundleIdentifier: "com.apple.music"))
     #expect(!MediaSourcePolicy.isBrowser(bundleIdentifier: nil))
 }
