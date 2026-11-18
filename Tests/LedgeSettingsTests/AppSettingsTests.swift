@@ -123,3 +123,26 @@ private func fresh() -> (AppSettings, UserDefaults) {
     s.showsLongCommands = true
     #expect(AppSettings(defaults: defaults).showsLongCommands)
 }
+
+@MainActor
+@Test func browsersArriveOnForAnExistingSavedList() {
+    let (_, defaults) = fresh()
+    // A list saved before browsers existed: Spotify was switched off.
+    defaults.set(["com.apple.music"], forKey: "mediaSources")
+    defaults.removeObject(forKey: "offeredMediaSources")
+    let s = AppSettings(defaults: defaults)
+    #expect(s.isMediaSourceEnabled("com.apple.music"))
+    #expect(!s.isMediaSourceEnabled("com.spotify.client"), "a music app switched off stays off")
+    for browser in AppSettings.knownBrowserSources {
+        #expect(s.isMediaSourceEnabled(browser.id), "\(browser.name) arrives on")
+    }
+}
+
+@MainActor
+@Test func aBrowserSwitchedOffStaysOff() {
+    let (s, defaults) = fresh()
+    s.setMediaSource("com.google.chrome", enabled: false)
+    let again = AppSettings(defaults: defaults)
+    #expect(!again.isMediaSourceEnabled("com.google.chrome"))
+    #expect(again.isMediaSourceEnabled("com.apple.safari"))
+}

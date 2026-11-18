@@ -39,19 +39,34 @@ public final class AppSettings {
         public static let agentFailed = "agentFailed"
         public static let showsLongCommands = "showsLongCommands"
         public static let mediaSources = "mediaSources"
+        /// Every source Settings has ever offered, so one added later
+        /// (browsers, 2026-11-18) arrives on rather than silently off.
+        public static let offeredMediaSources = "offeredMediaSources"
         public static let calendarLeadMinutes = "calendarLeadMinutes"
         public static let disabledCalendarIDs = "disabledCalendarIDs"
     }
 
     /// The music apps the island follows, by bundle identifier, with the
     /// names the window shows. The order is the window's order.
-    public static let knownMediaSources: [(id: String, name: String)] = [
+    public static let knownMusicSources: [(id: String, name: String)] = [
         ("com.apple.music", "Music"),
         ("com.spotify.client", "Spotify"),
         ("com.tidal.desktop", "TIDAL"),
         ("com.deezer.deezer-desktop", "Deezer"),
         ("com.github.th-ch.youtube-music", "YouTube Music"),
     ]
+
+    /// Browsers whose video the island follows (2026-11-18).
+    public static let knownBrowserSources: [(id: String, name: String)] = [
+        ("com.apple.safari", "Safari"),
+        ("com.google.chrome", "Chrome"),
+        ("company.thebrowser.browser", "Arc"),
+        ("org.mozilla.firefox", "Firefox"),
+        ("com.microsoft.edgemac", "Edge"),
+        ("com.brave.browser", "Brave"),
+    ]
+
+    public static let knownMediaSources = knownMusicSources + knownBrowserSources
 
     /// Hover dwell choices, in seconds: the island opens as soon as the
     /// cursor rests this long.
@@ -146,10 +161,20 @@ public final class AppSettings {
         agentWorking = defaults.object(forKey: Key.agentWorking) as? Bool ?? true
         agentFailed = defaults.object(forKey: Key.agentFailed) as? Bool ?? true
         showsLongCommands = defaults.object(forKey: Key.showsLongCommands) as? Bool ?? false
-        mediaSources = (defaults.object(forKey: Key.mediaSources) as? [String]).map(Set.init)
-            ?? Set(Self.knownMediaSources.map(\.id))
+        let known = Set(Self.knownMediaSources.map(\.id))
+        if let stored = defaults.object(forKey: Key.mediaSources) as? [String] {
+            // A list saved before the offered key existed was offered the music apps only.
+            let offered = (defaults.object(forKey: Key.offeredMediaSources) as? [String]).map(Set.init)
+                ?? Set(Self.knownMusicSources.map(\.id))
+            mediaSources = Set(stored).union(known.subtracting(offered))
+        } else {
+            mediaSources = known
+        }
         calendarLeadMinutes = defaults.object(forKey: Key.calendarLeadMinutes) as? Int ?? 5
         disabledCalendarIDs = Set((defaults.object(forKey: Key.disabledCalendarIDs) as? [String]) ?? [])
+        // `didSet` does not run in init: record the arrivals by hand.
+        save(Array(mediaSources).sorted(), Key.mediaSources)
+        save(Array(known).sorted(), Key.offeredMediaSources)
     }
 
     public func isCalendarEnabled(_ id: String) -> Bool { !disabledCalendarIDs.contains(id) }
