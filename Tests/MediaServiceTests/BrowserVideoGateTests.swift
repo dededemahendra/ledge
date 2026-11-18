@@ -48,3 +48,28 @@ private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
     #expect(!BrowserVideoGate.admits(paused, isShowing: true, pausedSince: t0, onCall: false,
                                       now: t0.addingTimeInterval(BrowserVideoGate.recheckDelay - 0.5)))
 }
+
+private func dia(playing: Bool) -> MediaPayload {
+    var p = MediaPayload()
+    p.bundleIdentifier = "company.thebrowser.dia"
+    p.title = "A video"
+    p.playing = playing
+    return p   // Dia reports its length as infinity, which the adapter drops
+}
+
+@Test func diaGetsInWithoutALengthBecauseItNeverReportsOne() {
+    #expect(BrowserVideoGate.admits(dia(playing: true), isShowing: false, pausedSince: nil, onCall: false, now: t0))
+}
+
+@Test func diaStillNeedsToBePlayingAndNoCall() {
+    #expect(!BrowserVideoGate.admits(dia(playing: false), isShowing: false, pausedSince: nil, onCall: false, now: t0))
+    #expect(!BrowserVideoGate.admits(dia(playing: true), isShowing: true, pausedSince: nil, onCall: true, now: t0))
+    #expect(BrowserVideoGate.admits(dia(playing: false), isShowing: true, pausedSince: t0, onCall: false, now: t0.addingTimeInterval(60)),
+            "its pause hold is the same two minutes")
+}
+
+@Test func otherBrowsersStillNeedALength() {
+    var chrome = dia(playing: true)
+    chrome.bundleIdentifier = "com.google.Chrome"
+    #expect(!BrowserVideoGate.admits(chrome, isShowing: false, pausedSince: nil, onCall: false, now: t0))
+}

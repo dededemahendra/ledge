@@ -88,3 +88,13 @@ out.
 - The rules live in `MediaService` as pure functions (source resolution, the
   entry gate, the pause hold) so they can be tested without the app.
   `AppModel.handle(_ payload:)` calls them and adds the call check.
+
+## Dia (2026-11-18, found live)
+
+Dia is a seventh browser (`company.thebrowser.dia`). It reports every video's
+length as infinity; the adapter cannot write infinity as JSON and drops that
+update, so no length ever reaches the app and rule 2 would keep Dia out for
+good. Dia is therefore exempt from rule 2 only (`browsersWithoutLength`): it
+must still play, still steps aside for a call, and holds two minutes paused.
+The cost: a Dia live stream is not told apart from a video.
+
