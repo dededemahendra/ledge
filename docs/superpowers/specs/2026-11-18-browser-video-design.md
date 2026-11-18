@@ -91,10 +91,9 @@ out.
 
 ## Dia (2026-11-18, found live)
 
-Dia is a seventh browser (`company.thebrowser.dia`). It reports every video's
-length as infinity; the adapter cannot write infinity as JSON and drops that
-update, so no length ever reaches the app and rule 2 would keep Dia out for
-good. Dia is therefore exempt from rule 2 only (`browsersWithoutLength`): it
-must still play, still steps aside for a call, and holds two minutes paused.
-The cost: a Dia live stream is not told apart from a video.
-
+Dia is a seventh browser (`company.thebrowser.dia`). It reports a normal
+video's length like the others. A live stream reports its length as infinity;
+the adapter cannot write infinity as JSON and drops that update, so the app
+sees no length and rule 2 keeps live streams out of every browser, Dia
+included. (An exemption for Dia was tried and removed the same day: it had
+been judged on a live stream, which let live streams in.)

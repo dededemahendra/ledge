@@ -1989,6 +1989,6 @@ and the settings arriving on. Live checks:
 - Settings › Media: the Video from section lists the six browsers, Safari
   "Playing now." while it plays; Chrome switched off stays off after a
   relaunch.
-- Dia: a YouTube video in Dia shows the card (no scrubber: Dia reports no
-  length). A Dia live stream would show too; that is the known cost.
+- Dia: a normal YouTube video in Dia shows the card. A YouTube live stream in
+  Dia (or any browser) does not.
 

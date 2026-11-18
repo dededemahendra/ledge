@@ -35,14 +35,6 @@ public enum MediaSourcePolicy {
 
     public static let allowedBundleIdentifiers = musicBundleIdentifiers.union(browserBundleIdentifiers)
 
-    /// Browsers that report a video's length as infinity even for an
-    /// ordinary one (Dia, seen 2026-11-18), which the adapter cannot write
-    /// as JSON and so drops: no length ever reaches the app. They are let
-    /// in without one, still playing and still behind a call.
-    public static let browsersWithoutLength: Set<String> = [
-        "company.thebrowser.dia",
-    ]
-
     public static func isBrowser(bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return false }
         return browserBundleIdentifiers.contains(bundleIdentifier.lowercased())
