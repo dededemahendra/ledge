@@ -28,8 +28,19 @@ public struct MediaPayload: Sendable, Equatable {
     /// `kMRMediaRemoteNowPlayingInfoRepeatMode`: 1 off, 2 one, 3 all
     /// (the adapter's own `repeat 3` comment calls 3 "playlist").
     public var repeatMode: Int?
+    /// The app that owns the playing process, when the adapter reports
+    /// one: Safari plays in a WebKit helper, which is `bundleIdentifier`.
+    public var parentApplicationBundleIdentifier: String?
 
     public init() {}
+
+    /// The app the island means by "the source" (2026-11-18): the parent
+    /// when there is one, so Safari's helper reads as Safari for the
+    /// allow-list, the Settings status, the favourite star and the click.
+    public var sourceIdentifier: String? {
+        if let parent = parentApplicationBundleIdentifier, !parent.isEmpty { return parent }
+        return bundleIdentifier
+    }
 
     /// `nil` when the source does not report shuffle at all — the panel
     /// disables the button then, rather than showing a state it cannot
@@ -78,6 +89,7 @@ public struct MediaPayload: Sendable, Equatable {
         p.shuffleMode = number(json["shuffleMode"]).map { Int($0) }
         p.processIdentifier = number(json["processIdentifier"]).map { Int($0) }
         p.repeatMode = number(json["repeatMode"]).map { Int($0) }
+        p.parentApplicationBundleIdentifier = json["parentApplicationBundleIdentifier"] as? String
 
         if let encoded = json["artworkData"] as? String {
             p.artworkData = Data(base64Encoded: encoded)

@@ -138,3 +138,16 @@ import Foundation
     #expect(MediaPayload.decode(["title": "Song"]).processIdentifier == nil)
     #expect(MediaPayload.decode(["processIdentifier": "51979"]).processIdentifier == nil, "wrong type is absent, never fatal")
 }
+
+@Test func sourceIsTheParentAppWhenThereIsOne() {
+    // Safari plays in its WebKit helper; the adapter names Safari as the parent.
+    let safari = MediaPayload.decode([
+        "bundleIdentifier": "com.apple.WebKit.GPU",
+        "parentApplicationBundleIdentifier": "com.apple.Safari",
+    ])
+    #expect(safari.parentApplicationBundleIdentifier == "com.apple.Safari")
+    #expect(safari.sourceIdentifier == "com.apple.Safari")
+    #expect(MediaPayload.decode(["bundleIdentifier": "com.spotify.client"]).sourceIdentifier == "com.spotify.client")
+    let blank = MediaPayload.decode(["bundleIdentifier": "com.google.Chrome", "parentApplicationBundleIdentifier": ""])
+    #expect(blank.sourceIdentifier == "com.google.Chrome", "an empty parent is no parent")
+}
