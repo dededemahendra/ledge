@@ -39,3 +39,12 @@ private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 @Test func aCallKeepsTheBrowserOut() {
     #expect(!BrowserVideoGate.admits(video(playing: true, duration: 600), isShowing: true, pausedSince: nil, onCall: true, now: t0))
 }
+
+@Test func theHoldIsCheckedAgainOnceItHasSurelyRunOut() {
+    // The app re-decides after `recheckDelay`; a wake a hair early must
+    // still land past the hold, or a paused card would never be asked again.
+    #expect(BrowserVideoGate.recheckDelay > BrowserVideoGate.pausedHold)
+    let paused = video(playing: false, duration: 600)
+    #expect(!BrowserVideoGate.admits(paused, isShowing: true, pausedSince: t0, onCall: false,
+                                      now: t0.addingTimeInterval(BrowserVideoGate.recheckDelay - 0.5)))
+}

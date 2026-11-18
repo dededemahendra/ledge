@@ -1335,7 +1335,7 @@ final class AppModel {
             } else if browserPausedSince == nil {
                 browserPausedSince = now
                 browserHoldTask = Task { @MainActor [weak self] in
-                    try? await Task.sleep(for: .seconds(BrowserVideoGate.pausedHold))
+                    try? await Task.sleep(for: .seconds(BrowserVideoGate.recheckDelay))
                     guard !Task.isCancelled, let self else { return }
                     self.browserHoldTask = nil
                     self.handle(self.lastMediaPayload)

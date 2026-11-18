@@ -13,6 +13,9 @@ import Foundation
 /// Once shown, a paused video keeps its card for `pausedHold`, then goes.
 public enum BrowserVideoGate {
     public static let pausedHold: TimeInterval = 120
+    /// When to ask again after a pause: a second past the hold, so a wake a
+    /// hair early still finds it spent rather than leaving the card up.
+    public static let recheckDelay: TimeInterval = pausedHold + 1
 
     public static func admits(_ payload: MediaPayload, isShowing: Bool, pausedSince: Date?, onCall: Bool, now: Date) -> Bool {
         guard !onCall else { return false }
