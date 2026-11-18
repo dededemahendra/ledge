@@ -790,6 +790,7 @@ public final class NotchController {
                 : metrics.oneActivity(earWidth: leadingEarWidth)
         case .expanded:
             if panel == .call, callPanel != nil { return metrics.callCard }
+            if panel == .agents, let agentPanel { return metrics.agentCard(contentHeight: agentPanel.contentHeight) }
             return metrics.expanded(
                 outputRows: panel == .media && isOutputPickerOpen ? outputs.count : 0,
                 earsShowing: earsShowAboveCard

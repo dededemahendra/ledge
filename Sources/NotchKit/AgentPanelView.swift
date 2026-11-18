@@ -85,8 +85,10 @@ struct AgentPanelView: View {
             )
     }
 
-    private var rowHeight: CGFloat { data.hero == nil ? 20 : 19 }
-    private var limit: Int { data.hero == nil ? Self.maxRowsWithoutHero : Self.maxRowsWithHero }
+    fileprivate static func rowHeight(hasHero: Bool) -> CGFloat { hasHero ? 19 : 20 }
+    fileprivate static func limit(hasHero: Bool) -> Int { hasHero ? maxRowsWithHero : maxRowsWithoutHero }
+    private var rowHeight: CGFloat { Self.rowHeight(hasHero: data.hero != nil) }
+    private var limit: Int { Self.limit(hasHero: data.hero != nil) }
     private var shown: [AgentPanelData.Row] { Array(data.rows.prefix(limit)) }
     private var more: Int { max(0, data.rows.count - limit) }
 
@@ -311,5 +313,24 @@ struct AgentPanelView: View {
     static func age(_ at: Date, now: Date) -> String {
         if now.timeIntervalSince(at) < 60 { return "just now" }
         return ageFormatter.localizedString(for: at, relativeTo: now)
+    }
+}
+
+
+extension AgentPanelData {
+    /// The room the card's content takes under the notch band (2026-11-18):
+    /// the view's own measurements added up, so the island can be as tall as
+    /// that and no taller. Pinned to the rendered view by
+    /// `NotchRootViewRenderTests`.
+    var contentHeight: CGFloat {
+        let hasHero = hero != nil
+        let shown = min(rows.count, AgentPanelView.limit(hasHero: hasHero))
+        let more = rows.count - shown
+        var height: CGFloat = 6                                  // top padding
+        height += hasHero ? 48 : 14                              // hero card, or the AGENTS label
+        if hasHero, !rows.isEmpty { height += 9.5 }              // the rule between them
+        height += CGFloat(shown) * AgentPanelView.rowHeight(hasHero: hasHero)
+        if more > 0 { height += 13 }                             // "n more"
+        return height + 12                                       // room under the last line
     }
 }

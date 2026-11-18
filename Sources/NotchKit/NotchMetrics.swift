@@ -186,6 +186,23 @@ public struct NotchMetrics: Sendable, Equatable {
     /// rows, the app and its controls over the mic and "Not a call".
     public static let callCardContentHeight: CGFloat = 96
 
+    /// The agents card (2026-11-18, user's call: the black under a lone
+    /// session's hero was empty room): as wide as the other cards and only as
+    /// tall as what it lists — `AgentPanelData.contentHeight` — never taller
+    /// than the standard card.
+    public func agentCard(contentHeight: CGFloat) -> NotchShapeParameters {
+        let content = min(contentHeight, Self.cardContentHeight)
+        if isVirtual {
+            return pill(width: Self.expandedWidth, height: content + cardTopBand(earsShowing: false), radius: 26)
+        }
+        return NotchShapeParameters(
+            width: Self.expandedWidth,
+            height: atLeastNotchHeight(notchRect.height + content),
+            bottomRadius: 26,
+            outerFillet: 13
+        )
+    }
+
     /// The call card (2026-10-22, polish): as wide as the other cards, only
     /// as tall as its two rows. Its ears give way to it, so a pill keeps
     /// the short top band.

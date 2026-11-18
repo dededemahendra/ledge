@@ -1078,3 +1078,43 @@ private func batteryExtents(level: Double) -> (drawn: CGFloat, fill: CGFloat, le
     #expect(empty.fill < empty.left + width * 0.1, "an empty battery has no fill, only its rim")
     #expect(abs((empty.drawn - empty.left) - width) < 0.6, "an empty battery still has its whole rim")
 }
+
+// MARK: - The agents card's height (2026-11-18)
+
+/// `AgentPanelData.contentHeight` is the view's own measurements added up;
+/// the island is sized from it. If the layout changes and the sum does not,
+/// the card clips or leaves black again — this pins the sum to what the view
+/// actually renders (its ideal height, plus the 12 pt left under the last line).
+@MainActor
+@Test func agentsCardContentHeightMatchesTheRenderedCard() {
+    func row(_ n: Int) -> AgentPanelData.Row {
+        .init(id: "r\(n)", name: "Session \(n)", mark: .idle, url: URL(string: "ledge://agent/r\(n)")!)
+    }
+    let hero = AgentPanelData.Hero(
+        id: "h", kind: .working, name: "A session", icon: nil, detail: "Thinking", isCommand: false,
+        since: Date(timeIntervalSince1970: 1_800_000_000), url: URL(string: "ledge://agent/h")!
+    )
+    let cases: [(String, AgentPanelData)] = [
+        ("hero alone", AgentPanelData(hero: hero, rows: [])),
+        ("hero and one row", AgentPanelData(hero: hero, rows: [row(0)])),
+        ("hero, three rows and more", AgentPanelData(hero: hero, rows: (0..<5).map(row))),
+        ("rows only", AgentPanelData(hero: nil, rows: (0..<3).map(row))),
+    ]
+    for (name, data) in cases {
+        let controller = makeController()
+        controller.setAgentPanel(data)
+        controller.setActivities([.init(id: NotchController.agentActivityID, title: "Agent", compactText: "x")], overflow: 0)
+        controller.setHovered(true)
+        #expect(controller.state == .expanded && controller.panel == .agents, "\(name)")
+
+        let renderer = ImageRenderer(content: NotchRootView(controller: controller).detailRowForTesting)
+        renderer.scale = 2
+        renderer.proposedSize = ProposedViewSize(width: controller.parameters.width, height: nil)
+        guard let cgImage = renderer.cgImage else { fatalError("no image for the agents card") }
+        let ideal = CGFloat(cgImage.height) / renderer.scale
+        let budget = controller.parameters.height - controller.metrics.notchRect.height
+
+        #expect(ideal <= budget, "\(name): content \(ideal)pt would be clipped by its \(budget)pt card")
+        #expect(abs(ideal + 12 - data.contentHeight) <= 2, "\(name): the sum says \(data.contentHeight)pt, the view renders \(ideal)pt + 12")
+    }
+}

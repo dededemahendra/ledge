@@ -1542,3 +1542,49 @@ private func tabGitHubPanel() -> GitHubPanelData {
     c.setCaption("make test · 1m 20s")
     #expect(c.captionText == "make test · 1m 20s")
 }
+
+// MARK: - The agents card's height (2026-11-18)
+
+private func heroRow(_ n: Int) -> AgentPanelData.Row {
+    .init(id: "r\(n)", name: "Session \(n)", mark: .idle, url: URL(string: "ledge://agent/r\(n)")!)
+}
+
+private func heroPanel(rows: Int) -> AgentPanelData {
+    AgentPanelData(
+        hero: .init(id: "h", kind: .working, name: "A session", icon: nil, detail: "Thinking",
+                    isCommand: false, since: Date(timeIntervalSince1970: 1_800_000_000),
+                    url: URL(string: "ledge://agent/h")!),
+        rows: (0..<rows).map(heroRow)
+    )
+}
+
+@MainActor
+private func openAgentsCard(_ data: AgentPanelData) -> NotchController {
+    let c = makeController()
+    c.setAgentPanel(data)
+    c.setActivities([.init(id: NotchController.agentActivityID, title: "Agent", compactText: "x")], overflow: 0)
+    c.setHovered(true)
+    return c
+}
+
+/// A lone session is a hero and nothing else: the card is as tall as that,
+/// not as tall as the music card it shares an island with, and it grows with
+/// its rows but never past the standard card.
+@MainActor
+@Test func theAgentsCardIsOnlyAsTallAsItsContent() {
+    let lone = openAgentsCard(heroPanel(rows: 0))
+    #expect(lone.state == .expanded && lone.panel == .agents)
+    #expect(lone.parameters.height == lone.metrics.agentCard(contentHeight: heroPanel(rows: 0).contentHeight).height)
+    #expect(lone.parameters.height < lone.metrics.expanded.height)
+    #expect(lone.parameters.width == lone.metrics.expanded.width)
+
+    let three = openAgentsCard(heroPanel(rows: 3))
+    #expect(three.parameters.height > lone.parameters.height, "rows make it taller")
+
+    for rows in [0, 1, 3, 9] {
+        let c = openAgentsCard(heroPanel(rows: rows))
+        #expect(c.parameters.height <= c.metrics.expanded.height, "\(rows) rows: never taller than the standard card")
+    }
+    let crowded = openAgentsCard(AgentPanelData(hero: nil, rows: (0..<9).map(heroRow)))
+    #expect(crowded.parameters.height <= crowded.metrics.expanded.height, "no hero, nine rows")
+}

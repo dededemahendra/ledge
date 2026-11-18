@@ -1992,3 +1992,13 @@ and the settings arriving on. Live checks:
 - Dia: a normal YouTube video in Dia shows the card. A YouTube live stream in
   Dia (or any browser) does not.
 
+
+# Agents card fits its content (2026-11-18)
+
+The open island's height for the Agents card is `NotchMetrics.agentCard(contentHeight:)`, fed by
+`AgentPanelData.contentHeight` (the view's own measurements, pinned to the rendered view by
+`agentsCardContentHeightMatchesTheRenderedCard`), and never taller than the standard card. Live checks:
+one session working: hover the island, the card is only as tall as its hero, with no black below it;
+a second and third session make it grow, springing the way the output list does; a hero with three
+rows and "n more" is no taller than the music card; hovering from the music card to the agents card
+and back animates the height both ways.
