@@ -1067,7 +1067,7 @@ final class AppModel {
         let output = controller.outputs.first(where: \.isCurrent)?.name
         return PreviewContent(
             media: controller.media,
-            mediaSource: controller.media == nil ? nil : mediaPayload.bundleIdentifier,
+            mediaSource: controller.media == nil ? nil : mediaPayload.sourceIdentifier?.lowercased(),
             nextEvent: next(.event),
             nextReminder: next(.reminder),
             batteryPercent: power.availability.isAvailable ? power.latest?.percent : nil,
@@ -1132,9 +1132,11 @@ final class AppModel {
                 queue.remove(kind: .call)
                 publish()
             }
+            let hadCall = callShown != nil
             callShown = nil
             callLiveApp = nil
             presenter.setCallPanel(nil)
+            if hadCall { reconsiderBrowserMedia() }
         }
         liveActivities.setEnabled(settings.showsLiveActivities)
         if !settings.showsLiveActivities, queue.ordered.contains(where: { $0.kind == .liveActivity }) {
@@ -1301,16 +1303,46 @@ final class AppModel {
     /// matching `handle(_ event: PowerEvent)`/`handle(_ event: HUDEvent)`
     /// above, neither of which logs on this path.
     private func handle(_ payload: MediaPayload) {
-        // Music apps only (`MediaSourcePolicy`): a browser tab or a video
-        // call is not "now playing" for the island, however loudly
-        // MediaRemote reports it.
+        lastMediaPayload = payload
+        // Music apps and, behind `BrowserVideoGate`, browsers (2026-11-18):
+        // a browser holds the island only while it plays something with a
+        // length and no call is up, and for two minutes once paused. The
+        // source is the parent app: Safari plays in a WebKit helper.
+        let source = payload.sourceIdentifier
         guard payload.hasMedia, let title = payload.title,
-              MediaSourcePolicy.isAllowed(bundleIdentifier: payload.bundleIdentifier, enabled: settings.mediaSources) else {
+              MediaSourcePolicy.isAllowed(bundleIdentifier: source, enabled: settings.mediaSources) else {
             if payload.hasMedia {
-                Self.log.debug("media: ignoring a source the island does not follow (\(payload.bundleIdentifier ?? "?", privacy: .private))")
+                Self.log.debug("media: ignoring a source the island does not follow (\(source ?? "?", privacy: .private))")
             }
             holdThenClearMedia()
             return
+        }
+        if MediaSourcePolicy.isBrowser(bundleIdentifier: source) {
+            let isShowing = presenter.controller.media != nil && MediaSourcePolicy.isBrowser(bundleIdentifier: mediaPayload.sourceIdentifier)
+            let now = Date()
+            // A shown video's first pause starts its hold now.
+            let pausedSince = browserPausedSince ?? (isShowing && !payload.isPlaying ? now : nil)
+            guard BrowserVideoGate.admits(payload, isShowing: isShowing, pausedSince: pausedSince,
+                                          onCall: callShown != nil, now: now) else {
+                // A call or a spent hold takes the card at once; anything
+                // else (a tab that never played, a live stream) gets the
+                // usual grace, as a source the island does not follow does.
+                if isShowing, callShown != nil || browserPausedSince != nil { clearMedia() } else { holdThenClearMedia() }
+                return
+            }
+            if payload.isPlaying {
+                resetBrowserHold()
+            } else if browserPausedSince == nil {
+                browserPausedSince = now
+                browserHoldTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(BrowserVideoGate.pausedHold))
+                    guard !Task.isCancelled, let self else { return }
+                    self.browserHoldTask = nil
+                    self.handle(self.lastMediaPayload)
+                }
+            }
+        } else {
+            resetBrowserHold()
         }
         // It is ours: whatever was about to clear the card no longer is.
         clearMediaTask?.cancel()
@@ -1332,7 +1364,7 @@ final class AppModel {
                !presenter.controller.isGitHubLeading, !presenter.controller.isAgentLeading {
                 showCaption(payload.artist.map { "\(title) · \($0)" } ?? title)
             }
-            favorites.trackChanged(bundleIdentifier: payload.bundleIdentifier)
+            favorites.trackChanged(bundleIdentifier: source)
         }
 
         queue.insert(
@@ -1727,9 +1759,11 @@ final class AppModel {
             )
             guard record.title != callShown?.title || record.compactText != callShown?.compactText
                     || record.symbolName != callShown?.symbolName || record.artwork != callShown?.artwork else { return }
+            let began = callShown == nil
             callShown = record
             queue.insert(record)
             publish()
+            if began { reconsiderBrowserMedia() }
         case .ended(let app, let length):
             callShown = nil
             callLiveApp = nil
@@ -1741,6 +1775,7 @@ final class AppModel {
                 symbolName: "phone.down.fill"
             ))
             publish()
+            reconsiderBrowserMedia()
         case .idle:
             // An ended moment runs out on its own; only a live call is taken
             // away here (hidden, or Calls unable to read the mic).
@@ -1750,6 +1785,7 @@ final class AppModel {
             presenter.setCallPanel(nil)
             queue.remove(kind: .call)
             publish()
+            reconsiderBrowserMedia()
         }
     }
 
@@ -1922,6 +1958,27 @@ final class AppModel {
     private var clearMediaTask: Task<Void, Never>?
     private static let mediaClearGrace: Duration = .milliseconds(1500)
 
+    /// The adapter's latest payload, shown or not: a call starting or
+    /// ending, or a browser's pause hold running out, decides again from it.
+    private var lastMediaPayload = MediaPayload()
+    /// When a shown browser video paused, and the task that re-decides once
+    /// `BrowserVideoGate.pausedHold` has passed.
+    private var browserPausedSince: Date?
+    private var browserHoldTask: Task<Void, Never>?
+
+    private func resetBrowserHold() {
+        browserHoldTask?.cancel()
+        browserHoldTask = nil
+        browserPausedSince = nil
+    }
+
+    /// A call came or went: a browser's video steps aside for it, and comes
+    /// back after if it still plays.
+    private func reconsiderBrowserMedia() {
+        guard MediaSourcePolicy.isBrowser(bundleIdentifier: lastMediaPayload.sourceIdentifier) else { return }
+        handle(lastMediaPayload)
+    }
+
     private func holdThenClearMedia() {
         guard presenter.controller.media != nil else {
             clearMedia()
@@ -1942,6 +1999,7 @@ final class AppModel {
     private func clearMedia() {
         clearMediaTask?.cancel()
         clearMediaTask = nil
+        resetBrowserHold()
         mediaPayload = MediaPayload()
         positionOverride = nil
         queue.remove(kind: .media)
@@ -1959,7 +2017,10 @@ final class AppModel {
 
     /// Brings the app that is playing to the front.
     private func openSourceApp() {
-        activateApp(bundleID: mediaPayload.bundleIdentifier, pid: mediaPayload.processIdentifier.map { pid_t($0) })
+        // A parent app (Safari over its WebKit helper) is brought forward by
+        // bundle id: the pid is the helper's, which has no window.
+        let pid = mediaPayload.parentApplicationBundleIdentifier == nil ? mediaPayload.processIdentifier.map { pid_t($0) } : nil
+        activateApp(bundleID: mediaPayload.sourceIdentifier, pid: pid)
     }
 
     /// Brings an app to the front: the one playing, or the one on a call.

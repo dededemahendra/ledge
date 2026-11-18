@@ -46,6 +46,7 @@ reuse or redistribute the code.
 | Trigger | Island |
 | --- | --- |
 | Music playing (Apple Music, Spotify, TIDAL, Deezer, YouTube Music) | spinning cover left, current output's glyph right; resting the cursor on it opens the card |
+| Video playing in a browser (Safari, Chrome, Arc, Firefox, Edge, Brave) | the same as music, while the video plays; it stays two minutes once paused, never comes up for a live stream or a tab that is only paused, and steps aside for a call. Each browser has its own switch in Settings › Media |
 | Song changes | the island drops one line for 3 s: "Title · Artist" |
 | Nothing playing, cursor resting on the island | the calendar card (below): today and the next day with something on; click an item to join, or to open it in Calendar or Reminders |
 | A Clock app timer or stopwatch — including "Hey Siri, set a timer" | live in the island while it runs: a draining ring and the clock, the pause glyph when paused, "Done" once it has rung, the stopwatch glyph and a rising clock for a stopwatch; click to open the Clock on that tab |
@@ -129,7 +130,7 @@ System Settings' idiom: a sidebar of sections, grouped forms. Every option has a
 login, how long the cursor rests before the island opens, the song-change
 caption), Island (which blips show: keys, battery, devices, Focus, Clock timers, calls, Live Activities,
 calendar events, reminders; and whether the island shows on the lock screen, look
-only), Media (which music apps the island follows),
+only), Media (which music apps and browsers the island follows),
 Calendar (how many minutes before an event, and which calendars and reminder
 lists to follow — every one the Mac has, grouped by account with its colour; a
 calendar added later is on until switched off), GitHub (connect with your gh login or a token, and which moments the island tells you about), Agents (the switch, its status, and which of the four moments the island tells you about), Permissions (each grant, what it

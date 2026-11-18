@@ -1968,3 +1968,24 @@ Rendered headlessly on a pill: the mark reads at 13 pt beside "1:05".
 Judge live: the mark sits still and level with the clock while a session
 works; a waiting session's tab shows it in amber.
 
+# Browser video (2026-11-18)
+
+Browsers are on `MediaSourcePolicy`'s list behind `BrowserVideoGate`: the
+source (`MediaPayload.sourceIdentifier`, the parent app over Safari's WebKit
+helper) is a browser, it plays, its duration is finite and above zero, and no
+call is on the island. A shown video keeps its card 120 s once paused.
+`AppModel` re-decides from the last payload when a call starts or ends and
+when the hold runs out. Unit-tested: the gate, the source, the allow-list,
+and the settings arriving on. Live checks:
+
+- A YouTube video in Safari, then in Chrome, brings the card up with its
+  title and channel; play/pause and the scrubber work.
+- Pause it: the card stays; after two minutes it leaves. Play brings it back.
+- A live stream does not appear.
+- A tab paused before Ledge launched does not appear.
+- Join a Meet call with a video playing in another tab: the call takes the
+  island and the video card goes; hang up and it returns if still playing.
+- Clicking the artwork brings the browser forward (Safari too).
+- Settings › Media: the Video from section lists the six browsers, Safari
+  "Playing now." while it plays; Chrome switched off stays off after a
+  relaunch.

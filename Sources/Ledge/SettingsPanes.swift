@@ -211,25 +211,35 @@ struct MediaSettings: View {
                     .asPaneHeader()
             }
             Section {
-                ForEach(AppSettings.knownMediaSources, id: \.id) { source in
-                    SettingsRow(source.name, detail: status(of: source.id, content: content),
-                                scene: .nowPlaying, director: director) {
-                        AppIcon(bundleIdentifier: source.id)
-                    } control: {
-                        Toggle(source.name, isOn: Binding(
-                            get: { settings.isMediaSourceEnabled(source.id) },
-                            set: { on in
-                                settings.setMediaSource(source.id, enabled: on)
-                                if on { director.switchedOn(.nowPlaying) }
-                            }
-                        ))
-                        .labelsHidden()
-                    }
-                }
+                sourceRows(AppSettings.knownMusicSources, content: content)
             } header: {
                 Text("Now playing from")
+            }
+            Section {
+                sourceRows(AppSettings.knownBrowserSources, content: content)
+            } header: {
+                Text("Video from")
             } footer: {
-                Text("The island follows music from these apps only. A browser tab or a video never takes the notch.")
+                Text("The island follows music from these apps, and video from these browsers while it plays. Calls and live streams never take the notch.")
+            }
+        }
+    }
+
+    /// One switch per source, with its icon and status.
+    private func sourceRows(_ sources: [(id: String, name: String)], content: PreviewContent) -> some View {
+        ForEach(sources, id: \.id) { source in
+            SettingsRow(source.name, detail: status(of: source.id, content: content),
+                        scene: .nowPlaying, director: director) {
+                AppIcon(bundleIdentifier: source.id)
+            } control: {
+                Toggle(source.name, isOn: Binding(
+                    get: { settings.isMediaSourceEnabled(source.id) },
+                    set: { on in
+                        settings.setMediaSource(source.id, enabled: on)
+                        if on { director.switchedOn(.nowPlaying) }
+                    }
+                ))
+                .labelsHidden()
             }
         }
     }

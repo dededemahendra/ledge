@@ -529,6 +529,10 @@ played most recently, browser tabs included, and those were landing in the
 island with their titles; a disallowed source is treated exactly as nothing
 playing. Extending the list is one line.
 
+**Browser video (2026-11-18, user's call):** Safari, Chrome, Arc, Firefox, Edge
+and Brave are on the list too, behind `BrowserVideoGate` (playing, a length, no
+call; two minutes once paused). See `2026-11-18-browser-video-design.md`.
+
 Vendors [`mediaremote-adapter`](https://github.com/ungive/mediaremote-adapter)
 (BSD-3-Clause), which restores MediaRemote access broken by Apple in macOS 15.4.
 It loads `MediaRemoteAdapter.framework` inside `/usr/bin/perl`, which reports
